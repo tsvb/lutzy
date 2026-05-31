@@ -67,6 +67,11 @@ struct LUTzyApp: App {
                     NotificationCenter.default.post(name: .exportImage, object: nil)
                 }
                 .keyboardShortcut("s")
+
+                Button("Export All...") {
+                    NotificationCenter.default.post(name: .exportAll, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
             }
         }
     }
