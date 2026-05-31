@@ -25,6 +25,8 @@ final class AppViewModel: ObservableObject {
 
     @Published var isLoading: Bool = false
     @Published var isExporting: Bool = false
+    /// Progress (0...1) during a multi-image "Export All" run.
+    @Published var batchProgress: Double = 0
     @Published var statusMessage: String = "Open an image to get started"
     @Published var exportFormat: ImageProcessor.ExportFormat = .jpeg
 
@@ -311,6 +313,87 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    /// Apply the current LUT to every imported image and export them all to a
+    /// chosen folder. Runs off the main actor with progress; images that fail
+    /// to load or encode are skipped and counted, never aborting the batch.
+    func batchExportDialog() {
+        // Snapshot only the Sendable bits we need — avoid carrying NSImage
+        // thumbnails across the actor boundary.
+        let work = collection.items.map {
+            (url: $0.url, data: $0.imageData, name: $0.displayName)
+        }
+        guard !work.isEmpty else {
+            statusMessage = "Import a set of images first (Export All works on the filmstrip)"
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.title = "Choose Export Folder"
+        panel.prompt = "Export Here"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+
+        isExporting = true
+        batchProgress = 0
+        let total = work.count
+        statusMessage = "Exporting 0 of \(total)…"
+
+        let lut = selectedLUT
+        let fmt = exportFormat
+
+        Task.detached { [processor] in
+            var exported = 0
+            var failed = 0
+
+            for (index, item) in work.enumerated() {
+                let source: CIImage?
+                if let url = item.url {
+                    source = try? processor.loadImage(from: url)
+                } else if let data = item.data {
+                    source = CIImage(data: data)
+                } else {
+                    source = nil
+                }
+
+                if let source {
+                    let graded = lut?.apply(to: source) ?? source
+                    let suffix = lut.map { "_" + $0.name.replacingOccurrences(of: " ", with: "_") } ?? ""
+                    let dest = uniqueExportURL(in: folder, base: item.name + suffix, ext: fmt.fileExtension)
+                    do {
+                        try processor.export(graded, to: dest, format: fmt)
+                        exported += 1
+                    } catch {
+                        failed += 1
+                    }
+                } else {
+                    failed += 1
+                }
+
+                let done = index + 1
+                await MainActor.run {
+                    self.batchProgress = Double(done) / Double(total)
+                    self.statusMessage = "Exporting \(done) of \(total)…"
+                }
+            }
+
+            let okCount = exported
+            let failCount = failed
+            await MainActor.run {
+                self.isExporting = false
+                self.batchProgress = 0
+                let dest = folder.lastPathComponent
+                if failCount == 0 {
+                    self.statusMessage = "Exported \(okCount) image\(okCount == 1 ? "" : "s") to \(dest)"
+                } else {
+                    self.statusMessage = "Exported \(okCount) of \(total) (\(failCount) failed) to \(dest)"
+                }
+            }
+        }
+    }
+
     // MARK: - Recipe extractor
 
     func presentRecipeExtractor() {
@@ -446,4 +529,20 @@ final class AppViewModel: ObservableObject {
             library.setFolder(url)
         }
     }
+}
+
+// MARK: - Batch export helpers
+
+/// A non-colliding `base.ext` URL inside `folder`, appending " 2", " 3", …
+/// when a file of that name already exists. Free function (not `@MainActor`)
+/// so it can be called from the off-actor batch export task.
+private func uniqueExportURL(in folder: URL, base: String, ext: String) -> URL {
+    let fm = FileManager.default
+    var candidate = folder.appendingPathComponent("\(base).\(ext)")
+    var n = 2
+    while fm.fileExists(atPath: candidate.path) {
+        candidate = folder.appendingPathComponent("\(base) \(n).\(ext)")
+        n += 1
+    }
+    return candidate
 }
