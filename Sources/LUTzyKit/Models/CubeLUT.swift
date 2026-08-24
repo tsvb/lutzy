@@ -212,6 +212,89 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         }
     }
 
+    // MARK: - Sampling
+
+    /// Sample the cube at flat RGB triplets, tetrahedrally.
+    ///
+    /// For measurement, not for rendering — Core Image owns the render path and
+    /// interpolates trilinearly. Tetrahedral here because `lutcraft` measures
+    /// tetrahedrally, and a tag that disagreed with the offline tools by an
+    /// interpolation difference would be a tag nobody could reproduce.
+    func sample(_ points: [Float]) -> [Float] {
+        guard size > 1, points.count >= 3 else { return points }
+        let n = size
+        let maxIndex = Float(n - 1)
+        var out = [Float](repeating: 0, count: points.count - points.count % 3)
+
+        tableData.withUnsafeBytes { raw in
+            let table = raw.bindMemory(to: Float.self)
+            // R varies fastest — the order the table was built in.
+            func corner(_ r: Int, _ g: Int, _ b: Int, _ channel: Int) -> Float {
+                table[(((b * n) + g) * n + r) * 4 + channel]
+            }
+
+            for base in stride(from: 0, to: out.count, by: 3) {
+                var lower = [0, 0, 0]
+                var frac = [Float](repeating: 0, count: 3)
+                for axis in 0..<3 {
+                    let scaled = min(max(points[base + axis], 0), 1) * maxIndex
+                    let floored = min(Int(scaled), n - 2)
+                    lower[axis] = floored
+                    frac[axis] = scaled - Float(floored)
+                }
+                let dr = frac[0], dg = frac[1], db = frac[2]
+
+                // The six tetrahedra of the unit cube, chosen by the ordering of
+                // the fractional coordinates. Each is walked as three steps from
+                // the near corner to the far one.
+                let first: [Int]
+                let second: [Int]
+                if dr >= dg, dg >= db            { first = [1, 0, 0]; second = [1, 1, 0] }
+                else if dr >= dg, dr >= db       { first = [1, 0, 0]; second = [1, 0, 1] }
+                else if dr >= dg                 { first = [0, 0, 1]; second = [1, 0, 1] }
+                else if dr >= db                 { first = [0, 1, 0]; second = [1, 1, 0] }
+                else if dg >= db                 { first = [0, 1, 0]; second = [0, 1, 1] }
+                else                             { first = [0, 0, 1]; second = [0, 1, 1] }
+
+                let axis1 = first.firstIndex(of: 1)!
+                let axis2 = (0..<3).first { second[$0] - first[$0] == 1 }!
+                let axis3 = 3 - axis1 - axis2
+
+                for channel in 0..<3 {
+                    let c000 = corner(lower[0], lower[1], lower[2], channel)
+                    let c111 = corner(lower[0] + 1, lower[1] + 1, lower[2] + 1, channel)
+                    let c1 = corner(lower[0] + first[0], lower[1] + first[1], lower[2] + first[2], channel)
+                    let c2 = corner(lower[0] + second[0], lower[1] + second[1], lower[2] + second[2], channel)
+                    out[base + channel] = c000
+                        + frac[axis1] * (c1 - c000)
+                        + frac[axis2] * (c2 - c1)
+                        + frac[axis3] * (c111 - c2)
+                }
+            }
+        }
+        return out
+    }
+
+    /// The largest channel spread anywhere in the table. Zero means the LUT is
+    /// monochrome — it cannot produce a coloured pixel from any input.
+    var monoSpread: Double {
+        tableData.withUnsafeBytes { raw in
+            let table = raw.bindMemory(to: Float.self)
+            var worst: Float = 0
+            for entry in stride(from: 0, to: table.count, by: 4) {
+                let r = table[entry], g = table[entry + 1], b = table[entry + 2]
+                worst = Swift.max(worst, Swift.max(r, Swift.max(g, b)) - Swift.min(r, Swift.min(g, b)))
+            }
+            return Double(worst)
+        }
+    }
+
+    /// A stable identity for the *contents* of a LUT, so tags survive a file
+    /// being renamed or moved and follow a duplicate to its copy.
+    var contentHash: String {
+        SHA256.hash(data: tableData).map { String(format: "%02x", $0) }.joined()
+    }
+
     // MARK: - Inspection
 
     /// The flattened RGBA float table handed to Core Image, as floats.

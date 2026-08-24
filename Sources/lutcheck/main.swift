@@ -303,6 +303,44 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
 }
 
 
+// --- tags agree with lutcraft ----------------------------------------------
+// The whole point of measuring tags rather than typing them is that a hundred
+// files get described consistently — which only holds if the app and the
+// offline generator describe them the *same way*. This replays lutcraft's own
+// output for every LUT it can find and compares tag for tag.
+var tagsMatchOK = true
+let expectedTags = "Fixtures/lutcraft-tags.tsv"
+if let table = try? String(contentsOfFile: expectedTags, encoding: .utf8) {
+    var checked = 0, mismatched = 0
+    let roots = ["/Users/world4jason/code_ground/claude lut/out/lumix-s9-vlog/luts"]
+    var byStem: [String: URL] = [:]
+    for root in roots {
+        let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: nil)
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension.lowercased() == "cube" else { continue }
+            byStem[url.deletingPathExtension().lastPathComponent] = url
+        }
+    }
+    for line in table.split(separator: "\n") {
+        let fields = line.components(separatedBy: "\t")
+        guard fields.count == 4, let url = byStem[fields[0]], let lut = try? CubeLUT(url: url) else { continue }
+        checked += 1
+        let mine = LUTProfiler.autoTags(LUTProfiler.measure(lut), inputSpace: lut.inputSpace)
+        let theirs = fields[3].split(separator: ",").map(String.init).sorted()
+        if mine != theirs {
+            mismatched += 1
+            if mismatched <= 5 {
+                print("tags \(fields[0]): mine \(mine) vs lutcraft \(theirs)")
+            }
+        }
+    }
+    tagsMatchOK = checked > 0 && mismatched == 0
+    print("tags vs lutcraft -> \(checked - mismatched)/\(checked) agree -> \(tagsMatchOK ? "PASS" : "FAIL")")
+} else {
+    print("tags vs lutcraft -> SKIP (no fixture)")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -424,4 +462,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
