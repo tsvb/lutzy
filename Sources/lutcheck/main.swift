@@ -398,13 +398,61 @@ if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
 }
 
 
+// --- the difference image ---------------------------------------------------
+// Black means "these two agree". That is the whole claim the layout makes, so
+// it is the one to check: identical input must come out black, and a known
+// difference must come out at the amplified size rather than at the raw one.
+var diffOK = true
+@MainActor func solidImage(_ value: Int) -> NSImage {
+    var pixels = [UInt8](repeating: UInt8(value), count: 4 * 16 * 16)
+    let space = CGColorSpace(name: CGColorSpace.sRGB)!
+    let ctx = CGContext(data: &pixels, width: 16, height: 16, bitsPerComponent: 8, bytesPerRow: 64,
+                        space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    let image = ctx.makeImage()!
+    return NSImage(cgImage: image, size: NSSize(width: 16, height: 16))
+}
+@MainActor func centreValue(_ image: NSImage?) -> Int? {
+    guard let image, let tiff = image.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: tiff),
+          let colour = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)
+    else { return nil }
+    return Int((colour.redComponent * 255).rounded())
+}
+
+let same = DifferenceComposer.compose(base: solidImage(128), graded: solidImage(128))
+let sameValue = centreValue(same) ?? -1
+let sameOK = sameValue == 0
+print("difference of identical frames -> \(sameValue) -> \(sameOK ? "PASS" : "FAIL")")
+
+// 138 - 128 = 10 code values; at the default gain of 8 that is 80.
+let apart = DifferenceComposer.compose(base: solidImage(128), graded: solidImage(138))
+let apartValue = centreValue(apart) ?? -1
+let apartOK = abs(apartValue - 80) <= 2
+print("difference of 10 code values at x8 -> \(apartValue) (want 80) -> \(apartOK ? "PASS" : "FAIL")")
+
+// Unamplified, the same pair must come back at its true size — proof the gain
+// is a display choice and not baked into the measurement.
+let unamplified = DifferenceComposer.compose(base: solidImage(128), graded: solidImage(138), gain: 1)
+let rawValue = centreValue(unamplified) ?? -1
+let unamplifiedOK = abs(rawValue - 10) <= 2
+print("difference at x1 -> \(rawValue) (want 10) -> \(unamplifiedOK ? "PASS" : "FAIL")")
+
+// Mismatched sizes cannot be subtracted, and must say so rather than guess.
+let mismatch = DifferenceComposer.compose(base: solidImage(128), graded: nil)
+let mismatchOK = mismatch == nil
+print("difference with a missing side -> \(mismatchOK ? "PASS" : "FAIL")")
+
+diffOK = sameOK && apartOK && unamplifiedOK && mismatchOK
+print("difference -> \(diffOK ? "PASS" : "FAIL")")
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
 // drop or duplicate a picture.
 var layoutOK = true
 for (layout, expected) in [
-    (ComparisonLayout.single, 1), (.split, 2), (.compare, 2),
+    (ComparisonLayout.single, 1), (.split, 2), (.compare, 2), (.wipe, 1), (.diff, 1),
     (.grid1x2, 2), (.grid2x2, 4), (.grid3x2, 6), (.grid3x3, 9)
 ] as [(ComparisonLayout, Int)] {
     let ok = layout.cellCount == expected && layout.rows * layout.columns == expected
@@ -416,6 +464,11 @@ let gridSet = ComparisonLayout.allCases.filter(\.isGrid)
 let familyOK = gridSet == [.grid1x2, .grid2x2, .grid3x2, .grid3x3]
 layoutOK = layoutOK && familyOK
 print("layout grid family -> \(familyOK ? "PASS" : "FAIL")")
+// Only the layouts that judge against a *chosen* base keep one in cell 0.
+let baseSet = ComparisonLayout.allCases.filter(\.hasChosenBase)
+let baseOK = baseSet == [.compare, .wipe, .diff]
+layoutOK = layoutOK && baseOK
+print("layout chosen-base family -> \(baseOK ? "PASS" : "FAIL")")
 print("layouts -> \(layoutOK ? "PASS" : "FAIL")")
 
 
@@ -519,4 +572,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

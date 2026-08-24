@@ -176,6 +176,9 @@ final class AppViewModel: ObservableObject {
     @Published var cellLUTIDs: [LUTID?] = []
     /// The rasterized cells, index-parallel to `cellLUTIDs`.
     @Published var cellImages: [NSImage?] = []
+    /// The amplified difference between the base cell and the current look.
+    /// Only built while the difference layout is on screen.
+    @Published var diffNSImage: NSImage?
     /// One in-flight render per cell, so re-picking one cell cancels one render
     /// rather than the whole sheet.
     var cellTasks: [Int: Task<Void, Never>] = [:]
@@ -794,6 +797,7 @@ final class AppViewModel: ObservableObject {
         // invalidates every cell. `renderAllCells` returns immediately unless a
         // multi-cell layout is actually on screen.
         renderAllCells()
+        refreshDifference()
     }
 
     /// Rasterize the comparison baseline for the side-by-side left panel. Only needs to re-run when

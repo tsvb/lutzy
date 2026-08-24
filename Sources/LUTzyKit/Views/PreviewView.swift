@@ -5,6 +5,9 @@ import SwiftUI
 struct PreviewView: View {
     @ObservedObject var viewModel: AppViewModel
 
+    /// Where the wipe's edge sits, as a fraction of the width.
+    @State private var wipePosition: CGFloat = 0.5
+
     private let bgColor = Color(nsColor: NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1))
 
     var body: some View {
@@ -19,6 +22,10 @@ struct PreviewView: View {
                     if viewModel.isComparisonAvailable { sideBySideView } else { singleView }
                 case .compare:
                     compareView
+                case .wipe:
+                    wipeView
+                case .diff:
+                    differenceView
                 case .single:
                     singleView
                 default:
@@ -83,6 +90,112 @@ struct PreviewView: View {
                 .padding(12)
         }
         .clipped()
+    }
+
+    // MARK: - Wipe (chosen base under the current LUT)
+
+    /// Both looks in the same place, split by a draggable edge.
+    ///
+    /// The layout for differences too small to survive the eye travelling
+    /// between two side-by-side panels — a skin tone or a sky shifts by an
+    /// amount that is obvious across an edge and invisible across a gap.
+    private var wipeView: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                bgColor
+
+                if let base = viewModel.cellImages.first ?? nil {
+                    Image(nsImage: base)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                }
+                if let graded = viewModel.previewNSImage {
+                    Image(nsImage: graded)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        // Reveal the graded side from the split rightwards. A
+                        // mask rather than a crop, so both stay registered.
+                        .mask(alignment: .leading) {
+                            Rectangle()
+                                .frame(width: geo.size.width * (1 - wipePosition))
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                }
+
+                // The handle.
+                Rectangle()
+                    .fill(Color.white.opacity(0.9))
+                    .frame(width: 1)
+                    .frame(maxHeight: .infinity)
+                    .overlay(
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 26, height: 26)
+                            .overlay(Image(systemName: "arrow.left.and.right")
+                                .font(.caption2)
+                                .foregroundStyle(.primary))
+                    )
+                    .offset(x: geo.size.width * wipePosition - 0.5)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                wipePosition = min(max(value.location.x / geo.size.width, 0), 1)
+                            }
+                    )
+
+                HStack {
+                    CompareBaseMenu(
+                        name: viewModel.compareBaseLUT?.name ?? "No LUT",
+                        luts: viewModel.library.allLUTs,
+                        choose: { viewModel.setCell(0, to: $0) }
+                    )
+                    Spacer()
+                    ComparisonBadge(text: viewModel.selectedLUT?.name ?? "Adjusted")
+                }
+                .padding(12)
+            }
+        }
+        .padding(8)
+    }
+
+    // MARK: - Difference
+
+    /// What the current LUT changes relative to the base, amplified.
+    ///
+    /// Black means the two agree. Everything else is where they do not, and the
+    /// hue of what shows is the direction of the disagreement.
+    private var differenceView: some View {
+        ZStack(alignment: .bottom) {
+            bgColor
+
+            if let diff = viewModel.diffNSImage {
+                Image(nsImage: diff)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(8)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+
+            VStack {
+                HStack {
+                    CompareBaseMenu(
+                        name: viewModel.compareBaseLUT?.name ?? "No LUT",
+                        luts: viewModel.library.allLUTs,
+                        choose: { viewModel.setCell(0, to: $0) }
+                    )
+                    Spacer()
+                    ComparisonBadge(text: viewModel.selectedLUT?.name ?? "Adjusted")
+                }
+                Spacer()
+                ComparisonBadge(
+                    text: "difference ×\(Int(DifferenceComposer.defaultGain)) — black means identical"
+                )
+            }
+            .padding(12)
+        }
     }
 
     // MARK: - Compare (chosen base vs current)

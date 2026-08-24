@@ -21,7 +21,7 @@ extension AppViewModel {
         guard layout != comparisonLayout else { return }
         comparisonLayout = layout
         isSideBySide = layout == .split
-        if layout.isGrid || layout == .compare {
+        if layout.isGrid || layout.hasChosenBase {
             fitCells(to: layout)
             renderAllCells()
         }
@@ -34,7 +34,7 @@ extension AppViewModel {
     /// it shows anything, and the point of it is to survey a library quickly.
     /// Shrinking keeps the first cells, so 3×3 → 2×2 is a crop, not a reshuffle.
     private func fitCells(to layout: ComparisonLayout) {
-        let wanted = layout == .compare ? 1 : layout.cellCount
+        let wanted = layout.hasChosenBase ? 1 : layout.cellCount
         if cellLUTIDs.count > wanted {
             cellLUTIDs = Array(cellLUTIDs.prefix(wanted))
             cellImages = Array(cellImages.prefix(wanted))
@@ -71,7 +71,7 @@ extension AppViewModel {
         cellLUTIDs.map { id in id.flatMap { lutForCell($0) } }
     }
 
-    /// What the compare layout judges against. Its right-hand side is always the
+    /// What compare, wipe and diff judge against. The other side is always the
     /// current selection, so the base is the only thing to choose.
     var compareBaseLUT: CubeLUT? { cellLUTIDs.first.flatMap { $0 }.flatMap { lutForCell($0) } }
 
@@ -98,7 +98,7 @@ extension AppViewModel {
 
     /// Re-render every cell. Called when the frame itself changed.
     func renderAllCells() {
-        guard comparisonLayout.isGrid || comparisonLayout == .compare else { return }
+        guard comparisonLayout.isGrid || comparisonLayout.hasChosenBase else { return }
         for index in cellLUTIDs.indices { renderCell(index) }
     }
 
@@ -129,11 +129,33 @@ extension AppViewModel {
                 cgImage: cgImage,
                 size: NSSize(width: cgImage.width, height: cgImage.height)
             )
+            self.refreshDifference()
         }
+    }
+
+    /// Rebuild the difference image, if that is what is on screen.
+    ///
+    /// Called from both sides — the main preview and the base cell land
+    /// independently, and whichever arrives second is the one that completes
+    /// the pair. Cheap enough to redo on each: it is one kernel over a
+    /// preview-sized image.
+    func refreshDifference() {
+        guard comparisonLayout == .diff else {
+            if diffNSImage != nil { diffNSImage = nil }
+            return
+        }
+        diffNSImage = DifferenceComposer.compose(
+            base: cellImages.first ?? nil,
+            graded: previewNSImage
+        )
     }
 
     /// The render size for one cell of the current layout.
     private var cellBox: CGSize {
+        // Wipe overlays the two and difference subtracts them, so in both the
+        // base has to come out the same size as the main preview — a cell
+        // rendered smaller could not be subtracted at all.
+        guard comparisonLayout.isGrid else { return maxPreview }
         let divisor = CGFloat(max(comparisonLayout.columns, comparisonLayout.rows))
         let floor: CGFloat = 420
         return CGSize(
