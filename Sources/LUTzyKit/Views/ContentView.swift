@@ -120,16 +120,20 @@ public struct ContentView: View {
 
         Divider()
 
-        // Side-by-side toggle
-        Button {
-            viewModel.toggleSideBySide()
+        // How the preview is divided. A menu rather than a toggle: there are
+        // seven layouts now, and V still cycles the two that get used most.
+        Menu {
+            ForEach(ComparisonLayout.allCases, id: \.self) { layout in
+                Button {
+                    viewModel.setLayout(layout)
+                } label: {
+                    Label(layout.label, systemImage: layout.symbol)
+                }
+            }
         } label: {
-            Label(
-                viewModel.isSideBySide ? "Single View" : "Side by Side",
-                systemImage: viewModel.isSideBySide ? "rectangle" : "rectangle.split.2x1"
-            )
+            Label(viewModel.comparisonLayout.label, systemImage: viewModel.comparisonLayout.symbol)
         }
-        .help("Toggle side-by-side comparison (V)")
+        .help("Compare against the original, against another LUT, or several LUTs at once (V toggles the last two)")
 
         // Source folder browser
         Button {

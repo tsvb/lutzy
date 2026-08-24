@@ -31,7 +31,9 @@ final class AppViewModel: ObservableObject {
 
     /// How to reproduce the open image. Held instead of a decoded `CIImage` because a RAW has to be
     /// re-developed to honour `document.rawDevelop` (§4.2).
-    private var imageSource: ImageSource?
+    /// Internal rather than private only because `AppViewModel+Compare` renders the
+    /// same source into its grid cells, and `private` does not cross a file.
+    var imageSource: ImageSource?
 
     /// What the open image's RAW decoder can do, and where its own defaults sit. `nil` for a
     /// standard image, which has no develop stage at all — **and also `nil` while the probe is still
@@ -164,6 +166,23 @@ final class AppViewModel: ObservableObject {
     @Published var isShowingOriginal: Bool = false
     @Published var isSideBySide: Bool = true
 
+    // MARK: - Comparison grid (see AppViewModel+Compare)
+
+    /// How the preview area is divided. Stored here rather than in the
+    /// extension because Swift extensions cannot hold stored properties.
+    @Published var comparisonLayout: ComparisonLayout = .split
+    /// One LUT reference per cell, in cell order. `nil` is a deliberate choice —
+    /// the ungraded picture — not an empty slot.
+    @Published var cellLUTIDs: [LUTID?] = []
+    /// The rasterized cells, index-parallel to `cellLUTIDs`.
+    @Published var cellImages: [NSImage?] = []
+    /// One in-flight render per cell, so re-picking one cell cancels one render
+    /// rather than the whole sheet.
+    var cellTasks: [Int: Task<Void, Never>] = [:]
+    /// What V returns to. Remembered so a glance at the single view does not
+    /// cost the user their 3×3.
+    var lastComparisonLayout: ComparisonLayout = .split
+
     /// Inspector visibility. Computing the histogram is gated on this — plus on the Info tab being
     /// the one on screen — so we don't tally pixels for a panel nobody's looking at.
     @Published var isInspectorPresented: Bool = false {
@@ -229,7 +248,8 @@ final class AppViewModel: ObservableObject {
 
     /// The renderer. An `any RenderEngining` rather than the concrete actor so a test can drive the
     /// preview flow without a GPU — the reason Step 4 introduced the protocol.
-    private let engine: any RenderEngining
+    /// See `imageSource` — the comparison grid renders through the same engine.
+    let engine: any RenderEngining
     private var loadTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var originalPreviewTask: Task<Void, Never>?
@@ -682,7 +702,7 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - Preview
 
-    private let maxPreview = CGSize(width: 1600, height: 1200)
+    let maxPreview = CGSize(width: 1600, height: 1200)
     private static let intensityDebounceMs = 60
 
     /// What the main preview panel should currently show, as a render request.
@@ -739,6 +759,12 @@ final class AppViewModel: ObservableObject {
             )
             self.updateHistogram()
         }
+
+        // The grid shows the same frame under other LUTs, so anything that
+        // changes the frame — a new image, develop, an adjustment, intensity —
+        // invalidates every cell. `renderAllCells` returns immediately unless a
+        // multi-cell layout is actually on screen.
+        renderAllCells()
     }
 
     /// Rasterize the comparison baseline for the side-by-side left panel. Only needs to re-run when
@@ -773,8 +799,16 @@ final class AppViewModel: ObservableObject {
         schedulePreview()
     }
 
+    /// The V shortcut. With seven layouts a boolean toggle is no longer the
+    /// whole story, so this flips between single and whatever comparison layout
+    /// was last used — the two states a keystroke is actually for.
     func toggleSideBySide() {
-        isSideBySide.toggle()
+        if comparisonLayout == .single {
+            setLayout(lastComparisonLayout)
+        } else {
+            lastComparisonLayout = comparisonLayout
+            setLayout(.single)
+        }
     }
 
     // MARK: - Info inspector (EXIF + histogram)

@@ -1,3 +1,4 @@
+import AppKit
 import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
@@ -176,14 +177,33 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
 // sRGB and reading that tag as display-referred would misfire on the exact case
 // this feature exists for.
 var metadataOK = true
-@MainActor func writeJPEG(description: String?, to url: URL) -> Bool {
+/// Write a fixture image. PNG when it has to carry colour: JPEG's 4:2:0 chroma
+/// subsampling averages a per-pixel colour ramp on an 8×8 away to near-neutral,
+/// which reads exactly like a pipeline that has lost colour and is not one.
+@MainActor func writeJPEG(description: String?, to url: URL, colourful: Bool = false) -> Bool {
+    // Flat grey is the right fixture for a metadata test and the wrong one for
+    // a "do these cells differ" test: these LUTs are built to leave mid grey
+    // near mid grey, so nine film simulations land within a few code values of
+    // each other on it. A saturated ramp is where they separate.
     var pixels = [UInt8](repeating: 128, count: 4 * 8 * 8)
+    if colourful {
+        for y in 0..<8 {
+            for x in 0..<8 {
+                let i = (y * 8 + x) * 4
+                pixels[i]     = UInt8(x * 36 % 256)
+                pixels[i + 1] = UInt8(y * 36 % 256)
+                pixels[i + 2] = UInt8((x + y) * 18 % 256)
+            }
+        }
+    }
     guard let space = CGColorSpace(name: CGColorSpace.sRGB),
           let ctx = CGContext(data: &pixels, width: 8, height: 8, bitsPerComponent: 8,
                               bytesPerRow: 32, space: space,
                               bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
           let image = ctx.makeImage(),
-          let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
+          let dest = CGImageDestinationCreateWithURL(
+              url as CFURL,
+              (colourful ? UTType.png : UTType.jpeg).identifier as CFString, 1, nil)
     else { return false }
     var properties: [String: Any] = [:]
     if let description {
@@ -244,4 +264,164 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
     pipelineOK = pipelineOK && adaptedOK && recoveredOK
 }
 
-exit(adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+// --- colour, not just neutrals ----------------------------------------------
+// Every measurement above this line used greys, and a grey cannot tell a
+// correct 3x3 matrix from one whose rows have collapsed, nor a LUT that carries
+// colour from one that flattens it. This feeds a saturated triplet through and
+// checks each channel separately.
+@MainActor func pipelineColour(lutPath: String, sourceSpace: SourceSpace, rgb: (Float, Float, Float)) -> [Float]? {
+    guard let lut = try? CubeLUT(url: URL(fileURLWithPath: lutPath)) else { return nil }
+    let ctx = CIContext()
+    var pixel: [Float] = [rgb.0, rgb.1, rgb.2, 1.0]
+    let img = pixel.withUnsafeMutableBytes { p in
+        CIImage(bitmapData: Data(bytes: p.baseAddress!, count: 16), bytesPerRow: 16,
+                size: CGSize(width: 1, height: 1), format: .RGBAf,
+                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+    var doc = EditDocument()
+    doc.lut = LUTSettings(lutID: lut.lutID, intensity: 1.0)
+    doc.sourceSpace = sourceSpace
+    let out = RenderPipeline.buildImage(developed: img, document: doc, lut: lut,
+                                        sourceIsVLog: sourceSpace == .vlog)
+    var px = [Float](repeating: 0, count: 4)
+    ctx.render(out, toBitmap: &px, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+               format: .RGBAf, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    return Array(px[0..<3])
+}
+
+var colourOK = true
+if FileManager.default.fileExists(atPath: vlogLUT) {
+    for probe in [(Float(0.80), Float(0.20), Float(0.20)), (0.20, 0.70, 0.30), (0.15, 0.30, 0.85)] {
+        guard let out = pipelineColour(lutPath: vlogLUT, sourceSpace: .display, rgb: probe) else { continue }
+        let spread = out.max()! - out.min()!
+        let ok = spread > 0.02
+        colourOK = colourOK && ok
+        print(String(format: "colour in (%.2f %.2f %.2f) -> out (%.4f %.4f %.4f) spread %.4f  %@",
+                     probe.0, probe.1, probe.2, out[0], out[1], out[2], spread, ok ? "ok" : "NEUTRAL — colour lost"))
+    }
+    print("colour through the V-Log path -> \(colourOK ? "PASS" : "FAIL")")
+}
+
+
+// --- comparison layouts -----------------------------------------------------
+// The grid renders one cell per slot and reads them back by row-major index, so
+// a layout whose rows × columns disagreed with its cell count would silently
+// drop or duplicate a picture.
+var layoutOK = true
+for (layout, expected) in [
+    (ComparisonLayout.single, 1), (.split, 2), (.compare, 2),
+    (.grid1x2, 2), (.grid2x2, 4), (.grid3x2, 6), (.grid3x3, 9)
+] as [(ComparisonLayout, Int)] {
+    let ok = layout.cellCount == expected && layout.rows * layout.columns == expected
+    layoutOK = layoutOK && ok
+    print("layout \(layout.label.padding(toLength: 8, withPad: " ", startingAt: 0)) \(layout.columns)x\(layout.rows) = \(layout.cellCount) cells  \(ok ? "ok" : "WRONG, wanted \(expected)")")
+}
+// Only the grids are contact sheets; the A/B pair decide their own two sides.
+let gridSet = ComparisonLayout.allCases.filter(\.isGrid)
+let familyOK = gridSet == [.grid1x2, .grid2x2, .grid3x2, .grid3x3]
+layoutOK = layoutOK && familyOK
+print("layout grid family -> \(familyOK ? "PASS" : "FAIL")")
+print("layouts -> \(layoutOK ? "PASS" : "FAIL")")
+
+
+// --- the grid actually fills and renders ------------------------------------
+// The layout maths above says how many cells there should be; this says the
+// view model puts a different LUT in each of them and gets a picture back for
+// every one. Without it a grid could pass every check and still show nine
+// copies of the same frame, or nine spinners.
+var gridOK = true
+let lutFolder = "/Users/world4jason/code_ground/claude lut/out/lumix-s9-vlog/luts/fuji"
+if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil, to: scratch.appendingPathComponent("lutcheck-grid.png"), colourful: true) {
+    let imageURL = scratch.appendingPathComponent("lutcheck-grid.png")
+    defer { try? FileManager.default.removeItem(at: imageURL) }
+
+    let vm = AppViewModel()
+    vm.library.scan(URL(fileURLWithPath: lutFolder))
+    vm.openImage(url: imageURL)
+
+    // Both the scan and the open are asynchronous; wait for them rather than
+    // guessing at a sleep.
+    func settle(_ what: String, _ done: @MainActor () -> Bool) -> Bool {
+        for _ in 0..<400 {
+            if done() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+        print("grid \(what) -> FAIL (timed out)")
+        return false
+    }
+
+    if settle("library scan", { vm.library.allLUTs.count >= 9 }),
+       settle("image open", { vm.imageSource != nil }) {
+        vm.setLayout(.grid3x3)
+        let filled = vm.cellLUTIDs.count == 9
+        let distinct = Set(vm.cellLUTIDs.compactMap { $0 }).count
+        let rendered = settle("cell renders", { vm.cellImages.allSatisfy { $0 != nil } })
+        gridOK = filled && distinct == 9 && rendered
+        print("grid 3x3 -> \(vm.cellLUTIDs.count) cells, \(distinct) distinct LUTs, \(vm.cellImages.compactMap { $0 }.count) rendered -> \(gridOK ? "PASS" : "FAIL")")
+
+        // The cells must differ in *pixels*, not merely be labelled with
+        // different LUTs: a grid that ignored its per-cell LUT would pass every
+        // check above while showing nine copies of the same frame.
+        // Several pixels, not one: a single sample can collide between two
+        // genuinely different looks, and then the test reports a bug that is
+        // not there.
+        func signature(_ image: NSImage?) -> String? {
+            guard let image,
+                  let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff)
+            else { return nil }
+            var parts: [String] = []
+            // Off the diagonal: the fixture's R and G ramp along x and y, so
+            // x == y is neutral by construction and would compare grey to grey.
+            for (fx, fy) in [(0.2, 0.8), (0.4, 0.1), (0.7, 0.3), (0.9, 0.6)] {
+                let x = Int(Double(bitmap.pixelsWide - 1) * fx)
+                let y = Int(Double(bitmap.pixelsHigh - 1) * fy)
+                guard let colour = bitmap.colorAt(x: x, y: y) else { continue }
+                parts.append(String(format: "%02X%02X%02X",
+                                    Int(colour.redComponent * 255),
+                                    Int(colour.greenComponent * 255),
+                                    Int(colour.blueComponent * 255)))
+            }
+            return parts.joined(separator: "-")
+        }
+        let swatches = vm.cellImages.compactMap(signature)
+        let distinctSwatches = Set(swatches).count
+        // Some cells must also still be *coloured*. This folder is alphabetical
+        // and starts with four ACROS emulations, which are black-and-white by
+        // design — so neutral early cells are the right answer, and a check that
+        // demanded colour from all nine would fail on correct output.
+        func isNeutral(_ signature: String) -> Bool {
+            signature.split(separator: "-").allSatisfy { swatch in
+                let s = Array(swatch)
+                guard s.count == 6 else { return false }
+                return s[0...1] == s[2...3] && s[2...3] == s[4...5]
+            }
+        }
+        let coloured = swatches.filter { isNeutral($0) == false }.count
+        let pixelsOK = swatches.count == 9 && distinctSwatches == 9 && coloured >= 3
+        gridOK = gridOK && pixelsOK
+        print("grid cells differ -> \(distinctSwatches)/\(swatches.count) distinct, \(coloured) carry colour (4 ACROS are mono by design) -> \(pixelsOK ? "PASS" : "FAIL")")
+
+        // Shrinking is a crop, not a reshuffle: the first four survive.
+        let before = Array(vm.cellLUTIDs.prefix(4))
+        vm.setLayout(.grid2x2)
+        let cropOK = vm.cellLUTIDs == before
+        gridOK = gridOK && cropOK
+        print("grid 3x3 -> 2x2 keeps the first four -> \(cropOK ? "PASS" : "FAIL")")
+
+        // Re-picking one cell must not disturb its neighbours.
+        let others = Array(vm.cellLUTIDs.dropFirst())
+        vm.setCell(0, to: nil)
+        let isolatedOK = vm.cellLUTIDs.first == .some(nil) && Array(vm.cellLUTIDs.dropFirst()) == others
+        gridOK = gridOK && isolatedOK
+        print("grid re-picking one cell leaves the rest -> \(isolatedOK ? "PASS" : "FAIL")")
+    } else {
+        gridOK = false
+    }
+} else {
+    print("grid -> SKIP (no LUT folder on this machine)")
+}
+print("grid -> \(gridOK ? "PASS" : "FAIL")")
+
+
+exit(colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

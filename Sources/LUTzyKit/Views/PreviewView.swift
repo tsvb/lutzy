@@ -12,10 +12,17 @@ struct PreviewView: View {
             bgColor
 
             if viewModel.sourceImage != nil {
-                if viewModel.isSideBySide && viewModel.isComparisonAvailable {
-                    sideBySideView
-                } else {
+                switch viewModel.comparisonLayout {
+                case .split:
+                    // Split still needs something to compare against: with a
+                    // neutral document both halves would be the same pixels.
+                    if viewModel.isComparisonAvailable { sideBySideView } else { singleView }
+                case .compare:
+                    compareView
+                case .single:
                     singleView
+                default:
+                    ComparisonGridView(viewModel: viewModel)
                 }
             } else if viewModel.isLoading {
                 ProgressView()
@@ -76,6 +83,49 @@ struct PreviewView: View {
                 .padding(12)
         }
         .clipped()
+    }
+
+    // MARK: - Compare (chosen base vs current)
+
+    /// Like split, except the left side is a LUT of the user's choosing rather
+    /// than the ungraded original. This is the layout for telling two similar
+    /// looks apart: against the same flat baseline they look alike, and against
+    /// each other they do not.
+    private var compareView: some View {
+        GeometryReader { geo in
+            HStack(spacing: 2) {
+                ZStack(alignment: .bottom) {
+                    bgColor
+                    if let image = viewModel.cellImages.first ?? nil {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: geo.size.width / 2, maxHeight: .infinity)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    CompareBaseMenu(
+                        name: viewModel.compareBaseLUT?.name ?? "No LUT",
+                        luts: viewModel.library.allLUTs,
+                        choose: { viewModel.setCell(0, to: $0) }
+                    )
+                    .padding(12)
+                }
+                .clipped()
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 1)
+
+                panelView(
+                    image: viewModel.previewNSImage,
+                    label: viewModel.selectedLUT?.name ?? "Adjusted",
+                    labelSide: .trailing,
+                    width: geo.size.width / 2
+                )
+            }
+        }
+        .padding(8)
     }
 
     // MARK: - Single image
@@ -153,6 +203,35 @@ struct PreviewView: View {
             }
         }
         return true
+    }
+}
+
+/// The compare layout's base picker. Same idea as a grid cell's name plate: the
+/// label you read to decide is the control you click to change it.
+private struct CompareBaseMenu: View {
+    let name: String
+    let luts: [CubeLUT]
+    let choose: (CubeLUT?) -> Void
+
+    var body: some View {
+        Menu {
+            Button("No LUT (original)") { choose(nil) }
+            Divider()
+            ForEach(luts) { lut in
+                Button(lut.name) { choose(lut) }
+            }
+        } label: {
+            Text(name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
