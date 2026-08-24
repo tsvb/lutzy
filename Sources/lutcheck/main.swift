@@ -120,12 +120,16 @@ print(String(format: "rawVLog(1.0)=%.5f expect 0.59912 | rawVLog(0.18)=%.5f expe
 // display-input LUT must not touch the adapter at all.
 func pipelineGrey(lutPath: String, sourceSpace: SourceSpace, input: Float) -> Float? {
     guard let lut = try? CubeLUT(url: URL(fileURLWithPath: lutPath)) else { return nil }
-    let ctx = CIContext(options: [.workingColorSpace: NSNull()])
+    // The same context the app builds — colour management ON. A context with
+    // `workingColorSpace: NSNull()` measures a different pipeline than the one
+    // that ships, and hid the very conversion this is about.
+    let ctx = CIContext()
     let linear = CGColorSpace(name: CGColorSpace.linearSRGB)!
     var pixel: [Float] = [input, input, input, 1.0]
     let img = pixel.withUnsafeMutableBytes { p in
         CIImage(bitmapData: Data(bytes: p.baseAddress!, count: 16), bytesPerRow: 16,
-                size: CGSize(width: 1, height: 1), format: .RGBAf, colorSpace: linear)
+                size: CGSize(width: 1, height: 1), format: .RGBAf,
+                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     }
     var doc = EditDocument()
     doc.lut = LUTSettings(lutID: lut.lutID, intensity: 1.0)
@@ -135,8 +139,10 @@ func pipelineGrey(lutPath: String, sourceSpace: SourceSpace, input: Float) -> Fl
         sourceIsVLog: sourceSpace == .vlog
     )
     var px = [Float](repeating: 0, count: 4)
+    // Read back as sRGB code values: a LUT emits a finished picture's codes,
+    // and lutcraft's expected numbers are in exactly those terms.
     ctx.render(out, toBitmap: &px, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-               format: .RGBAf, colorSpace: linear)
+               format: .RGBAf, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     return px[0]
 }
 
@@ -146,17 +152,40 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
     let lut = try! CubeLUT(url: URL(fileURLWithPath: vlogLUT))
     print("loaded \(lut.name): size \(lut.size), inputSpace \(lut.inputSpace), tag \(lut.photoStyleTag ?? "none")")
     pipelineOK = lut.inputSpace == .vlog
-    // Ordinary source: adapter runs, so a mid grey lands on the LUT's mid-grey
-    // response rather than on its near-black end.
-    let viaAdapter = pipelineGrey(lutPath: vlogLUT, sourceSpace: .display, input: 0.2140) ?? -1
-    // Claiming the same picture is already V-Log feeds 0.214 straight in, which
-    // is far down the LUT's range: it must come out darker.
-    let direct = pipelineGrey(lutPath: vlogLUT, sourceSpace: .vlog, input: 0.2140) ?? -1
+    // The two source settings must actually route differently: a display grey
+    // becomes V-Log 0.4034 while a V-Log grey stays 0.42, so the same input
+    // lands on two different entries of the same cube. Which one is brighter is
+    // a property of this LUT, not of the wiring — the exact values are checked
+    // against lutcraft below.
+    let viaAdapter = pipelineGrey(lutPath: vlogLUT, sourceSpace: .display, input: 0.42) ?? -1
+    let direct = pipelineGrey(lutPath: vlogLUT, sourceSpace: .vlog, input: 0.42) ?? -1
     print(String(format: "mid grey via adapter -> %.4f | claimed already V-Log -> %.4f", viaAdapter, direct))
-    pipelineOK = pipelineOK && viaAdapter > direct && viaAdapter > 0.02
+    pipelineOK = pipelineOK && abs(viaAdapter - direct) > 0.02 && viaAdapter > 0.02
     print("pipeline routing -> \(pipelineOK ? "PASS" : "FAIL")")
 } else {
     print("pipeline routing -> SKIP (no V-Log LUT on this machine)")
+}
+
+
+// --- does the cube get indexed with the right number? -----------------------
+// The V-Log path owns its encoding end to end: the adapter (or the code-value
+// recovery, for an already-V-Log source) writes V-Log codes, `CIColorCube`
+// indexes them raw, and the output codes are decoded back to linear. These
+// numbers come from lutcraft sampling the same cube trilinearly, which is what
+// Core Image does — sampling it tetrahedrally instead moves them by ~0.01 and
+// says nothing about whether the wiring is right.
+if FileManager.default.fileExists(atPath: vlogLUT) {
+    // display 0.42 -> linear 0.1473 -> V-Log 0.4034 -> cube -> 0.3243
+    let adapted = pipelineGrey(lutPath: vlogLUT, sourceSpace: .display, input: 0.42) ?? -1
+    // already V-Log 0.42 -> cube -> 0.3786, untouched on the way in
+    let recovered = pipelineGrey(lutPath: vlogLUT, sourceSpace: .vlog, input: 0.42) ?? -1
+    let adaptedOK = abs(adapted - 0.3243) < 0.01
+    let recoveredOK = abs(recovered - 0.3786) < 0.01
+    print(String(format: "display 0.42 through adapter -> %.4f (want 0.3243) -> %@",
+                 adapted, adaptedOK ? "PASS" : "FAIL"))
+    print(String(format: "V-Log 0.42 straight in       -> %.4f (want 0.3786) -> %@",
+                 recovered, recoveredOK ? "PASS" : "FAIL"))
+    pipelineOK = pipelineOK && adaptedOK && recoveredOK
 }
 
 exit(adapterOK && tagsOK && detectionOK && pipelineOK ? 0 : 1)

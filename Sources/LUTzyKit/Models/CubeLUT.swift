@@ -231,6 +231,16 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// lockstep with the output encoding space; both default to `WorkingSpace.current` so they cannot
     /// drift apart. See `WorkingSpace`.
     func makeFilter(space: WorkingSpace = .current) -> CIFilter? {
+        // A V-Log LUT is indexed with code values the adapter produced, so it
+        // uses the colour-space-free cube: `CIColorCubeWithColorSpace` would
+        // convert those codes into its space first and index the wrong entry.
+        // Every other LUT keeps the managed path exactly as before.
+        if inputSpace == .vlog {
+            guard let filter = CIFilter(name: "CIColorCube") else { return nil }
+            filter.setValue(size, forKey: "inputCubeDimension")
+            filter.setValue(tableData as NSData, forKey: "inputCubeData")
+            return filter
+        }
         guard let filter = CIFilter(name: "CIColorCubeWithColorSpace") else { return nil }
         filter.setValue(size, forKey: "inputCubeDimension")
         filter.setValue(tableData as NSData, forKey: "inputCubeData")

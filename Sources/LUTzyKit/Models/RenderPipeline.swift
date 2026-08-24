@@ -213,6 +213,15 @@ enum RenderPipeline {
         }
     }
 
+    /// Linear cross-fade between two images in the working space.
+    private static func blend(from: CIImage, to: CIImage, amount: Double) -> CIImage {
+        let dissolve = CIFilter.dissolveTransition()
+        dissolve.inputImage = from
+        dissolve.targetImage = to
+        dissolve.time = Float(max(0, min(1, amount)))
+        return dissolve.outputImage ?? to
+    }
+
     // MARK: - LUT
 
     private static func applyLUT(
@@ -230,14 +239,24 @@ enum RenderPipeline {
         // already V-Log (a clip shot on the S9), in which case it is fed
         // straight in. A display-input LUT is untouched, so ordinary LUTs
         // behave exactly as before.
-        let prepared: CIImage
-        if lut.inputSpace == .vlog && !sourceIsVLog {
-            prepared = VLogInputAdapter.encode(image)
-        } else {
-            prepared = image
+        guard lut.inputSpace == .vlog else {
+            let cubeFilter = cache?.filter(for: lut, space: space) ?? lut.makeFilter(space: space)
+            return lut.apply(to: image, intensity: settings.intensity, using: cubeFilter) ?? image
         }
 
+        // V-Log path: this project owns the encoding at both ends. The source
+        // becomes V-Log code values (unless it already is V-Log), the cube is
+        // indexed with those codes directly, and the LUT's own output codes are
+        // decoded back into the linear working space the rest of the graph uses.
+        let prepared = sourceIsVLog ? VLogInputAdapter.recoverCodeValues(image) : VLogInputAdapter.encode(image)
         let cubeFilter = cache?.filter(for: lut, space: space) ?? lut.makeFilter(space: space)
-        return lut.apply(to: prepared, intensity: settings.intensity, using: cubeFilter) ?? prepared
+        guard let graded = lut.apply(to: prepared, intensity: 1.0, using: cubeFilter) else { return image }
+        let decoded = VLogInputAdapter.decodeOutput(graded)
+
+        // Intensity blends against the picture the user started from, in the
+        // working space — not against V-Log codes, which would mix two
+        // different encodings and dim the midpoint.
+        guard settings.intensity < 1.0 else { return decoded }
+        return blend(from: image, to: decoded, amount: settings.intensity)
     }
 }

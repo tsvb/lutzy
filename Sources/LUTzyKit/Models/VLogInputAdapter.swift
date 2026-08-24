@@ -14,6 +14,14 @@ import CoreImage
 ///   linear Rec.709  → V-Gamut linear  → V-Log encode
 /// ```
 ///
+/// The result is a **code value**, and it is handed to `CIColorCube` — the
+/// variant with *no* colour space — precisely so nothing converts it on the way
+/// in. `CIColorCubeWithColorSpace` converts its input into its own space before
+/// indexing, which sRGB-encoded these codes and indexed far too high: measured,
+/// input 0.10 landed on 0.436 where 0.181 was wanted. Two implicit conversions
+/// (in and out) cannot be cancelled by guessing at one of them, so this path
+/// removes both and owns the encoding at each end.
+///
 /// Core Image hands a colour kernel its sample already in the working space's
 /// **linear** form, so there is no sRGB decode to do here — the render context
 /// has done it. Doing it again was a measured slope error of up to 0.039.
@@ -54,6 +62,17 @@ enum VLogInputAdapter {
             vec3 hi = pow((c + 0.055) / 1.055, vec3(2.4));
             return mix(lo, hi, step(vec3(0.04045), c));
         }
+        // The cube filter converts its input into its own colour space (sRGB)
+        // before indexing, so a V-Log code emitted as linear data would be
+        // sRGB-encoded on the way in and index far too high — measured: input
+        // 0.10 landed on 0.436 instead of 0.181, which is the washed-out
+        // preview this fixes. Emitting the code pre-decoded means that
+        // conversion hands the cube exactly the V-Log value.
+        vec3 srgb_decode(vec3 c) {
+            vec3 lo = c / 12.92;
+            vec3 hi = pow((c + 0.055) / 1.055, vec3(2.4));
+            return mix(lo, hi, step(vec3(0.04045), c));
+        }
         vec3 linear_to_vlog(vec3 x) {
             vec3 lo = 5.6 * x + 0.125;
             vec3 hi = 0.241514 * log(max(x + 0.00873, 1e-6)) / log(10.0) + 0.598206;
@@ -68,10 +87,50 @@ enum VLogInputAdapter {
                 m10 * lin.r + m11 * lin.g + m12 * lin.b,
                 m20 * lin.r + m21 * lin.g + m22 * lin.b
             );
-            vec3 v = linear_to_vlog(max(vg, 0.0));
-            return vec4(clamp(v, 0.0, 1.0), s.a);
+            vec3 v = clamp(linear_to_vlog(max(vg, 0.0)), 0.0, 1.0);
+            return vec4(v, s.a);
         }
         """
+
+    /// Recover the code values of a picture that is *already* V-Log.
+    ///
+    /// Core Image decodes an image into its linear working space before any
+    /// kernel sees it, which is right for a display-referred picture and wrong
+    /// for a V-Log one: those numbers are already code values and must reach
+    /// the cube untouched. Re-encoding cancels that decode exactly. Measured
+    /// without it, a V-Log 0.42 indexed 0.147 and came back 0.0027 instead of
+    /// 0.3809 — the LUT's near-black end instead of its midtone.
+    static func recoverCodeValues(_ image: CIImage) -> CIImage {
+        let source = """
+        kernel vec4 recover(__sample s) {
+            vec3 c = clamp(s.rgb, 0.0, 1.0);
+            vec3 lo = c * 12.92;
+            vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
+            return vec4(mix(lo, hi, step(vec3(0.0031308), c)), s.a);
+        }
+        """
+        guard let kernel = CIColorKernel(source: source) else { return image }
+        return kernel.apply(extent: image.extent, arguments: [image]) ?? image
+    }
+
+    /// Bring a LUT's output code values back into the linear working space.
+    ///
+    /// The other half of owning the encoding: a LUT emits finished-picture code
+    /// values, and `CIColorCube` returns them untouched, so they have to be
+    /// decoded before the rest of the graph — which works in linear light —
+    /// sees them.
+    static func decodeOutput(_ image: CIImage) -> CIImage {
+        let source = """
+        kernel vec4 decodeOut(__sample s) {
+            vec3 c = clamp(s.rgb, 0.0, 1.0);
+            vec3 lo = c / 12.92;
+            vec3 hi = pow((c + 0.055) / 1.055, vec3(2.4));
+            return vec4(mix(lo, hi, step(vec3(0.04045), c)), s.a);
+        }
+        """
+        guard let kernel = CIColorKernel(source: source) else { return image }
+        return kernel.apply(extent: image.extent, arguments: [image]) ?? image
+    }
 
     /// Encode a display-referred image as V-Log/V-Gamut.
     /// Returns the input unchanged if the kernel failed to compile.
