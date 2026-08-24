@@ -28,6 +28,9 @@ struct LUTSidebar: View {
     @State private var browse: Browse = .list
 
     @State private var isDropTargeted = false
+    /// Whether the filter panel is open. Starts open: the point of it is to be
+    /// seen, and someone who wants the space back can close it.
+    @State private var filtersExpanded = true
 
     /// The LUT whose tag sheet is open, and the text being typed into it.
     @State private var taggingLUT: CubeLUT?
@@ -157,7 +160,10 @@ struct LUTSidebar: View {
                 lutList
             }
         }
-        .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
+        // Wider than before, and draggable up to it: the filter panel wraps, so a
+        // wider sidebar means more of the vocabulary per row rather than just
+        // more whitespace.
+        .frame(minWidth: 220, idealWidth: 260, maxWidth: 460)
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             importDrop(providers)
         }
@@ -309,7 +315,11 @@ struct LUTSidebar: View {
         taggingLUT = nil
     }
 
-    /// The tags in use, as a row of toggles.
+    /// The tags in use, as a wrapping panel of toggles.
+    ///
+    /// Wrapping rather than a scrolling line: a filter exists to be surveyed
+    /// before it is used, and a single row that hides two thirds of the
+    /// vocabulary behind a horizontal drag cannot be surveyed at all.
     ///
     /// Measured tags and typed ones sit together deliberately: from the point
     /// of view of finding a LUT there is no difference between "高對比" (which
@@ -318,40 +328,85 @@ struct LUTSidebar: View {
     @ViewBuilder
     private var tagFilterBar: some View {
         if viewModel.tags.counts.isEmpty == false {
-            ScrollView(.horizontal, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    if viewModel.tagFilter.isEmpty == false {
-                        Button {
-                            viewModel.clearTagFilter()
-                        } label: {
-                            Label("Clear", systemImage: "xmark")
-                                .font(.caption2)
-                                .labelStyle(.titleAndIcon)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.12)) { filtersExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: filtersExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("Filter")
+                                .font(.caption)
+                            if viewModel.tagFilter.isEmpty == false {
+                                Text("\(viewModel.tagFilter.count)")
+                                    .font(.caption2)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(Color.accentColor, in: Capsule())
+                                    .foregroundColor(.white)
+                            }
                         }
-                        .buttonStyle(.borderless)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     }
-                    ForEach(viewModel.tags.counts, id: \.tag) { item in
-                        let active = viewModel.tagFilter.contains(item.tag)
-                        Button {
-                            viewModel.toggleTagFilter(item.tag)
-                        } label: {
-                            Text("\(item.tag) \(item.count)")
-                                .font(.caption2)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(active ? Color.accentColor.opacity(0.85)
-                                                   : Color.primary.opacity(0.08),
-                                            in: Capsule())
-                                .foregroundColor(active ? .white : .primary)
-                        }
-                        .buttonStyle(.plain)
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    if viewModel.tagFilter.isEmpty == false {
+                        Button("Clear") { viewModel.clearTagFilter() }
+                            .buttonStyle(.plain)
+                            .font(.caption2)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
+
+                if filtersExpanded {
+                    // Capped so a big vocabulary cannot push the LUT list off
+                    // the bottom of the window; it scrolls past that point.
+                    ScrollView(.vertical, showsIndicators: false) {
+                        FlowLayout(spacing: 5, lineSpacing: 5) {
+                            ForEach(viewModel.tags.counts, id: \.tag) { item in
+                                tagChip(item.tag, count: item.count)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 132)
+                } else if viewModel.tagFilter.isEmpty == false {
+                    // Collapsed, still show what is currently narrowing the
+                    // list — a filter you cannot see is a list that looks broken.
+                    FlowLayout(spacing: 5, lineSpacing: 5) {
+                        ForEach(viewModel.tagFilter.sorted(), id: \.self) { tag in
+                            tagChip(tag, count: nil)
+                        }
+                    }
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
         }
+    }
+
+    private func tagChip(_ tag: String, count: Int?) -> some View {
+        let active = viewModel.tagFilter.contains(tag)
+        return Button {
+            viewModel.toggleTagFilter(tag)
+        } label: {
+            HStack(spacing: 4) {
+                Text(tag)
+                if let count {
+                    Text("\(count)")
+                        .foregroundStyle(active ? Color.white.opacity(0.75) : Color(nsColor: .tertiaryLabelColor))
+                }
+            }
+            .font(.caption2)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(active ? Color.accentColor.opacity(0.85) : Color.primary.opacity(0.08),
+                        in: Capsule())
+            .foregroundColor(active ? .white : .primary)
+        }
+        .buttonStyle(.plain)
     }
 
     /// The folders, as tiles with counts.
