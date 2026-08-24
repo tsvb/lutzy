@@ -6,6 +6,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Central state for the LUTzy app.
+/// One LUT as the manager lists it. A named type rather than a tuple because
+/// `Table` needs `Identifiable` rows, and the identity is the LUT's.
+struct LibraryRow: Identifiable, Hashable {
+    let lut: CubeLUT
+    let category: String
+    var id: String { lut.id }
+}
+
 @MainActor
 final class AppViewModel: ObservableObject {
 
@@ -248,6 +256,9 @@ final class AppViewModel: ObservableObject {
 
     /// Whether the sidebar is showing only starred LUTs.
     @Published var showingFavouritesOnly = false
+
+    /// What the app is being used for: looking, managing, or (later) editing.
+    @Published var section: AppSection = .viewer
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -734,6 +745,50 @@ final class AppViewModel: ObservableObject {
 
     func browse(_ category: String?) {
         browsedCategory = category
+    }
+
+    /// Every LUT the current filters leave, with the folder it is in.
+    ///
+    /// The manager works on a flat list because that is what bulk actions need:
+    /// "these nine, into Fuji" does not care which folders they came from.
+    var visibleLUTs: [LibraryRow] {
+        filteredCategories.flatMap { category in
+            category.luts.map { LibraryRow(lut: $0, category: category.name) }
+        }
+    }
+
+    /// Star or unstar a whole selection.
+    ///
+    /// One decision for the group rather than a per-LUT toggle: toggling nine
+    /// LUTs of which four are starred leaves five starred and four not, which
+    /// is never what was meant. If any are unstarred, star them all.
+    func setFavourite(_ luts: [CubeLUT]) {
+        let shouldStar = luts.contains { tags.isFavourite($0) == false }
+        for lut in luts where tags.isFavourite(lut) != shouldStar {
+            tags.toggleFavourite(lut)
+        }
+        statusMessage = shouldStar ? "Starred \(luts.count)" : "Unstarred \(luts.count)"
+    }
+
+    func addTag(_ tag: String, to luts: [CubeLUT]) {
+        for lut in luts { tags.addTag(tag, to: lut) }
+        statusMessage = "Tagged \(luts.count) with “\(tag)”"
+    }
+
+    func move(_ luts: [CubeLUT], toCategory category: String) {
+        var moved = 0
+        for lut in luts where library.move(lut, toCategory: category) { moved += 1 }
+        statusMessage = moved == luts.count
+            ? "Moved \(moved) to \(category.isEmpty ? "the top level" : category)"
+            : "Moved \(moved) of \(luts.count) — the rest are not in the app's library"
+    }
+
+    func remove(_ luts: [CubeLUT]) {
+        var removed = 0
+        for lut in luts where library.removeFromLibrary(lut) { removed += 1 }
+        statusMessage = removed == luts.count
+            ? "Moved \(removed) to the Trash"
+            : "Removed \(removed) of \(luts.count) — the rest are not in the app's library"
     }
 
     /// Move a LUT into another folder of the app's own library.

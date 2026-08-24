@@ -570,6 +570,54 @@ if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
 }
 
 
+// --- bulk actions -----------------------------------------------------------
+// Starring a mixed selection is the one with a wrong answer that looks right:
+// toggling each LUT in turn leaves the already-starred ones unstarred, which is
+// never what "star these" meant.
+var bulkOK = true
+if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
+    let storeURL = scratch.appendingPathComponent("lutcheck-bulk.json")
+    try? FileManager.default.removeItem(at: storeURL)
+    defer { try? FileManager.default.removeItem(at: storeURL) }
+
+    // A second LUT, so the selection can be genuinely mixed.
+    let others = (try? FileManager.default.contentsOfDirectory(
+        at: URL(fileURLWithPath: vlogLUT).deletingLastPathComponent(),
+        includingPropertiesForKeys: nil))?
+        .filter { $0.pathExtension == "cube" && $0.path != vlogLUT }
+        .sorted { $0.path < $1.path } ?? []
+    if let second = others.first.flatMap({ try? CubeLUT(url: $0) }) {
+        let store = LUTTagStore(fileURL: storeURL)
+        store.indexNow([lut, second])
+        store.toggleFavourite(lut)          // one starred, one not
+
+        // "Star these" on a mixed selection must end with all of them starred.
+        let shouldStar = [lut, second].contains { store.isFavourite($0) == false }
+        for candidate in [lut, second] where store.isFavourite(candidate) != shouldStar {
+            store.toggleFavourite(candidate)
+        }
+        let mixedOK = store.isFavourite(lut) && store.isFavourite(second) && store.favouriteCount == 2
+        print("bulk star on a mixed selection stars all -> \(mixedOK ? "PASS" : "FAIL")")
+
+        // And again, now that they agree, must clear both.
+        let shouldStarAgain = [lut, second].contains { store.isFavourite($0) == false }
+        for candidate in [lut, second] where store.isFavourite(candidate) != shouldStarAgain {
+            store.toggleFavourite(candidate)
+        }
+        let clearOK = store.favouriteCount == 0
+        print("bulk star again clears all -> \(clearOK ? "PASS" : "FAIL")")
+
+        store.addTag("日系", to: lut)
+        store.addTag("日系", to: second)
+        let taggedOK = store.typedTags(for: lut) == ["日系"] && store.typedTags(for: second) == ["日系"]
+        print("bulk tag applies to every one -> \(taggedOK ? "PASS" : "FAIL")")
+
+        bulkOK = mixedOK && clearOK && taggedOK
+        print("bulk actions -> \(bulkOK ? "PASS" : "FAIL")")
+    }
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -696,4 +744,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

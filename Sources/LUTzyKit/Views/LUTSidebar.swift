@@ -12,21 +12,6 @@ struct LUTSidebar: View {
     @State private var collapsed: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: LUTSidebar.collapsedKey) ?? [])
 
-    /// What the sidebar is showing. Folders and favourites are two ways of
-    /// narrowing the same library rather than two libraries, so this is a view
-    /// mode and the filters underneath compose with it.
-    enum Browse: String, CaseIterable {
-        case list, folders, favourites
-        var symbol: String {
-            switch self {
-            case .list: return "list.bullet"
-            case .folders: return "folder"
-            case .favourites: return "star"
-            }
-        }
-    }
-    @State private var browse: Browse = .list
-
     @State private var isDropTargeted = false
     /// Whether the filter panel is open. Starts open: the point of it is to be
     /// seen, and someone who wants the space back can close it.
@@ -79,17 +64,6 @@ struct LUTSidebar: View {
                     .disabled(isSearching)
                     .help(allExpanded ? "Collapse all folders" : "Expand all folders")
                 }
-                Picker("", selection: $browse) {
-                    ForEach(Browse.allCases, id: \.self) { mode in
-                        Image(systemName: mode.symbol).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .onChange(of: browse) { _, mode in
-                    viewModel.showingFavouritesOnly = mode == .favourites
-                }
                 Text("\(viewModel.library.allLUTs.count)")
                     .font(.caption)
                     .foregroundColor(Color(nsColor: .tertiaryLabelColor))
@@ -125,18 +99,20 @@ struct LUTSidebar: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
 
-            if let browsed = viewModel.browsedCategory {
+            if viewModel.browsedCategory != nil || viewModel.showingFavouritesOnly {
                 HStack(spacing: 6) {
-                    Image(systemName: "folder.fill").font(.caption2)
-                    Text(browsed).font(.caption).lineLimit(1)
+                    Image(systemName: viewModel.showingFavouritesOnly ? "star.fill" : "folder.fill")
+                        .font(.caption2)
+                    Text(viewModel.browsedCategory ?? "Starred").font(.caption).lineLimit(1)
                     Spacer()
                     Button {
                         viewModel.browse(nil)
+                        viewModel.showingFavouritesOnly = false
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                     }
                     .buttonStyle(.borderless)
-                    .help("Show every folder")
+                    .help("Show the whole library")
                 }
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
@@ -152,9 +128,7 @@ struct LUTSidebar: View {
                 scanningState
             } else if viewModel.library.allLUTs.isEmpty {
                 emptyState
-            } else if browse == .folders {
-                folderBrowser
-            } else if browse == .favourites && viewModel.tags.favouriteCount == 0 {
+            } else if viewModel.showingFavouritesOnly && viewModel.tags.favouriteCount == 0 {
                 noFavouritesState
             } else {
                 lutList
@@ -405,50 +379,6 @@ struct LUTSidebar: View {
             .background(active ? Color.accentColor.opacity(0.85) : Color.primary.opacity(0.08),
                         in: Capsule())
             .foregroundColor(active ? .white : .primary)
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// The folders, as tiles with counts.
-    ///
-    /// A grid rather than the list's own section headers because this answers a
-    /// different question: not "which LUT" but "what have I got", and a library
-    /// of several hundred is easier to take in as a dozen tiles than as a
-    /// scroll.
-    private var folderBrowser: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
-                folderTile(name: "All LUTs", count: viewModel.library.allLUTs.count, category: nil)
-                ForEach(viewModel.folderTiles, id: \.name) { tile in
-                    folderTile(name: tile.name, count: tile.count, category: tile.name)
-                }
-            }
-            .padding(12)
-        }
-    }
-
-    private func folderTile(name: String, count: Int, category: String?) -> some View {
-        let active = viewModel.browsedCategory == category
-        return Button {
-            viewModel.browse(category)
-            browse = .list
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "folder")
-                    .foregroundStyle(.secondary)
-                Text(name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 4)
-                Text("\(count)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(active ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.06),
-                        in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
     }

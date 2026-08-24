@@ -68,10 +68,17 @@ public struct ContentView: View {
     }
 
     private var mainContent: some View {
+        // Three columns: what you are doing, which LUTs are in scope, and the
+        // thing itself. The middle column is shared between the viewer and the
+        // manager on purpose — the filters that narrow a library are the same
+        // filters whichever of the two you are in, and duplicating them would
+        // mean two places to keep in step.
         NavigationSplitView {
+            NavigationSidebar(viewModel: viewModel)
+        } content: {
             LUTSidebar(viewModel: viewModel)
         } detail: {
-            detailContent
+            sectionContent
         }
         .inspector(isPresented: $viewModel.isInspectorPresented) {
             InfoInspectorView(viewModel: viewModel)
@@ -79,7 +86,40 @@ public struct ContentView: View {
         }
     }
 
-    private var detailContent: some View {
+    /// What the detail column shows, by section.
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch viewModel.section {
+        case .viewer:
+            viewerContent
+        case .manager:
+            LibraryManagerView(viewModel: viewModel)
+        case .editor:
+            comingSoon
+        }
+    }
+
+    /// The editor, before it exists.
+    ///
+    /// Listed and explained rather than hidden: the app's shape is easier to
+    /// learn if what is missing is visible, and this says what it will do
+    /// rather than teasing that something will.
+    private var comingSoon: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 40, weight: .thin))
+                .foregroundStyle(.tertiary)
+            Text("LUT Editor")
+                .font(.title3)
+            Text("Not built yet. It will edit a LUT's curve and colour directly,\nrather than only deriving one from a graded JPEG.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var viewerContent: some View {
         HStack(spacing: 0) {
             if viewModel.isSourceBrowserPresented && !viewModel.collection.items.isEmpty {
                 SourceBrowserView(viewModel: viewModel)
