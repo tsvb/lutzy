@@ -21,8 +21,11 @@ public struct LUTzyCommands: Commands {
             Button("Open Image...") { post(.openImage) }
                 .keyboardShortcut("o")
 
-            Button("Choose LUT Folder...") { post(.chooseLUTFolder) }
+            Button("Import LUTs…") { post(.importLUTs) }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
+
+            Button("Use a LUT Folder…") { post(.chooseLUTFolder) }
+                .keyboardShortcut("l", modifiers: [.command, .option])
 
             Divider()
 
@@ -72,6 +75,9 @@ struct MenuCommandReceivers: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .exportAll)) { _ in
                 viewModel.batchExportDialog()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .importLUTs)) { _ in
+                viewModel.importLUTs()
+            }
             .onReceive(NotificationCenter.default.publisher(for: .chooseLUTFolder)) { _ in
                 viewModel.chooseLUTFolder()
             }
@@ -97,6 +103,7 @@ extension Notification.Name {
     static let exportImage = Notification.Name("LUTzy.exportImage")
     static let exportAll = Notification.Name("LUTzy.exportAll")
     static let chooseLUTFolder = Notification.Name("LUTzy.chooseLUTFolder")
+    static let importLUTs = Notification.Name("LUTzy.importLUTs")
     static let importFromPhotos = Notification.Name("LUTzy.importFromPhotos")
     static let openSourceFolder = Notification.Name("LUTzy.openSourceFolder")
     static let refreshSourceFolder = Notification.Name("LUTzy.refreshSourceFolder")

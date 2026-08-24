@@ -998,6 +998,54 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - LUT folder
 
+    /// Import LUTs into the app's own library, from a panel.
+    ///
+    /// Files and folders both: dropping a whole vendor folder in is the common
+    /// case, and making the user select 46 files individually to do it would be
+    /// the reason they never bother.
+    func importLUTs() {
+        let panel = NSOpenPanel()
+        panel.title = "Import LUTs"
+        panel.message = "Choose .cube files or folders of them."
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.folder, UTType(filenameExtension: "cube")].compactMap { $0 }
+        guard panel.runModal() == .OK, panel.urls.isEmpty == false else { return }
+        importLUTs(from: panel.urls)
+    }
+
+    /// The same import, for a drop.
+    func importLUTs(from urls: [URL]) {
+        statusMessage = "Importing LUTs…"
+        Task {
+            let result = await library.importLUTs(from: urls)
+            statusMessage = Self.importSummary(result)
+        }
+    }
+
+    /// Say what happened, including the nothing-happened cases — an import that
+    /// silently does nothing because every file was already there is the one
+    /// most likely to be read as a bug.
+    static func importSummary(_ result: LUTLibrary.ImportResult) -> String {
+        var parts: [String] = []
+        if result.imported > 0 { parts.append("Imported \(result.imported) LUT\(result.imported == 1 ? "" : "s")") }
+        if result.duplicates > 0 { parts.append("\(result.duplicates) already in the library") }
+        if result.failed > 0 { parts.append("\(result.failed) could not be read") }
+        return parts.isEmpty ? "Nothing to import" : parts.joined(separator: " · ")
+    }
+
+    /// Remove a LUT from the app's own library. Refused for LUTs that live in a
+    /// folder the user pointed the library at — see `LUTLibrary.removeFromLibrary`.
+    func removeLUT(_ lut: CubeLUT) {
+        if selectedLUT == lut { selectLUT(nil) }
+        if library.removeFromLibrary(lut) {
+            statusMessage = "Moved \(lut.name) to the Trash"
+        } else {
+            statusMessage = "\(lut.name) is not in the app's library — remove it where it lives"
+        }
+    }
+
     func chooseLUTFolder() {
         let panel = NSOpenPanel()
         panel.title = "Select LUT Folder"

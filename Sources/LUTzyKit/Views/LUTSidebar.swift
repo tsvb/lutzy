@@ -12,6 +12,8 @@ struct LUTSidebar: View {
     @State private var collapsed: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: LUTSidebar.collapsedKey) ?? [])
 
+    @State private var isDropTargeted = false
+
     /// The LUT whose tag sheet is open, and the text being typed into it.
     @State private var taggingLUT: CubeLUT?
     @State private var newTag: String = ""
@@ -105,6 +107,17 @@ struct LUTSidebar: View {
             }
         }
         .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            importDrop(providers)
+        }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .padding(4)
+                    .allowsHitTesting(false)
+            }
+        }
         .sheet(item: $taggingLUT) { lut in
             addTagSheet(for: lut)
         }
@@ -125,6 +138,12 @@ struct LUTSidebar: View {
         Button("Add Tag…") {
             newTag = ""
             taggingLUT = lut
+        }
+        Button("Reveal in Finder") {
+            NSWorkspace.shared.activateFileViewerSelecting([lut.url])
+        }
+        if viewModel.library.isManaged {
+            Button("Remove from Library") { viewModel.removeLUT(lut) }
         }
         if typed.isEmpty == false {
             Divider()
@@ -159,6 +178,34 @@ struct LUTSidebar: View {
         }
         .padding(16)
         .frame(width: 320)
+    }
+
+    /// Collect the dropped URLs, then import them in one pass.
+    ///
+    /// One pass rather than one import per provider: the library rescans after
+    /// each import, and a folder of fifty files dropped as fifty providers
+    /// would rescan fifty times.
+    private func importDrop(_ providers: [NSItemProvider]) -> Bool {
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var urls: [URL] = []
+
+        for provider in providers {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                defer { group.leave() }
+                guard let data = item as? Data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                lock.lock()
+                urls.append(url)
+                lock.unlock()
+            }
+        }
+        group.notify(queue: .main) {
+            guard urls.isEmpty == false else { return }
+            Task { @MainActor in viewModel.importLUTs(from: urls) }
+        }
+        return true
     }
 
     private func commitTag(for lut: CubeLUT) {
@@ -231,16 +278,28 @@ struct LUTSidebar: View {
                   ? "cube.transparent" : "exclamationmark.triangle")
                 .font(.system(size: 32))
                 .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-            Text(viewModel.library.scanError ?? "No LUTs loaded")
+            Text(viewModel.library.scanError ?? "No LUTs yet")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 16)
-            Button("Choose Folder...") {
+            Text("Drop .cube files or folders here")
+                .font(.caption)
+                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+            // Importing is the primary action now: the library lives inside the
+            // app, so this is a one-time step rather than something to redo on
+            // every launch. Pointing at a folder is still there for anyone who
+            // would rather keep their files where they are.
+            Button("Import LUTs…") {
+                viewModel.importLUTs()
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Use a Folder Instead…") {
                 viewModel.chooseLUTFolder()
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderless)
+            .font(.caption)
             Spacer()
         }
         .frame(maxWidth: .infinity)

@@ -446,6 +446,82 @@ diffOK = sameOK && apartOK && unamplifiedOK && mismatchOK
 print("difference -> \(diffOK ? "PASS" : "FAIL")")
 
 
+// --- importing into the app's own library -----------------------------------
+// The complaint this answers is having to re-point at a folder every launch, so
+// the rules that matter are the ones that make a library survive being added to
+// repeatedly: importing the same thing twice is a no-op, two different LUTs that
+// happen to share a name both survive, and a folder keeps its name as the
+// category.
+var importOK = true
+do {
+    let root = scratch.appendingPathComponent("lutcheck-import-\(UUID().uuidString)")
+    let source = root.appendingPathComponent("source/fuji")
+    let library = root.appendingPathComponent("library")
+    try? FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    func writeCube(_ url: URL, white: Double) {
+        var text = "LUT_3D_SIZE 2\n"
+        for index in 0..<8 {
+            let v = index == 7 ? white : Double(index) / 8.0
+            text += "\(v) \(v) \(v)\n"
+        }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+    writeCube(source.appendingPathComponent("a.cube"), white: 1.0)
+    writeCube(source.appendingPathComponent("b.cube"), white: 0.9)
+
+    // A folder import: both files land under the folder's own name.
+    let first = LUTLibrary.copyIn([source], to: library)
+    let landed = library.appendingPathComponent("fuji")
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: landed.path))?.sorted() ?? []
+    let folderOK = first == LUTLibrary.ImportResult(imported: 2, duplicates: 0, failed: 0)
+        && names == ["a.cube", "b.cube"]
+    print("import a folder -> \(first) into \(landed.lastPathComponent)/\(names) -> \(folderOK ? "PASS" : "FAIL")")
+
+    // The same folder again is a no-op, not a second copy of everything.
+    let again = LUTLibrary.copyIn([source], to: library)
+    let repeatOK = again == LUTLibrary.ImportResult(imported: 0, duplicates: 2, failed: 0)
+    print("import the same folder twice -> \(again) -> \(repeatOK ? "PASS" : "FAIL")")
+
+    // A *different* LUT that shares a name is kept, under a numbered name.
+    let clash = root.appendingPathComponent("clash")
+    try? FileManager.default.createDirectory(at: clash, withIntermediateDirectories: true)
+    writeCube(clash.appendingPathComponent("a.cube"), white: 0.5)
+    let clashed = LUTLibrary.copyIn([clash.appendingPathComponent("a.cube")], to: library)
+    let atRoot = (try? FileManager.default.contentsOfDirectory(atPath: library.path))?.sorted() ?? []
+    let clashOK = clashed.imported == 1 && atRoot.contains("a.cube")
+    print("import a name clash -> \(atRoot) -> \(clashOK ? "PASS" : "FAIL")")
+
+    // Anything that is not a cube is reported rather than silently dropped.
+    let junk = root.appendingPathComponent("notes.txt")
+    try? "hello".write(to: junk, atomically: true, encoding: .utf8)
+    let junked = LUTLibrary.copyIn([junk], to: library)
+    let junkOK = junked == LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 1)
+    print("import a non-LUT -> \(junked) -> \(junkOK ? "PASS" : "FAIL")")
+
+    // And the summary says so, including the case where nothing happened.
+    let summaryOK = AppViewModel.importSummary(first).contains("Imported 2")
+        && AppViewModel.importSummary(again).contains("already in the library")
+        && AppViewModel.importSummary(LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 0)) == "Nothing to import"
+    print("import summary -> \(summaryOK ? "PASS" : "FAIL")")
+
+    importOK = folderOK && repeatOK && clashOK && junkOK && summaryOK
+}
+print("import -> \(importOK ? "PASS" : "FAIL")")
+
+// Removing must never reach outside the app's own folder: everywhere else the
+// files belong to the user, and "remove from my library" is not "delete that".
+var removeOK = true
+if let outside = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
+    let library = LUTLibrary()
+    removeOK = library.removeFromLibrary(outside) == false
+        && FileManager.default.fileExists(atPath: vlogLUT)
+    print("remove refuses a LUT outside the library -> \(removeOK ? "PASS" : "FAIL")")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -572,4 +648,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
