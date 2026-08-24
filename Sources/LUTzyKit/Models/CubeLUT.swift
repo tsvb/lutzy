@@ -2,6 +2,25 @@ import Foundation
 import CoreImage
 import CryptoKit
 
+/// What a LUT expects to be fed.
+///
+/// LUTzy has always assumed a LUT maps a finished picture to a finished
+/// picture (`.display`). A camera-look LUT built for a LUMIX S9 instead expects
+/// **V-Log / V-Gamut** — scene-referred log — and applying it to an ordinary
+/// sRGB image is the single most common way to get a washed-out, wrong result.
+/// Recording which one a LUT wants lets the pipeline convert the source into
+/// that space first, rather than feeding it the wrong thing.
+enum LUTInputSpace: String, Codable, Sendable, Equatable, CaseIterable {
+    case display   // Rec.709 / sRGB finished picture — LUTzy's original assumption
+    case vlog      // Panasonic V-Log / V-Gamut, e.g. a LUMIX Real Time LUT
+
+    /// The `#LUMIXPHOTOSTYLE` tag the LUMIX S9 reads, mapped to a space.
+    /// The camera's own rule: absent or unrecognised means V-Log.
+    static func fromPhotoStyleTag(_ tag: String) -> LUTInputSpace {
+        tag.uppercased() == "VLOG" ? .vlog : .display
+    }
+}
+
 /// Parses a .cube 3D LUT file and creates a CIFilter for GPU-accelerated color grading.
 struct CubeLUT: Identifiable, Hashable, Sendable {
     let id: String          // full file path (or a synthetic id for in-memory LUTs)
@@ -9,6 +28,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     let category: String    // folder name or "General"
     let url: URL
     let size: Int
+    let inputSpace: LUTInputSpace   // what this LUT expects to be fed
+    let photoStyleTag: String?      // the raw #LUMIXPHOTOSTYLE tag, if any
     private let tableData: Data  // flattened RGBARGBA... float32 for Core Image
 
     // MARK: - Hashable
@@ -32,6 +53,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         self.size = size
         self.name = name
         self.category = category
+        self.inputSpace = .display
+        self.photoStyleTag = nil
         self.url = sourceURL ?? URL(fileURLWithPath: "/dev/null")
 
         var floats = [Float]()
@@ -72,6 +95,22 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         return "derived://\(name)/\(hex)"
     }
 
+    /// Decide what a LUT expects, tag first, then a name hint, else display.
+    ///
+    /// The tag is authoritative when present. Failing that, a name that says
+    /// "vlog"/"v-log" is taken at its word; anything else stays `.display`, so
+    /// an ordinary creative LUT behaves exactly as it did before this existed.
+    static func resolveInputSpace(photoStyle: String?, name: String) -> LUTInputSpace {
+        if let tag = photoStyle {
+            return LUTInputSpace.fromPhotoStyleTag(tag)
+        }
+        let lowered = name.lowercased()
+        if lowered.contains("vlog") || lowered.contains("v-log") {
+            return .vlog
+        }
+        return .display
+    }
+
     // MARK: - Parsing
 
     init(url: URL, category: String = "General") throws {
@@ -90,6 +129,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         let content = try String(contentsOf: url, encoding: .utf8)
         let lines = content.components(separatedBy: .newlines)
 
+        var photoStyle: String? = nil
         var lutSize = 0
         var domainMin: SIMD3<Float> = .zero
         var domainMax: SIMD3<Float> = .one
@@ -97,7 +137,19 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
+            if trimmed.isEmpty { continue }
+            if trimmed.hasPrefix("#") {
+                // #LUMIXPHOTOSTYLE <TAG> declares the base Photo Style, i.e. the
+                // input the LUT was authored for. Every other comment is skipped
+                // exactly as before.
+                let upper = trimmed.uppercased()
+                if upper.hasPrefix("#LUMIXPHOTOSTYLE") {
+                    photoStyle = trimmed
+                        .dropFirst("#LUMIXPHOTOSTYLE".count)
+                        .trimmingCharacters(in: .whitespaces)
+                }
+                continue
+            }
 
             if trimmed.hasPrefix("LUT_3D_SIZE") {
                 let parts = trimmed.split(separator: " ")
@@ -129,6 +181,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         }
 
         self.size = lutSize
+        self.photoStyleTag = photoStyle
+        self.inputSpace = Self.resolveInputSpace(photoStyle: photoStyle, name: cleaned)
 
         // Build Core Image color cube data: RGBA float32, R varies fastest.
         // .cube format: R fastest, G middle, B slowest — same as Core Image expects.

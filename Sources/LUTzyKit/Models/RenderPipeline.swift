@@ -42,13 +42,15 @@ enum RenderPipeline {
         lut: CubeLUT?,
         scale: RenderScale,
         space: WorkingSpace = .current,
+        sourceIsVLog: Bool = false,
         lutCache: LUTFilterCache? = nil
     ) -> CIImage? {
         guard let developed = developedSource(source, rawDevelop: document.rawDevelop, scale: scale) else {
             return nil
         }
         return buildImage(
-            developed: developed, document: document, lut: lut, space: space, lutCache: lutCache
+            developed: developed, document: document, lut: lut, space: space,
+            sourceIsVLog: sourceIsVLog, lutCache: lutCache
         )
     }
 
@@ -66,10 +68,14 @@ enum RenderPipeline {
         document: EditDocument,
         lut: CubeLUT?,
         space: WorkingSpace = .current,
+        sourceIsVLog: Bool = false,
         lutCache: LUTFilterCache? = nil
     ) -> CIImage {
         let adjusted = applyAdjustments(document.adjustments, to: developed)
-        return applyLUT(document.lut, lut: lut, to: adjusted, space: space, cache: lutCache)
+        return applyLUT(
+            document.lut, lut: lut, to: adjusted, space: space,
+            sourceIsVLog: sourceIsVLog, cache: lutCache
+        )
     }
 
     // MARK: - Source
@@ -214,11 +220,24 @@ enum RenderPipeline {
         lut: CubeLUT?,
         to image: CIImage,
         space: WorkingSpace,
+        sourceIsVLog: Bool,
         cache: LUTFilterCache?
     ) -> CIImage {
         guard !settings.isIdentity, let lut else { return image }
 
+        // A V-Log LUT expects scene-referred log, but the developed image is a
+        // finished picture. Convert it into V-Log first — unless the source is
+        // already V-Log (a clip shot on the S9), in which case it is fed
+        // straight in. A display-input LUT is untouched, so ordinary LUTs
+        // behave exactly as before.
+        let prepared: CIImage
+        if lut.inputSpace == .vlog && !sourceIsVLog {
+            prepared = VLogInputAdapter.encode(image)
+        } else {
+            prepared = image
+        }
+
         let cubeFilter = cache?.filter(for: lut, space: space) ?? lut.makeFilter(space: space)
-        return lut.apply(to: image, intensity: settings.intensity, using: cubeFilter) ?? image
+        return lut.apply(to: prepared, intensity: settings.intensity, using: cubeFilter) ?? prepared
     }
 }

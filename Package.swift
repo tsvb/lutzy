@@ -10,12 +10,19 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "LUTzy", targets: ["LUTzy"]),
+        .executable(name: "lutcheck", targets: ["lutcheck"]),
         .library(name: "LUTzyKit", targets: ["LUTzyKit"]),
     ],
     targets: [
         .target(
             name: "LUTzyKit",
-            swiftSettings: [.swiftLanguageMode(.v6)],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                // Lets the `lutcheck` verifier @testable-import the module, so
+                // colour maths can be checked under the CLI toolchain without
+                // XCTest (which needs a full Xcode this machine lacks).
+                .unsafeFlags(["-enable-testing"], .when(configuration: .debug)),
+            ],
             linkerSettings: [
                 .linkedFramework("PhotosUI"),
             ]
@@ -24,6 +31,11 @@ let package = Package(
             name: "LUTzy",
             dependencies: ["LUTzyKit"],
             exclude: ["Assets.xcassets", "LUTzy.entitlements"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .executableTarget(
+            name: "lutcheck",
+            dependencies: ["LUTzyKit"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
