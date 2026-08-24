@@ -12,14 +12,22 @@ struct LUTSidebar: View {
     @State private var collapsed: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: LUTSidebar.collapsedKey) ?? [])
 
+    /// The LUT whose tag sheet is open, and the text being typed into it.
+    @State private var taggingLUT: CubeLUT?
+    @State private var newTag: String = ""
+
     private var isSearching: Bool { !searchText.isEmpty }
 
+    /// Search narrows whatever the tag filter has already left. The two
+    /// compose rather than override: "the warm ones, called classic" is the
+    /// question people actually ask of a library this size.
     private var filteredCategories: [LUTLibrary.Category] {
+        let base = viewModel.filteredCategories
         if searchText.isEmpty {
-            return viewModel.library.categories
+            return base
         }
         let query = searchText.lowercased()
-        return viewModel.library.categories.compactMap { cat in
+        return base.compactMap { cat in
             // A folder-name match surfaces the whole folder; otherwise keep only
             // the LUTs whose own name matches.
             if cat.name.lowercased().contains(query) {
@@ -83,6 +91,8 @@ struct LUTSidebar: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
 
+            tagFilterBar
+
             Divider()
 
             // LUT list
@@ -95,6 +105,111 @@ struct LUTSidebar: View {
             }
         }
         .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
+        .sheet(item: $taggingLUT) { lut in
+            addTagSheet(for: lut)
+        }
+    }
+
+    /// A LUT's tags: what was measured, what was typed, and a way to add more.
+    ///
+    /// Measured tags are shown but not removable — they are claims about the
+    /// file, and deleting one by hand would only mean the next scan puts it
+    /// back. Typed ones are the user's, and are the only ones that can go.
+    @ViewBuilder
+    private func tagMenu(for lut: CubeLUT) -> some View {
+        let measured = viewModel.tags.tags(for: lut).filter {
+            viewModel.tags.typedTags(for: lut).contains($0) == false
+        }
+        let typed = viewModel.tags.typedTags(for: lut)
+
+        Button("Add Tag…") {
+            newTag = ""
+            taggingLUT = lut
+        }
+        if typed.isEmpty == false {
+            Divider()
+            ForEach(typed, id: \.self) { tag in
+                Button("Remove “\(tag)”") { viewModel.tags.removeTag(tag, from: lut) }
+            }
+        }
+        if measured.isEmpty == false {
+            Divider()
+            Section("Measured") {
+                ForEach(measured, id: \.self) { tag in
+                    Text(tag)
+                }
+            }
+        }
+    }
+
+    private func addTagSheet(for lut: CubeLUT) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tag \(lut.name)")
+                .font(.headline)
+            TextField("e.g. 日系, 婚禮, 想再試", text: $newTag)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { commitTag(for: lut) }
+            HStack {
+                Spacer()
+                Button("Cancel") { taggingLUT = nil }
+                Button("Add") { commitTag(for: lut) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+
+    private func commitTag(for lut: CubeLUT) {
+        viewModel.tags.addTag(newTag, to: lut)
+        newTag = ""
+        taggingLUT = nil
+    }
+
+    /// The tags in use, as a row of toggles.
+    ///
+    /// Measured tags and typed ones sit together deliberately: from the point
+    /// of view of finding a LUT there is no difference between "高對比" (which
+    /// was measured) and "日系" (which was typed), and separating them would
+    /// make the user remember which kind each one was.
+    @ViewBuilder
+    private var tagFilterBar: some View {
+        if viewModel.tags.counts.isEmpty == false {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    if viewModel.tagFilter.isEmpty == false {
+                        Button {
+                            viewModel.clearTagFilter()
+                        } label: {
+                            Label("Clear", systemImage: "xmark")
+                                .font(.caption2)
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundColor(.secondary)
+                    }
+                    ForEach(viewModel.tags.counts, id: \.tag) { item in
+                        let active = viewModel.tagFilter.contains(item.tag)
+                        Button {
+                            viewModel.toggleTagFilter(item.tag)
+                        } label: {
+                            Text("\(item.tag) \(item.count)")
+                                .font(.caption2)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(active ? Color.accentColor.opacity(0.85)
+                                                   : Color.primary.opacity(0.08),
+                                            in: Capsule())
+                                .foregroundColor(active ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+        }
     }
 
     private var scanningState: some View {
@@ -141,6 +256,7 @@ struct LUTSidebar: View {
                     ForEach(category.luts) { lut in
                         LUTRow(lut: lut, isSelected: viewModel.selectedLUT == lut)
                             .tag(lut)
+                            .contextMenu { tagMenu(for: lut) }
                     }
                 } header: {
                     HStack {

@@ -231,6 +231,12 @@ final class AppViewModel: ObservableObject {
     // MARK: - Owned state
 
     let library = LUTLibrary()
+
+    /// Measured and typed tags for the library, keyed by LUT content.
+    let tags = LUTTagStore()
+
+    /// Tags a LUT must carry to be listed. Empty means no filtering.
+    @Published var tagFilter: Set<String> = []
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -297,8 +303,12 @@ final class AppViewModel: ObservableObject {
         // than go on serving the old cube. Wired here, before `restoreFolder()` runs below, so the
         // launch scan is covered too.
         library.onScanned = { [weak self] in
-            guard let engine = self?.engine else { return }
+            guard let self else { return }
+            let engine = self.engine
             Task { await engine.invalidateLUTCache() }
+            // Measure whatever the scan found that has not been measured
+            // before. Typed tags are never disturbed by this — see LUTTagStore.
+            Task { await self.tags.index(self.library.allLUTs) }
         }
 
         export.onStatus = { [weak self] in self?.statusMessage = $0 }
@@ -670,6 +680,25 @@ final class AppViewModel: ObservableObject {
         switch finding.space {
         case .auto: return "Auto: \(finding.evidence)"
         default: return "Auto: \(finding.space.label) — \(finding.evidence)"
+        }
+    }
+
+    // MARK: - Tag filtering
+
+    /// Turn one tag on or off in the filter.
+    func toggleTagFilter(_ tag: String) {
+        if tagFilter.contains(tag) { tagFilter.remove(tag) } else { tagFilter.insert(tag) }
+    }
+
+    func clearTagFilter() { tagFilter.removeAll() }
+
+    /// The library, less anything the filter excludes. Categories that end up
+    /// empty drop out rather than showing as empty folders.
+    var filteredCategories: [LUTLibrary.Category] {
+        guard tagFilter.isEmpty == false else { return library.categories }
+        return library.categories.compactMap { category in
+            let kept = category.luts.filter { tags.matches($0, required: tagFilter) }
+            return kept.isEmpty ? nil : LUTLibrary.Category(id: category.id, name: category.name, luts: kept)
         }
     }
 

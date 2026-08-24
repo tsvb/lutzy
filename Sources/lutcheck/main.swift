@@ -341,6 +341,63 @@ if let table = try? String(contentsOfFile: expectedTags, encoding: .utf8) {
 }
 
 
+// --- the tag store ----------------------------------------------------------
+// The one rule that matters: a rescan re-derives measured tags and must never
+// touch typed ones. Measured tags are claims about the file and should be
+// replaced when the file changes; a typed "日系" cannot be recovered by any
+// amount of measuring, so losing it to an automated pass is unrecoverable.
+var storeOK = true
+if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
+    let storeURL = scratch.appendingPathComponent("lutcheck-tags.json")
+    try? FileManager.default.removeItem(at: storeURL)
+    defer { try? FileManager.default.removeItem(at: storeURL) }
+
+    let store = LUTTagStore(fileURL: storeURL)
+    store.indexNow([lut])
+    let measured = store.tags(for: lut)
+    let measuredOK = measured.isEmpty == false && measured == LUTProfiler.autoTags(LUTProfiler.measure(lut), inputSpace: lut.inputSpace)
+    print("store measured on index -> \(measured) -> \(measuredOK ? "PASS" : "FAIL")")
+
+    store.addTag("日系", to: lut)
+    store.addTag("日系", to: lut)          // adding twice must not duplicate
+    let afterTyping = store.tags(for: lut)
+    let typedOK = store.typedTags(for: lut) == ["日系"] && afterTyping.contains("日系")
+    print("store typed tag added once -> \(store.typedTags(for: lut)) -> \(typedOK ? "PASS" : "FAIL")")
+
+    // A rescan that actually re-measures — the tagger rules moved on — must
+    // put the measured tags back and leave the typed one alone. Re-indexing
+    // without forcing that would be a no-op and would prove nothing.
+    store.forceRemeasure()
+    store.indexNow([lut])
+    let survivedOK = store.typedTags(for: lut) == ["日系"]
+        && store.tags(for: lut) == afterTyping
+        && store.tags(for: lut).contains(measured[0])
+    print("store re-measures and keeps the typed tag -> \(survivedOK ? "PASS" : "FAIL")")
+
+    // Filtering is an AND across the required set, and an empty filter matches.
+    let anyMeasured = measured.first ?? ""
+    let filterOK = store.matches(lut, required: [])
+        && store.matches(lut, required: [anyMeasured, "日系"])
+        && store.matches(lut, required: ["沒有這個標籤"]) == false
+    print("store filter is an AND, empty matches all -> \(filterOK ? "PASS" : "FAIL")")
+
+    // Persistence: what was typed has to still be there next launch.
+    store.flush()
+    let reloaded = LUTTagStore(fileURL: storeURL)
+    let persistOK = reloaded.typedTags(for: lut) == ["日系"] && reloaded.tags(for: lut) == afterTyping
+    print("store survives a reload -> \(persistOK ? "PASS" : "FAIL")")
+
+    store.removeTag("日系", from: lut)
+    let removedOK = store.typedTags(for: lut).isEmpty && store.tags(for: lut) == measured
+    print("store typed tag removable -> \(removedOK ? "PASS" : "FAIL")")
+
+    storeOK = measuredOK && typedOK && survivedOK && filterOK && persistOK && removedOK
+    print("tag store -> \(storeOK ? "PASS" : "FAIL")")
+} else {
+    print("tag store -> SKIP (no V-Log LUT on this machine)")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -462,4 +519,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
