@@ -114,7 +114,7 @@ final class ImageCollection: ObservableObject {
         isActive = false
 
         scanTask = Task {
-            let scanned = await Task.detached { Self.scanFolder(url) }.value
+            let scanned = await Self.scanFolder(url)
             guard !Task.isCancelled else { return }
             self.items = scanned
             self.isActive = !scanned.isEmpty
@@ -124,7 +124,7 @@ final class ImageCollection: ObservableObject {
 
     /// The blocking half of `loadFromFolder`. `nonisolated` so it can run on a
     /// background executor — it touches no instance state.
-    private nonisolated static func scanFolder(_ url: URL) -> [Item] {
+    private nonisolated static func scanFolder(_ url: URL) async -> sending [Item] {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(
             at: url,
@@ -219,9 +219,7 @@ final class ImageCollection: ObservableObject {
                 // index alone would then point at a different file.
                 let itemID = items[i].id
 
-                let thumb = await Task.detached {
-                    Thumbnails.generate(from: url)
-                }.value
+                let thumb = await Thumbnails.generateOffMain(from: url)
 
                 guard !Task.isCancelled else { return }
                 guard let current = items.firstIndex(where: { $0.id == itemID }) else { continue }

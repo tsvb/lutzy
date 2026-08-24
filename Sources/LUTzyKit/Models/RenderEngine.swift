@@ -254,9 +254,11 @@ actor RenderEngine: RenderEngining {
         guard let filter = RenderPipeline.rawFilter(for: source.backing) else { return nil }
 
         var highlightRecovery = false
-        if #available(macOS 26, *) {
-            highlightRecovery = filter.isHighlightRecoverySupported
-        }
+        #if compiler(>=6.2)
+            if #available(macOS 26, *) {
+                highlightRecovery = filter.isHighlightRecoverySupported
+            }
+        #endif
 
         return RAWCapabilities(
             isSharpnessSupported: filter.isSharpnessSupported,

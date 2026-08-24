@@ -147,12 +147,16 @@ struct RAWDevelopSettings: Codable, Sendable, Equatable {
         //
         // This guard is not optional politeness: with a 14.0 deployment target the compiler *refuses*
         // the reference without it. That is the point of building against a current SDK — the
-        // requirement is checked rather than remembered. (It also means this file needs Xcode 26 or
-        // newer to compile at all; see CLAUDE.md.)
+        // requirement is checked rather than remembered. The compile-time guard additionally lets
+        // older SDKs build the app; Xcode 26 is the first toolchain that declares this symbol.
         //
         // A no-op on macOS 14/15, where the document keeps the setting and the decoder never sees it.
-        if let highlightRecoveryEnabled, #available(macOS 26, *), filter.isHighlightRecoverySupported {
-            filter.isHighlightRecoveryEnabled = highlightRecoveryEnabled
-        }
+        #if compiler(>=6.2)
+            if let highlightRecoveryEnabled,
+               #available(macOS 26, *),
+               filter.isHighlightRecoverySupported {
+                filter.isHighlightRecoveryEnabled = highlightRecoveryEnabled
+            }
+        #endif
     }
 }

@@ -24,6 +24,16 @@ enum Thumbnails {
     /// The filmstrip's thumbnail size, in pixels on the long edge.
     static let defaultMaxPixelSize = 240
 
+    /// Generate on the cooperative background executor and transfer the newly-created AppKit image
+    /// to the caller. The `sending` result expresses the ownership transfer without claiming that
+    /// `NSImage` itself is `Sendable`, which it explicitly is not.
+    static func generateOffMain(
+        from url: URL,
+        maxPixelSize: Int = defaultMaxPixelSize
+    ) async -> sending NSImage? {
+        generate(from: url, maxPixelSize: maxPixelSize)
+    }
+
     /// Generate a thumbnail from a file, using the embedded preview where there is one.
     static func generate(from url: URL, maxPixelSize: Int = defaultMaxPixelSize) -> NSImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }

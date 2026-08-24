@@ -15,13 +15,12 @@ while deploying to 14 is the normal Apple model and is the *stricter* arrangemen
 refuses any API newer than the deployment target unless it is `#available`-guarded, so the guard is
 enforced rather than remembered. Use newer API behind `#available` — don't avoid it.
 
-**Requires Xcode 26 or newer to build.** That is the cost of the above: `RAWDevelopSettings` references
-`CIRAWFilter.isHighlightRecoveryEnabled`, which only exists in the macOS 26 SDK. On an older Xcode the
-package will not compile, and no availability check can change that — `#available` gates a call at
-runtime; it cannot conjure a symbol the SDK never declared. That distinction cost a red build in Phase 2
-Step 2, when CI still ran `macos-14` (Xcode 15.4 / macOS 14.5 SDK) and the code built clean locally.
-
-If CI ever needs to move back to an older image, that reference is the thing that has to go with it.
+Xcode 26 or newer enables highlight recovery. `CIRAWFilter.isHighlightRecoveryEnabled` only exists in
+the macOS 26 SDK, so references to it sit behind both `#if compiler(>=6.2)` and the runtime
+`#available(macOS 26, *)` check. Older toolchains can still build and run the package, but preserve the
+stored setting without applying it. The two guards solve different problems: `#if` prevents an older
+SDK from compiling a symbol it never declared; `#available` protects the macOS 14 deployment target at
+runtime.
 
 ## Swift 6 language mode is on, for every target
 

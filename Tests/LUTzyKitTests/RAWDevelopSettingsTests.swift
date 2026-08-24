@@ -161,9 +161,11 @@ final class RAWDevelopSettingsTests: XCTestCase {
             XCTAssertEqual(filter.colorNoiseReductionAmount, 0.8, accuracy: 0.0001)
         }
         if filter.isLensCorrectionSupported { XCTAssertFalse(filter.isLensCorrectionEnabled) }
-        if #available(macOS 26, *), filter.isHighlightRecoverySupported {
-            XCTAssertFalse(filter.isHighlightRecoveryEnabled)
-        }
+        #if compiler(>=6.2)
+            if #available(macOS 26, *), filter.isHighlightRecoverySupported {
+                XCTAssertFalse(filter.isHighlightRecoveryEnabled)
+            }
+        #endif
 
         XCTAssertNotNil(filter.outputImage, "a configured filter must still produce an image")
     }
@@ -197,9 +199,11 @@ final class RAWDevelopSettingsTests: XCTestCase {
         XCTAssertEqual(subject.isLensCorrectionEnabled, reference.isLensCorrectionEnabled)
         XCTAssertEqual(subject.isGamutMappingEnabled, reference.isGamutMappingEnabled)
         XCTAssertEqual(subject.extendedDynamicRangeAmount, reference.extendedDynamicRangeAmount)
-        if #available(macOS 26, *) {
-            XCTAssertEqual(subject.isHighlightRecoveryEnabled, reference.isHighlightRecoveryEnabled)
-        }
+        #if compiler(>=6.2)
+            if #available(macOS 26, *) {
+                XCTAssertEqual(subject.isHighlightRecoveryEnabled, reference.isHighlightRecoveryEnabled)
+            }
+        #endif
     }
 
     // MARK: - The gates themselves, which leave no runtime trace to assert on

@@ -354,6 +354,23 @@ final class AppViewModel: ObservableObject {
         load(name: url.lastPathComponent, url: url, data: nil)
     }
 
+    /// Decode on the cooperative background executor, then transfer the newly-created Core Image
+    /// graph to the main actor. `sending` describes that one-way ownership transfer without lying
+    /// that `CIImage` is generally safe to share between isolation domains.
+    private nonisolated static func decode(
+        name: String,
+        url: URL?,
+        data: Data?
+    ) async throws -> sending CIImage {
+        if let url {
+            return try ImageDecoder.load(from: url)
+        }
+        if let data {
+            return try ImageDecoder.load(from: data, name: name)
+        }
+        throw ImageError.cannotLoad(name)
+    }
+
     /// Decode an image **off the main actor**, then publish it and render the
     /// previews. RAW demosaicing is expensive enough (hundreds of ms) that
     /// doing it inline would freeze the window on every ←/→ step.
@@ -373,28 +390,10 @@ final class AppViewModel: ObservableObject {
         statusMessage = "Loading \(name)..."
 
         loadTask = Task {
-            let decoded: Result<CIImage, Error> = await Task.detached {
-                do {
-                    if let url {
-                        return .success(try ImageDecoder.load(from: url))
-                    }
-                    if let data {
-                        return .success(try ImageDecoder.load(from: data, name: name))
-                    }
-                    return .failure(ImageError.cannotLoad(name))
-                } catch {
-                    return .failure(error)
-                }
-            }.value
+            do {
+                let ci = try await Self.decode(name: name, url: url, data: data)
+                guard !Task.isCancelled else { return }
 
-            guard !Task.isCancelled else { return }
-
-            switch decoded {
-            case .failure(let error):
-                self.isLoading = false
-                self.presentError("Error: \(error.localizedDescription)")
-
-            case .success(let ci):
                 self.sourceImage = ci
                 self.sourceURL = url
                 self.sourceName = name
@@ -415,6 +414,10 @@ final class AppViewModel: ObservableObject {
                 self.schedulePreview()
                 self.refreshMetadata(url: url, data: data)
                 self.refreshCapabilities()
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.isLoading = false
+                self.presentError("Error: \(error.localizedDescription)")
             }
         }
     }
