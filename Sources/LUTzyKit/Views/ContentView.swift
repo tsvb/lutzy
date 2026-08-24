@@ -149,17 +149,6 @@ public struct ContentView: View {
 
     @ViewBuilder
     private var toolbarContent: some View {
-        // Format picker
-        Picker("Format", selection: $viewModel.exportFormat) {
-            ForEach(ExportFormat.allCases) { fmt in
-                Text(fmt.rawValue).tag(fmt)
-            }
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 180)
-
-        Divider()
-
         // How the preview is divided. A menu rather than a toggle: there are
         // seven layouts now, and V still cycles the two that get used most.
         Menu {
@@ -271,15 +260,27 @@ public struct ContentView: View {
             Label("LUT Folder", systemImage: "folder")
         }
 
-        // Export
-        Button {
-            viewModel.exportDialog()
+        // Export. The file format lives here rather than in its own permanent
+        // segmented control: it is a property of the export, it is decided once
+        // and rarely revisited, and as a toolbar fixture it took the width of
+        // three real controls to say something nobody was looking at.
+        Menu {
+            Button("Export…") { viewModel.exportDialog() }
+            Divider()
+            Picker("Format", selection: $viewModel.exportFormat) {
+                ForEach(ExportFormat.allCases) { fmt in
+                    Text(fmt.rawValue).tag(fmt)
+                }
+            }
+            .pickerStyle(.inline)
         } label: {
             Label("Export", systemImage: "square.and.arrow.up")
+        } primaryAction: {
+            viewModel.exportDialog()
         }
         // ⌘S is bound once, on the File ▸ Export menu item (LUTzyApp.swift).
         // Binding it here too gave the window two competing handlers.
-        .help("Export the graded image (⌘S)")
+        .help("Export the graded image as \(viewModel.exportFormat.rawValue) (⌘S)")
         .disabled(viewModel.sourceImage == nil)
 
         // Batch export — only when a multi-image set is loaded

@@ -885,6 +885,12 @@ final class AppViewModel: ObservableObject {
                 size: NSSize(width: cgImage.width, height: cgImage.height)
             )
             self.updateHistogram()
+            // The difference needs *this* render, not the one on screen when
+            // the task started. Composing outside the task used whatever was
+            // still displayed, so switching LUT showed the difference against
+            // the previous one — a picture full of colour where black was the
+            // right answer.
+            self.refreshDifference()
         }
 
         // The grid shows the same frame under other LUTs, so anything that
@@ -892,7 +898,6 @@ final class AppViewModel: ObservableObject {
         // invalidates every cell. `renderAllCells` returns immediately unless a
         // multi-cell layout is actually on screen.
         renderAllCells()
-        refreshDifference()
     }
 
     /// Rasterize the comparison baseline for the side-by-side left panel. Only needs to re-run when

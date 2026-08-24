@@ -36,7 +36,12 @@ struct ComparisonGridView: View {
         let lut = viewModel.cellLUTs[index]
         let isSelected = lut?.lutID == viewModel.selectedLUT?.lutID
 
-        return ZStack(alignment: .bottom) {
+        // The picture takes the tap (which adopts the cell), and the name
+        // plate sits *above* that gesture rather than inside it. With both in
+        // one stack the cell's own tap swallowed every click on the menu, so
+        // the per-cell LUT could not be changed at all — the one thing the
+        // grid exists for.
+        return ZStack {
             bgColor
 
             if let image = viewModel.cellImages[index] {
@@ -46,7 +51,10 @@ struct ComparisonGridView: View {
             } else {
                 ProgressView().controlSize(.small)
             }
-
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { viewModel.adoptCell(index) }
+        .overlay(alignment: .bottom) {
             CellLabel(
                 name: lut?.name ?? "No LUT",
                 isSelected: isSelected,
@@ -62,8 +70,6 @@ struct ComparisonGridView: View {
             RoundedRectangle(cornerRadius: 4)
                 .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2)
         )
-        .contentShape(Rectangle())
-        .onTapGesture { viewModel.adoptCell(index) }
     }
 }
 
