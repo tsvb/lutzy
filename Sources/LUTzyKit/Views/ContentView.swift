@@ -173,6 +173,22 @@ public struct ContentView: View {
         .help("LUT intensity (0–100%)")
         .disabled(viewModel.selectedLUT == nil)
 
+        // Only a V-Log LUT reads this, so it appears only when one is picked:
+        // a control that cannot change the picture should not be on screen.
+        if viewModel.isSourceSpaceRelevant {
+            Picker("Source", selection: Binding(
+                get: { viewModel.sourceSpace },
+                set: { viewModel.setSourceSpace($0) }
+            )) {
+                ForEach(SourceSpace.allCases, id: \.self) { space in
+                    Text(space.label).tag(space)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 210)
+            .help("This LUT expects V-Log. Auto measures the image; override if it guesses wrong.")
+        }
+
         Divider()
 
         // Import menu

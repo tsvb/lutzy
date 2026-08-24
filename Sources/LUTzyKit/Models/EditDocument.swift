@@ -28,6 +28,11 @@ struct EditDocument: Codable, Sendable, Equatable {
     /// Which LUT, at what strength.
     var lut: LUTSettings = .none
 
+    /// What the source image is, for the benefit of a V-Log LUT. `.auto` lets
+    /// the detector decide; the other two are the user overruling it. Ignored
+    /// entirely by display-input LUTs, which is every ordinary creative LUT.
+    var sourceSpace: SourceSpace = .auto
+
     /// The version this build writes.
     static let currentVersion = 1
 
@@ -35,12 +40,14 @@ struct EditDocument: Codable, Sendable, Equatable {
         version: Int = EditDocument.currentVersion,
         rawDevelop: RAWDevelopSettings = .neutral,
         adjustments: [AdjustmentNode] = [],
-        lut: LUTSettings = .none
+        lut: LUTSettings = .none,
+        sourceSpace: SourceSpace = .auto
     ) {
         self.version = version
         self.rawDevelop = rawDevelop
         self.adjustments = adjustments
         self.lut = lut
+        self.sourceSpace = sourceSpace
     }
 
     /// True when this document would leave the source untouched.
@@ -63,13 +70,14 @@ struct EditDocument: Codable, Sendable, Equatable {
     /// engine's developed-source memo is keyed on it, so both sides of the comparison hit the same
     /// entry instead of re-developing the RAW on every Space press.
     var originalForComparison: EditDocument {
-        EditDocument(version: version, rawDevelop: rawDevelop, adjustments: [], lut: .none)
+        EditDocument(version: version, rawDevelop: rawDevelop, adjustments: [], lut: .none,
+                     sourceSpace: sourceSpace)
     }
 
     // MARK: - Codable
 
     enum CodingKeys: String, CodingKey {
-        case version, rawDevelop, adjustments, lut
+        case version, rawDevelop, adjustments, lut, sourceSpace
     }
 
     /// Decoded field by field rather than by synthesis, for two reasons.
@@ -95,5 +103,6 @@ struct EditDocument: Codable, Sendable, Equatable {
         self.rawDevelop = try container.decodeIfPresent(RAWDevelopSettings.self, forKey: .rawDevelop) ?? .neutral
         self.adjustments = try container.decodeIfPresent([AdjustmentNode].self, forKey: .adjustments) ?? []
         self.lut = try container.decodeIfPresent(LUTSettings.self, forKey: .lut) ?? .none
+        self.sourceSpace = try container.decodeIfPresent(SourceSpace.self, forKey: .sourceSpace) ?? .auto
     }
 }

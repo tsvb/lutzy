@@ -316,8 +316,39 @@ actor RenderEngine: RenderEngining {
     ) -> CIImage? {
         guard let developed = developedSource(source, document.rawDevelop, scale) else { return nil }
         return RenderPipeline.buildImage(
-            developed: developed, document: document, lut: lut, space: space, lutCache: lutCache
+            developed: developed, document: document, lut: lut, space: space,
+            sourceIsVLog: resolveSourceIsVLog(document: document, developed: developed, lut: lut),
+            lutCache: lutCache
         )
+    }
+
+    /// Whether the developed image should be fed to a V-Log LUT as-is.
+    ///
+    /// Only asked when it matters — a display-input LUT never reaches the
+    /// adapter, so an ordinary LUT costs nothing here. `.auto` measures the
+    /// image; if the measurement is inconclusive the answer is "ordinary",
+    /// which is both the commoner case and the one whose failure is milder:
+    /// converting a picture that was already V-Log flattens it visibly, while
+    /// the reverse just looks like the LUT did nothing.
+    private func resolveSourceIsVLog(document: EditDocument, developed: CIImage, lut: CubeLUT?) -> Bool {
+        guard lut?.inputSpace == .vlog else { return false }
+        switch document.sourceSpace {
+        case .vlog: return true
+        case .display: return false
+        case .auto: return detectedSourceSpace(for: developed) == .vlog
+        }
+    }
+
+    /// Detection is memoised alongside the developed-source memo: it renders a
+    /// small crop, and the preview path would otherwise ask on every intensity
+    /// tick. Keyed by the same `developedKey`, because that is precisely what
+    /// identifies the image being measured.
+    private func detectedSourceSpace(for developed: CIImage) -> SourceSpace? {
+        if let key = developedKey, key == detectionKey { return detectionResult }
+        let found = SourceSpaceDetector.detect(developed, context: context)
+        detectionKey = developedKey
+        detectionResult = found
+        return found
     }
 
     // MARK: - The developed-source memo
@@ -330,6 +361,9 @@ actor RenderEngine: RenderEngining {
 
     private var developedKey: DevelopedKey?
     private var developedImage: CIImage?
+    /// Memo for source-space detection, keyed by the developed source it measured.
+    private var detectionKey: DevelopedKey?
+    private var detectionResult: SourceSpace?
 
     /// The source stage, memoized for **preview** renders.
     ///

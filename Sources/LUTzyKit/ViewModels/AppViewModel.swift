@@ -616,6 +616,24 @@ final class AppViewModel: ObservableObject {
         schedulePreview()
     }
 
+    /// What space the open image is treated as, for a V-Log LUT.
+    var sourceSpace: SourceSpace { document.sourceSpace }
+
+    /// Whether the source-space control is worth showing at all: only a V-Log
+    /// LUT consults it, so an ordinary creative LUT leaves it hidden rather
+    /// than offering a setting that changes nothing.
+    var isSourceSpaceRelevant: Bool { selectedLUT?.inputSpace == .vlog }
+
+    /// Override how the source is interpreted, and re-render.
+    ///
+    /// No debounce: this is a discrete pick, not a drag, and it changes the
+    /// picture completely rather than by a degree.
+    func setSourceSpace(_ value: SourceSpace) {
+        guard value != document.sourceSpace else { return }
+        document.sourceSpace = value
+        schedulePreview()
+    }
+
     /// Set the LUT strength (0...1) and re-render the preview. Safe to call on
     /// every slider tick: the re-render is debounced and the previous one is
     /// cancelled, so a full-travel drag costs a handful of renders, not one per
