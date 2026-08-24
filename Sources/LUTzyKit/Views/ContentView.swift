@@ -186,7 +186,15 @@ public struct ContentView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 210)
-            .help("This LUT expects V-Log. Auto measures the image; override if it guesses wrong.")
+            .help("This LUT expects V-Log. Auto reads the file first and measures the image only if the file does not say; override either.")
+
+            if let evidence = viewModel.sourceSpaceEvidence {
+                Text(evidence)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(evidence)
+            }
         }
 
         Divider()

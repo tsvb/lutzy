@@ -1,4 +1,6 @@
 import CoreImage
+import ImageIO
+import UniformTypeIdentifiers
 import Foundation
 @testable import LUTzyKit
 
@@ -167,6 +169,60 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
 }
 
 
+// --- the file's own account of its space ------------------------------------
+// Metadata is evidence where the pixel detector only has inference, so `.auto`
+// reads it first. These cover what it must and must not conclude — notably that
+// a plain sRGB-tagged JPEG says *nothing*, because a DC-S9 shooting V-Log forces
+// sRGB and reading that tag as display-referred would misfire on the exact case
+// this feature exists for.
+var metadataOK = true
+@MainActor func writeJPEG(description: String?, to url: URL) -> Bool {
+    var pixels = [UInt8](repeating: 128, count: 4 * 8 * 8)
+    guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+          let ctx = CGContext(data: &pixels, width: 8, height: 8, bitsPerComponent: 8,
+                              bytesPerRow: 32, space: space,
+                              bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+          let image = ctx.makeImage(),
+          let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
+    else { return false }
+    var properties: [String: Any] = [:]
+    if let description {
+        properties[kCGImagePropertyTIFFDictionary as String] =
+            [kCGImagePropertyTIFFImageDescription as String: description]
+    }
+    CGImageDestinationAddImage(dest, image, properties as CFDictionary)
+    return CGImageDestinationFinalize(dest)
+}
+
+let scratch = FileManager.default.temporaryDirectory
+@MainActor func metadataCase(_ label: String, description: String?, expect: SourceSpace?) {
+    let url = scratch.appendingPathComponent("lutcheck-\(abs(label.hashValue)).jpg")
+    guard writeJPEG(description: description, to: url) else {
+        print("metadata \(label) -> FAIL (could not write fixture)"); metadataOK = false; return
+    }
+    defer { try? FileManager.default.removeItem(at: url) }
+    let found = SourceSpaceMetadata.read(ImageSource(url: url, nativeExtent: CGSize(width: 8, height: 8)))
+    let ok = found?.space == expect
+    metadataOK = metadataOK && ok
+    print("metadata \(label.padding(toLength: 30, withPad: " ", startingAt: 0)) -> \(found.map { "\($0.space) (\($0.evidence))" } ?? "nothing")  \(ok ? "ok" : "WRONG, wanted \(expect.map(String.init(describing:)) ?? "nothing")")")
+}
+
+metadataCase("says V-Log", description: "Recorded in V-Log", expect: .vlog)
+metadataCase("says V-Gamut", description: "V-Gamut / V-Log", expect: .vlog)
+metadataCase("says S-Log3", description: "Sony S-Log3 clip", expect: .auto)
+metadataCase("plain sRGB JPEG", description: nil, expect: nil)
+metadataCase("unrelated caption", description: "A log cabin in the snow", expect: nil)
+
+// A RAW is developed into a rendered picture whatever the sensor recorded, so
+// the decode path settles it without reading the file at all.
+let rawFinding = SourceSpaceMetadata.read(
+    ImageSource(url: URL(fileURLWithPath: "/nonexistent/frame.rw2"), nativeExtent: CGSize(width: 8, height: 8)))
+let rawOK = rawFinding?.space == .display
+metadataOK = metadataOK && rawOK
+print("metadata RAW file                       -> \(rawFinding?.space.label ?? "nothing")  \(rawOK ? "ok" : "WRONG")")
+print("metadata reading -> \(metadataOK ? "PASS" : "FAIL")")
+
+
 // --- does the cube get indexed with the right number? -----------------------
 // The V-Log path owns its encoding end to end: the adapter (or the code-value
 // recovery, for an already-V-Log source) writes V-Log codes, `CIColorCube`
@@ -188,4 +244,4 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
     pipelineOK = pipelineOK && adaptedOK && recoveredOK
 }
 
-exit(adapterOK && tagsOK && detectionOK && pipelineOK ? 0 : 1)
+exit(adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

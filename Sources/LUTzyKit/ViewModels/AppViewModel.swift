@@ -402,8 +402,10 @@ final class AppViewModel: ObservableObject {
                 // re-developed per render. `nativeExtent` comes from the decode we just did.
                 if let url {
                     self.imageSource = ImageSource(url: url, nativeExtent: ci.extent.size)
+                    self.metadataFinding = nil
                 } else if let data {
                     self.imageSource = ImageSource(data: data, nativeExtent: ci.extent.size)
+                    self.metadataFinding = nil
                 } else {
                     self.imageSource = nil
                 }
@@ -623,6 +625,33 @@ final class AppViewModel: ObservableObject {
     /// LUT consults it, so an ordinary creative LUT leaves it hidden rather
     /// than offering a setting that changes nothing.
     var isSourceSpaceRelevant: Bool { selectedLUT?.inputSpace == .vlog }
+
+    /// What the file itself says about its space, if anything. Read once per
+    /// opened image — it is a header read, but it is also on the path of a UI
+    /// that redraws freely.
+    private var metadataFinding: SourceSpaceMetadata.Finding??
+
+    private var sourceFinding: SourceSpaceMetadata.Finding? {
+        if let cached = metadataFinding { return cached }
+        let found = imageSource.flatMap { SourceSpaceMetadata.read($0) }
+        metadataFinding = .some(found)
+        return found
+    }
+
+    /// One line explaining what `Auto` is going on, shown under the picker.
+    ///
+    /// Only for `.auto`: once the user has picked, the picker already says what
+    /// is happening and a second explanation would just be noise. When the file
+    /// says nothing this reports that the pixels were measured — the honest
+    /// answer, and the cue that an override may be worth trying.
+    var sourceSpaceEvidence: String? {
+        guard isSourceSpaceRelevant, document.sourceSpace == .auto else { return nil }
+        guard let finding = sourceFinding else { return "Auto: measured from the image" }
+        switch finding.space {
+        case .auto: return "Auto: \(finding.evidence)"
+        default: return "Auto: \(finding.space.label) — \(finding.evidence)"
+        }
+    }
 
     /// Override how the source is interpreted, and re-render.
     ///

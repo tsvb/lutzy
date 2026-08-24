@@ -317,7 +317,7 @@ actor RenderEngine: RenderEngining {
         guard let developed = developedSource(source, document.rawDevelop, scale) else { return nil }
         return RenderPipeline.buildImage(
             developed: developed, document: document, lut: lut, space: space,
-            sourceIsVLog: resolveSourceIsVLog(document: document, developed: developed, lut: lut),
+            sourceIsVLog: resolveSourceIsVLog(source, document: document, developed: developed, lut: lut),
             lutCache: lutCache
         )
     }
@@ -325,18 +325,30 @@ actor RenderEngine: RenderEngining {
     /// Whether the developed image should be fed to a V-Log LUT as-is.
     ///
     /// Only asked when it matters — a display-input LUT never reaches the
-    /// adapter, so an ordinary LUT costs nothing here. `.auto` measures the
-    /// image; if the measurement is inconclusive the answer is "ordinary",
-    /// which is both the commoner case and the one whose failure is milder:
-    /// converting a picture that was already V-Log flattens it visibly, while
-    /// the reverse just looks like the LUT did nothing.
-    private func resolveSourceIsVLog(document: EditDocument, developed: CIImage, lut: CubeLUT?) -> Bool {
+    /// adapter, so an ordinary LUT costs nothing here.
+    ///
+    /// `.auto` asks the file first and measures its pixels only if the file did
+    /// not say, because metadata is evidence and statistics are inference. When
+    /// neither settles it the answer is "ordinary": it is both the commoner
+    /// case and the milder failure — converting a picture that was already
+    /// V-Log flattens it visibly, while the reverse just looks like the LUT did
+    /// very little. Either way the user's own choice sits above both.
+    private func resolveSourceIsVLog(_ source: ImageSource, document: EditDocument,
+                                     developed: CIImage, lut: CubeLUT?) -> Bool {
         guard lut?.inputSpace == .vlog else { return false }
         switch document.sourceSpace {
         case .vlog: return true
         case .display: return false
-        case .auto: return detectedSourceSpace(for: developed) == .vlog
+        case .auto: return autoSourceSpace(source, developed: developed) == .vlog
         }
+    }
+
+    /// What `.auto` resolves to, and what the UI reports it resolved to.
+    func autoSourceSpace(_ source: ImageSource, developed: CIImage) -> SourceSpace? {
+        if let finding = SourceSpaceMetadata.read(source), finding.space != .auto {
+            return finding.space
+        }
+        return detectedSourceSpace(for: developed)
     }
 
     /// Detection is memoised alongside the developed-source memo: it renders a
