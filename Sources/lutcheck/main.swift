@@ -522,6 +522,54 @@ if let outside = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
 }
 
 
+// --- stars and folders ------------------------------------------------------
+// A star is a flag, not a tag: it must not turn up in the tag filter row
+// alongside 高對比, and it has to survive a reload like everything else keyed by
+// content. Moving between folders is a file move, so it is refused outside the
+// app's own library for the same reason removing is.
+var starOK = true
+if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
+    let storeURL = scratch.appendingPathComponent("lutcheck-stars.json")
+    try? FileManager.default.removeItem(at: storeURL)
+    defer { try? FileManager.default.removeItem(at: storeURL) }
+
+    let store = LUTTagStore(fileURL: storeURL)
+    store.indexNow([lut])
+    let tagsBefore = store.tags(for: lut)
+
+    store.toggleFavourite(lut)
+    let setOK = store.isFavourite(lut) && store.favouriteCount == 1
+    // The star must not leak into the vocabulary.
+    let separateOK = store.tags(for: lut) == tagsBefore
+        && store.counts.contains { $0.tag.contains("star") || $0.tag == "★" } == false
+    print("star set, and kept out of the tag list -> \(setOK && separateOK ? "PASS" : "FAIL")")
+
+    store.flush()
+    let reloaded = LUTTagStore(fileURL: storeURL)
+    let persistOK = reloaded.isFavourite(lut) && reloaded.favouriteCount == 1
+    print("star survives a reload -> \(persistOK ? "PASS" : "FAIL")")
+
+    store.toggleFavourite(lut)
+    let clearOK = store.isFavourite(lut) == false && store.favouriteCount == 0
+    print("star toggles off -> \(clearOK ? "PASS" : "FAIL")")
+
+    // Re-measuring must not disturb it either.
+    store.toggleFavourite(lut)
+    store.forceRemeasure()
+    store.indexNow([lut])
+    let survivesOK = store.isFavourite(lut)
+    print("star survives a re-measure -> \(survivesOK ? "PASS" : "FAIL")")
+
+    let library = LUTLibrary()
+    let refusedOK = library.move(lut, toCategory: "Anywhere") == false
+        && FileManager.default.fileExists(atPath: vlogLUT)
+    print("move refuses a LUT outside the library -> \(refusedOK ? "PASS" : "FAIL")")
+
+    starOK = setOK && separateOK && persistOK && clearOK && survivesOK && refusedOK
+    print("stars and folders -> \(starOK ? "PASS" : "FAIL")")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -648,4 +696,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

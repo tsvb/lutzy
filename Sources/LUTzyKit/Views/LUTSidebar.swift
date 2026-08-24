@@ -12,11 +12,29 @@ struct LUTSidebar: View {
     @State private var collapsed: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: LUTSidebar.collapsedKey) ?? [])
 
+    /// What the sidebar is showing. Folders and favourites are two ways of
+    /// narrowing the same library rather than two libraries, so this is a view
+    /// mode and the filters underneath compose with it.
+    enum Browse: String, CaseIterable {
+        case list, folders, favourites
+        var symbol: String {
+            switch self {
+            case .list: return "list.bullet"
+            case .folders: return "folder"
+            case .favourites: return "star"
+            }
+        }
+    }
+    @State private var browse: Browse = .list
+
     @State private var isDropTargeted = false
 
     /// The LUT whose tag sheet is open, and the text being typed into it.
     @State private var taggingLUT: CubeLUT?
     @State private var newTag: String = ""
+    /// The LUT waiting for a folder name to be typed.
+    @State private var movingLUT: CubeLUT?
+    @State private var newFolder: String = ""
 
     private var isSearching: Bool { !searchText.isEmpty }
 
@@ -58,6 +76,17 @@ struct LUTSidebar: View {
                     .disabled(isSearching)
                     .help(allExpanded ? "Collapse all folders" : "Expand all folders")
                 }
+                Picker("", selection: $browse) {
+                    ForEach(Browse.allCases, id: \.self) { mode in
+                        Image(systemName: mode.symbol).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .onChange(of: browse) { _, mode in
+                    viewModel.showingFavouritesOnly = mode == .favourites
+                }
                 Text("\(viewModel.library.allLUTs.count)")
                     .font(.caption)
                     .foregroundColor(Color(nsColor: .tertiaryLabelColor))
@@ -93,6 +122,24 @@ struct LUTSidebar: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
 
+            if let browsed = viewModel.browsedCategory {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.fill").font(.caption2)
+                    Text(browsed).font(.caption).lineLimit(1)
+                    Spacer()
+                    Button {
+                        viewModel.browse(nil)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Show every folder")
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+            }
+
             tagFilterBar
 
             Divider()
@@ -102,6 +149,10 @@ struct LUTSidebar: View {
                 scanningState
             } else if viewModel.library.allLUTs.isEmpty {
                 emptyState
+            } else if browse == .folders {
+                folderBrowser
+            } else if browse == .favourites && viewModel.tags.favouriteCount == 0 {
+                noFavouritesState
             } else {
                 lutList
             }
@@ -121,6 +172,9 @@ struct LUTSidebar: View {
         .sheet(item: $taggingLUT) { lut in
             addTagSheet(for: lut)
         }
+        .sheet(item: $movingLUT) { lut in
+            newFolderSheet(for: lut)
+        }
     }
 
     /// A LUT's tags: what was measured, what was typed, and a way to add more.
@@ -138,6 +192,20 @@ struct LUTSidebar: View {
         Button("Add Tag…") {
             newTag = ""
             taggingLUT = lut
+        }
+        Button(viewModel.tags.isFavourite(lut) ? "Unstar" : "Star") {
+            viewModel.tags.toggleFavourite(lut)
+        }
+        if viewModel.library.isManaged {
+            Menu("Move to Folder") {
+                Button("Top Level") { viewModel.moveLUT(lut, toCategory: "") }
+                Divider()
+                ForEach(viewModel.library.categoryNames, id: \.self) { name in
+                    Button(name) { viewModel.moveLUT(lut, toCategory: name) }
+                }
+                Divider()
+                Button("New Folder…") { movingLUT = lut }
+            }
         }
         Button("Reveal in Finder") {
             NSWorkspace.shared.activateFileViewerSelecting([lut.url])
@@ -208,6 +276,33 @@ struct LUTSidebar: View {
         return true
     }
 
+    private func newFolderSheet(for lut: CubeLUT) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Move \(lut.name) to a new folder")
+                .font(.headline)
+            TextField("Folder name", text: $newFolder)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { commitMove(lut) }
+            HStack {
+                Spacer()
+                Button("Cancel") { movingLUT = nil }
+                Button("Move") { commitMove(lut) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newFolder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+
+    private func commitMove(_ lut: CubeLUT) {
+        let name = newFolder.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard name.isEmpty == false else { return }
+        viewModel.moveLUT(lut, toCategory: name)
+        newFolder = ""
+        movingLUT = nil
+    }
+
     private func commitTag(for lut: CubeLUT) {
         viewModel.tags.addTag(newTag, to: lut)
         newTag = ""
@@ -257,6 +352,67 @@ struct LUTSidebar: View {
                 .padding(.bottom, 8)
             }
         }
+    }
+
+    /// The folders, as tiles with counts.
+    ///
+    /// A grid rather than the list's own section headers because this answers a
+    /// different question: not "which LUT" but "what have I got", and a library
+    /// of several hundred is easier to take in as a dozen tiles than as a
+    /// scroll.
+    private var folderBrowser: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                folderTile(name: "All LUTs", count: viewModel.library.allLUTs.count, category: nil)
+                ForEach(viewModel.folderTiles, id: \.name) { tile in
+                    folderTile(name: tile.name, count: tile.count, category: tile.name)
+                }
+            }
+            .padding(12)
+        }
+    }
+
+    private func folderTile(name: String, count: Int, category: String?) -> some View {
+        let active = viewModel.browsedCategory == category
+        return Button {
+            viewModel.browse(category)
+            browse = .list
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                Text(name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 4)
+                Text("\(count)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(active ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.06),
+                        in: RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var noFavouritesState: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "star")
+                .font(.system(size: 28))
+                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+            Text("Nothing starred yet")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Text("Click a LUT's star to keep it here")
+                .font(.caption)
+                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var scanningState: some View {
@@ -313,7 +469,10 @@ struct LUTSidebar: View {
             ForEach(filteredCategories) { category in
                 Section(isExpanded: isExpandedBinding(category.id)) {
                     ForEach(category.luts) { lut in
-                        LUTRow(lut: lut, isSelected: viewModel.selectedLUT == lut)
+                        LUTRow(lut: lut,
+                               isSelected: viewModel.selectedLUT == lut,
+                               isFavourite: viewModel.tags.isFavourite(lut),
+                               toggleFavourite: { viewModel.tags.toggleFavourite(lut) })
                             .tag(lut)
                             .contextMenu { tagMenu(for: lut) }
                     }
@@ -371,6 +530,10 @@ struct LUTSidebar: View {
 struct LUTRow: View {
     let lut: CubeLUT
     let isSelected: Bool
+    let isFavourite: Bool
+    let toggleFavourite: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -383,7 +546,21 @@ struct LUTRow: View {
                 .lineLimit(1)
 
             Spacer()
+
+            // The star appears on hover unless it is already set: a column of
+            // empty stars down a library of several hundred is noise, and a
+            // filled one is information.
+            if isFavourite || isHovering {
+                Button(action: toggleFavourite) {
+                    Image(systemName: isFavourite ? "star.fill" : "star")
+                        .font(.caption)
+                        .foregroundStyle(isFavourite ? Color.yellow : Color.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help(isFavourite ? "Unstar" : "Star")
+            }
         }
         .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
     }
 }

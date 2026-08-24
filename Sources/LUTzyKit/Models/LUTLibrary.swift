@@ -251,6 +251,35 @@ final class LUTLibrary: ObservableObject {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// The folders in the managed library, as the browser lists them.
+    var categoryNames: [String] {
+        categories.map(\.name).sorted()
+    }
+
+    /// Move a LUT into another folder of the app's own library.
+    ///
+    /// A folder is the file's own location, so this is a file move — which is
+    /// why it is refused outside the managed library, for the same reason
+    /// removing is. Tags are keyed by content and follow the file across.
+    /// An empty category name means the top level.
+    @discardableResult
+    func move(_ lut: CubeLUT, toCategory category: String) -> Bool {
+        let managed = Self.managedFolder.standardizedFileURL
+        guard lut.url.standardizedFileURL.path.hasPrefix(managed.path + "/") else { return false }
+
+        let folder = category.isEmpty ? managed : managed.appendingPathComponent(category, isDirectory: true)
+        let destination = Self.uniqueURL(in: folder, named: lut.url.lastPathComponent)
+        guard destination.standardizedFileURL != lut.url.standardizedFileURL else { return true }
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: lut.url, to: destination)
+        } catch {
+            return false
+        }
+        scan(managed)
+        return true
+    }
+
     /// Delete a LUT from the app's own library.
     ///
     /// Refuses anything outside the managed folder: everywhere else the files

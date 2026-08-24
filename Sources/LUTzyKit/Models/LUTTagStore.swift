@@ -28,6 +28,10 @@ final class LUTTagStore: ObservableObject {
         var metrics: LUTMetrics
         var measured: [String]
         var typed: [String]
+        /// Starred. A flag rather than a reserved tag: a favourite is not a
+        /// description of the LUT, and putting it in the tag vocabulary would
+        /// mean it turned up in the filter row alongside 高對比.
+        var isFavourite: Bool = false
         /// Which version of the measuring rules produced `measured`. Without
         /// it, an entry measured once is never measured again, and improving
         /// the tagger would leave every existing library describing itself by
@@ -72,6 +76,26 @@ final class LUTTagStore: ObservableObject {
 
     func typedTags(for lut: CubeLUT) -> [String] {
         entries[lut.contentHash]?.typed ?? []
+    }
+
+    func isFavourite(_ lut: CubeLUT) -> Bool {
+        entries[lut.contentHash]?.isFavourite ?? false
+    }
+
+    var favouriteCount: Int {
+        entries.values.filter(\.isFavourite).count
+    }
+
+    /// Star or unstar. Creates an entry if the LUT has never been measured —
+    /// starring something should not depend on a scan having reached it yet.
+    func toggleFavourite(_ lut: CubeLUT) {
+        var entry = entries[lut.contentHash] ?? Entry(
+            name: lut.name, inputSpace: lut.inputSpace == .vlog ? "vlog" : "display",
+            metrics: LUTProfiler.measure(lut), measured: [], typed: [], taggerVersion: 0
+        )
+        entry.isFavourite.toggle()
+        entries[lut.contentHash] = entry
+        scheduleSave()
     }
 
     func metrics(for lut: CubeLUT) -> LUTMetrics? {

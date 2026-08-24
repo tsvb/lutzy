@@ -240,6 +240,14 @@ final class AppViewModel: ObservableObject {
 
     /// Tags a LUT must carry to be listed. Empty means no filtering.
     @Published var tagFilter: Set<String> = []
+
+    /// Which folder the sidebar is showing, or `nil` for all of them. Set by
+    /// the folder browser; independent of the tag filter, which composes with
+    /// it.
+    @Published var browsedCategory: String?
+
+    /// Whether the sidebar is showing only starred LUTs.
+    @Published var showingFavouritesOnly = false
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -695,13 +703,40 @@ final class AppViewModel: ObservableObject {
 
     func clearTagFilter() { tagFilter.removeAll() }
 
-    /// The library, less anything the filter excludes. Categories that end up
-    /// empty drop out rather than showing as empty folders.
+    /// The library, less anything the filters exclude.
+    ///
+    /// Three filters compose rather than override — a folder, a set of tags,
+    /// and the star — because "the warm ones I starred, in Fuji" is a question
+    /// this library is big enough to be asked. Categories that end up empty
+    /// drop out rather than showing as empty folders.
     var filteredCategories: [LUTLibrary.Category] {
-        guard tagFilter.isEmpty == false else { return library.categories }
-        return library.categories.compactMap { category in
-            let kept = category.luts.filter { tags.matches($0, required: tagFilter) }
+        library.categories.compactMap { category in
+            if let browsed = browsedCategory, category.name != browsed { return nil }
+            let kept = category.luts.filter { lut in
+                if showingFavouritesOnly && tags.isFavourite(lut) == false { return false }
+                return tags.matches(lut, required: tagFilter)
+            }
             return kept.isEmpty ? nil : LUTLibrary.Category(id: category.id, name: category.name, luts: kept)
+        }
+    }
+
+    /// Folder tiles for the browser: every folder with how many LUTs it holds.
+    var folderTiles: [(name: String, count: Int)] {
+        library.categories
+            .map { (name: $0.name, count: $0.luts.count) }
+            .sorted { $0.name < $1.name }
+    }
+
+    func browse(_ category: String?) {
+        browsedCategory = category
+    }
+
+    /// Move a LUT into another folder of the app's own library.
+    func moveLUT(_ lut: CubeLUT, toCategory category: String) {
+        if library.move(lut, toCategory: category) {
+            statusMessage = "Moved \(lut.name) to \(category.isEmpty ? "the top level" : category)"
+        } else {
+            statusMessage = "\(lut.name) is not in the app's library — move it where it lives"
         }
     }
 
