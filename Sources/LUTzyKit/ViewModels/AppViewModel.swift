@@ -285,6 +285,11 @@ final class AppViewModel: ObservableObject {
             collection.objectWillChange.eraseToAnyPublisher(),
             export.objectWillChange.eraseToAnyPublisher(),
             derive.objectWillChange.eraseToAnyPublisher(),
+            // Without this the tag filter row never appears: the store
+            // publishes its counts, but the sidebar observes this view model,
+            // and an unforwarded child leaves the UI showing pre-scan state
+            // forever.
+            tags.objectWillChange.eraseToAnyPublisher(),
         ] {
             cancellables.append(child.sink { [weak self] _ in
                 Task { @MainActor [weak self] in
