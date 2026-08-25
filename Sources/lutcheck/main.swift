@@ -180,19 +180,22 @@ var metadataOK = true
 /// Write a fixture image. PNG when it has to carry colour: JPEG's 4:2:0 chroma
 /// subsampling averages a per-pixel colour ramp on an 8×8 away to near-neutral,
 /// which reads exactly like a pipeline that has lost colour and is not one.
-@MainActor func writeJPEG(description: String?, to url: URL, colourful: Bool = false) -> Bool {
+@MainActor func writeJPEG(description: String?, to url: URL, colourful: Bool = false, seed: Int = 0) -> Bool {
     // Flat grey is the right fixture for a metadata test and the wrong one for
     // a "do these cells differ" test: these LUTs are built to leave mid grey
     // near mid grey, so nine film simulations land within a few code values of
     // each other on it. A saturated ramp is where they separate.
     var pixels = [UInt8](repeating: 128, count: 4 * 8 * 8)
     if colourful {
+        // `seed` shifts the ramp so a set of fixtures is a set of *different*
+        // pictures. Without it every one is byte-identical, and a check that
+        // asks "is the right image on screen" cannot tell.
         for y in 0..<8 {
             for x in 0..<8 {
                 let i = (y * 8 + x) * 4
-                pixels[i]     = UInt8(x * 36 % 256)
-                pixels[i + 1] = UInt8(y * 36 % 256)
-                pixels[i + 2] = UInt8((x + y) * 18 % 256)
+                pixels[i]     = UInt8((x * 36 + seed * 29) % 256)
+                pixels[i + 1] = UInt8((y * 36 + seed * 53) % 256)
+                pixels[i + 2] = UInt8(((x + y) * 18 + seed * 71) % 256)
             }
         }
     }
@@ -864,6 +867,153 @@ if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
 }
 
 
+// --- switching images quickly -----------------------------------------------
+// Reported symptom: flicking through a set to compare a LUT often "fails to
+// switch". Two things could cause that and they need telling apart — the wrong
+// image ending up open (a race), or the right one arriving far too late (work
+// piling up behind cancelled decodes). This measures both.
+var switchOK = true
+do {
+    let root = scratch.appendingPathComponent("lutcheck-switch-\(UUID().uuidString)")
+    let images = root.appendingPathComponent("Images")
+    try? FileManager.default.createDirectory(at: images, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    for index in 0..<8 {
+        _ = writeJPEG(description: nil, to: images.appendingPathComponent("img\(index).png"),
+                      colourful: true, seed: index + 1)
+    }
+
+    let vm = AppViewModel(
+        projects: ProjectStore(root: root.appendingPathComponent("Projects")),
+        tags: LUTTagStore(fileURL: root.appendingPathComponent("tags.json"))
+    )
+    vm.collection.loadFromFolder(images)
+    await vm.collection.scanCompletion()
+
+    func waitFor(_ what: String, _ done: @MainActor () -> Bool, limit: Int = 600) async -> Bool {
+        for _ in 0..<limit {
+            if done() { return true }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        print("switch \(what) -> FAIL (timed out)")
+        return false
+    }
+
+    let ready = await waitFor("initial scan", { vm.collection.items.count == 8 })
+    // `sourceName` is the file name; `displayName` has no extension. Compare
+    // like with like, or the check reports a failure that is its own.
+    let names = vm.collection.items.map { $0.url?.lastPathComponent ?? $0.displayName }
+
+    // Flick through every image with no pause, the way a person does when
+    // comparing a look across a set.
+    let started = Date()
+    for index in vm.collection.items.indices {
+        vm.selectCollectionImage(at: index)
+    }
+    let wanted = names[names.count - 1]
+    let landed = await waitFor("settling on the last image", { vm.sourceName == wanted })
+    let elapsed = Date().timeIntervalSince(started)
+
+    // The right one has to be open, and the selection has to agree with it.
+    let agreesOK = vm.sourceName == wanted && vm.collection.selectedIndex == names.count - 1
+    print(String(format: "switch 8 images with no pause -> landed on %@ after %.2fs -> %@",
+                 vm.sourceName, elapsed, landed && agreesOK ? "PASS" : "FAIL"))
+
+    // Then the same again, to catch state that only breaks on a second pass.
+    for index in vm.collection.items.indices.reversed() {
+        vm.selectCollectionImage(at: index)
+    }
+    let backOK = await waitFor("settling on the first image", { vm.sourceName == names[0] })
+    let backAgreesOK = vm.collection.selectedIndex == 0 && vm.sourceName == names[0]
+    print("switch back the other way -> \(vm.sourceName) -> \(backOK && backAgreesOK ? "PASS" : "FAIL")")
+
+    // A render has to arrive, and it has to be of the image that ended up
+    // open. "The switch failed" would look identical if the state moved on but
+    // a stale render stayed on screen, so compare pixels rather than trust that
+    // a picture exists.
+    let renderedOK = await waitFor("a preview for the open image", { vm.previewNSImage != nil })
+
+    // Every fixture is a different colour ramp, so the middle pixel identifies
+    // which one is being shown.
+    func middlePixel(_ image: NSImage?) -> String? {
+        guard let image, let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let colour = bitmap.colorAt(x: bitmap.pixelsWide / 3, y: bitmap.pixelsHigh / 3)
+        else { return nil }
+        return String(format: "%02X%02X%02X",
+                      Int(colour.redComponent * 255),
+                      Int(colour.greenComponent * 255),
+                      Int(colour.blueComponent * 255))
+    }
+    let onScreen = middlePixel(vm.previewNSImage)
+    // Render the same image again from scratch and compare.
+    vm.selectCollectionImage(at: 0)
+    _ = await waitFor("first image", { vm.sourceName == names[0] })
+    let firstPixel = middlePixel(vm.previewNSImage)
+    vm.selectCollectionImage(at: names.count - 1)
+    _ = await waitFor("last image again", { vm.sourceName == names[names.count - 1] })
+    try? await Task.sleep(for: .milliseconds(400))
+    let lastPixel = middlePixel(vm.previewNSImage)
+    // Different fixtures must look different, and what was on screen at the end
+    // of the reverse pass — which finished on the first image — must be the
+    // first image, not a leftover of whatever was open before it.
+    let freshOK = onScreen != nil && firstPixel != nil && lastPixel != nil
+        && firstPixel != lastPixel && onScreen == firstPixel
+    print("switch shows the image that is open -> first \(firstPixel ?? "?"), last \(lastPixel ?? "?"), after the reverse pass \(onScreen ?? "?") -> \(freshOK ? "PASS" : "FAIL")")
+    print("switch leaves a rendered preview -> \(renderedOK ? "PASS" : "FAIL")")
+
+    switchOK = ready && landed && agreesOK && backOK && backAgreesOK && renderedOK && freshOK
+
+    // The reported case has a RAW in the set. RAW decoding is expensive and,
+    // unlike a PNG, long enough that cancelled work piling up is visible as
+    // "the switch failed". Measure a single decode, then a flick through a set
+    // containing several, and see whether the cancelled ones were skipped.
+    let rawSource = "/Users/world4jason/Library/Application Support/LUTStudio/Projects/134B3126-AAD9-4E7E-9521-19658D2B9464/Images/Panasonic - DC-S9 - 3_2.RW2"
+    if FileManager.default.fileExists(atPath: rawSource) {
+        let rawFolder = root.appendingPathComponent("Raws")
+        try? FileManager.default.createDirectory(at: rawFolder, withIntermediateDirectories: true)
+        for index in 0..<5 {
+            try? FileManager.default.copyItem(
+                at: URL(fileURLWithPath: rawSource),
+                to: rawFolder.appendingPathComponent("raw\(index).RW2"))
+        }
+        let rawVM = AppViewModel(
+            projects: ProjectStore(root: root.appendingPathComponent("RawProjects")),
+            tags: LUTTagStore(fileURL: root.appendingPathComponent("rawtags.json"))
+        )
+        rawVM.collection.loadFromFolder(rawFolder)
+        await rawVM.collection.scanCompletion()
+        let rawNames = rawVM.collection.items.map { $0.url?.lastPathComponent ?? $0.displayName }
+
+        // One image, from cold: the cost of a single switch.
+        var single = Date()
+        rawVM.selectCollectionImage(at: 0)
+        _ = await waitFor("one RAW", { rawVM.sourceName == rawNames[0] }, limit: 1500)
+        let one = Date().timeIntervalSince(single)
+
+        // Now flick through all of them with no pause. If cancelled decodes are
+        // skipped this costs about one decode; if they all run it costs five.
+        single = Date()
+        for index in rawVM.collection.items.indices {
+            rawVM.selectCollectionImage(at: index)
+        }
+        let settled = await waitFor("flicking through RAWs",
+                                    { rawVM.sourceName == rawNames[rawNames.count - 1] }, limit: 1500)
+        let many = Date().timeIntervalSince(single)
+        let ratio = one > 0 ? many / one : 0
+        // Skipping superseded work should land near one decode, not five.
+        let skipOK = settled && ratio < 2.0
+        print(String(format: "switch %d RAWs: one takes %.2fs, all %d take %.2fs (%.1fx) -> %@",
+                     rawNames.count, one, rawNames.count, many, ratio,
+                     skipOK ? "PASS" : "FAIL — cancelled decodes are not being skipped"))
+        switchOK = switchOK && skipOK
+    } else {
+        print("switch RAW pile-up -> SKIP (no RAW on this machine)")
+    }
+}
+print("switching -> \(switchOK ? "PASS" : "FAIL")")
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -1000,4 +1150,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
