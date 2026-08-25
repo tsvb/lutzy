@@ -1,4 +1,4 @@
-## 0. Product decision gate
+## 0. Resolved product decisions
 
 - [x] 0.1 Confirm visual LUT browsing is local-only and excludes online download, creator, and marketplace scope
 - [x] 0.2 Confirm LUT Library and LUT Manager are separate top-level Workspace destinations
@@ -6,6 +6,7 @@
 - [x] 0.4 Confirm the sample set is fixed built-in app content and does not accept Media Library additions
 - [x] 0.5 Confirm four samples: skin-tone portrait, outdoor sky/foliage, indoor mixed light, and saturated objects/neutrals
 - [x] 0.6 Confirm a draggable vertical Before/After split plus hold-Space original comparison
+- [x] 0.7 Confirm card tags prioritise user-authored tags, then measured tags, with stable alphabetical ordering
 
 ## 1. Navigation and state boundaries
 

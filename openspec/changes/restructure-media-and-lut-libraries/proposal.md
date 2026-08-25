@@ -17,7 +17,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - Let LUT Library perform only lightweight curation—Star, add to an existing Collection, and open in Viewer—while LUT Manager owns Collection structure and metadata editing.
 - Add a persistent LUT Manager metadata Inspector as the first interaction to test, replacing the add-only Tag sheet for normal editing.
 - Keep LUT Library local-only: it displays LUTs already imported into or created by the app and has no marketplace, download catalogue, or creator-network scope.
-- Show a LUT preview, name, vendor or Custom origin, and no more than three tags on each LUT Library gallery card.
+- Show a LUT preview, name, vendor or Custom origin, and no more than three tags on each LUT Library gallery card, prioritising user-authored tags before measured tags.
 - Open a LUT detail from the visual Library with multiple sample images and an original-versus-graded comparison rendered through the same colour pipeline as Viewer.
 - Treat supplied screenshots as non-normative references for hierarchy and interaction, not pixel-level designs to reproduce.
 

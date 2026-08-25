@@ -40,6 +40,14 @@ Each LUT Library Gallery card SHALL show a rendered sample preview, LUT name, ex
 - **WHEN** a vendor LUT has more than three tags
 - **THEN** its card shows the LUT name, confirmed vendor, exactly three or fewer tags, and may indicate an additional-tag count without rendering more tag chips
 
+#### Scenario: Choose the three visible tags
+- **WHEN** a LUT has more tags than the card can display
+- **THEN** user-authored tags receive priority in stable alphabetical order and measured tags fill remaining slots in stable alphabetical order
+
+#### Scenario: More than three user-authored tags
+- **WHEN** a LUT has more than three user-authored tags
+- **THEN** the first three under stable alphabetical sorting appear and no per-card manual tag-order control is required
+
 #### Scenario: LUT is self-made
 - **WHEN** a LUT is marked Custom
 - **THEN** its card labels the origin as Custom rather than inventing a vendor from its folder

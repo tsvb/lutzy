@@ -123,7 +123,7 @@ Collections are manual in this change. The condition-builder shown in one refere
 
 ### Preserve Manager table work and add a separate visual Library path
 
-LUT Manager remains the place for folder moves, Collection creation/rename/deletion, full membership editing, tagging, origin editing, removal, and other batch work. LUT Library consumes the same source-filtered LUT data for browsing without exposing destructive bulk controls. Its only write actions are Star, add to an existing Collection, and open in Viewer. Gallery cards prioritise the rendered look, then show the LUT name, confirmed vendor name or Custom/Unknown origin, and up to three tags. Extra tags remain available in detail and Manager metadata editing; the card may show a non-tag overflow count.
+LUT Manager remains the place for folder moves, Collection creation/rename/deletion, full membership editing, tagging, origin editing, removal, and other batch work. LUT Library consumes the same source-filtered LUT data for browsing without exposing destructive bulk controls. Its only write actions are Star, add to an existing Collection, and open in Viewer. Gallery cards prioritise the rendered look, then show the LUT name, confirmed vendor name or Custom/Unknown origin, and up to three tags. User-authored tags fill those slots first in stable alphabetical order; measured tags fill any remaining slots in their own stable alphabetical order. Extra tags remain available in detail and Manager metadata editing; the card may show a non-tag overflow count. The design does not add manual per-LUT card-tag ordering.
 
 Manager edits descriptive metadata and organisation only: display name, Vendor/Custom/Unknown origin, tags, Collection membership, physical folder, and Starred state. Controls that change LUT colour values, curves, interpolation, or the transform itself remain exclusively in LUT Editor.
 
@@ -163,8 +163,6 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 ## Open Questions
 
-The primary information architecture and LUT sample/detail interaction are resolved. One metadata-display question remains:
-
-1. When a LUT has more than three tags, which three receive card priority?
+None. Product-level decisions raised during the requested grilling session are resolved and recorded in `source-requirements.md`.
 
 Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; video playback is future work.

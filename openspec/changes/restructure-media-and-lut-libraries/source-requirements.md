@@ -54,6 +54,7 @@ This file preserves the user's original intent and the evolution of decisions be
 13. LUT Library samples are fixed built-in app assets. Users do not add or manage Library samples through Media Library; personal-image testing remains in Viewer.
 14. The built-in set contains four images: skin-tone portrait, outdoor sky/foliage, indoor mixed light, and saturated objects with neutral references.
 15. LUT detail uses a vertically divided Before/After image with a horizontally draggable split. Holding Space temporarily shows the complete original and release restores the comparison.
+16. Gallery cards show at most three Tags. User-authored Tags take priority, then measured Tags fill remaining positions; each group uses stable alphabetical order and users do not manage a separate card-display order.
 
 ### Colour consistency
 
@@ -138,7 +139,7 @@ The visual LUT space operates on the same local LUT set as LUT Manager. It is no
 
 ### 2026-08-26 — Display and management write boundary
 
-LUT Library is allowed to Star, add to an existing Collection, and open a LUT in Viewer. LUT Manager owns Collection structure, full membership editing, LUT metadata, folder moves, and deletion. Manager must improve metadata editing beyond the current add-only Tag sheet; the exact editing interaction remains open.
+LUT Library is allowed to Star, add to an existing Collection, and open a LUT in Viewer. LUT Manager owns Collection structure, full membership editing, LUT metadata, folder moves, and deletion. Manager replaces the current add-only Tag sheet with the confirmed persistent metadata Inspector.
 
 ### 2026-08-26 — Manager edits metadata, Editor edits transforms
 
@@ -168,6 +169,10 @@ The fixed set contains exactly four licensed assets: a skin-tone portrait; an ou
 
 The earlier reference with a central Before/After divider and sample thumbnails is accepted as the interaction direction. LUT detail uses a horizontally draggable vertical split; holding Space temporarily reveals the complete original. The reference still does not prescribe pixel-level styling.
 
+### 2026-08-26 — Gallery Tag priority
+
+Cards display at most three Tags. User-authored Tags fill the available slots first in stable alphabetical order, followed by measured Tags in stable alphabetical order. Full Tags remain visible in detail and Manager; no manual card-tag ordering feature is added.
+
 ## Reference-image index
 
 The following files are non-normative references. Their recorded purpose is limited to the note beside each path.
@@ -188,7 +193,7 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-ba66183b-4b3f-4a56-b62d-dfde63a9a59b.png` | Consolidated final Viewer information hierarchy |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-d0181aac-c1d2-4658-9667-514bec8e0b36.png` | Consolidated LUT sample-detail request |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5d49264b-f669-4619-a06a-638252e97e46.png` | Consolidated Gallery-card metadata request |
-| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5411ffd7-3444-4663-a8b9-ec10b4e680ac.png` | Consolidated open decision: split visual display from management |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5411ffd7-3444-4663-a8b9-ec10b4e680ac.png` | Reference for the now-resolved split between visual display and management |
 
 ## OpenSpec record map
 
