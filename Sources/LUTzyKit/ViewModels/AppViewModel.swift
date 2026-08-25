@@ -737,6 +737,42 @@ final class AppViewModel: ObservableObject {
     /// is happening and a second explanation would just be noise. When the file
     /// says nothing this reports that the pixels were measured — the honest
     /// answer, and the cue that an override may be worth trying.
+    /// Whether the picture is going through the display-to-V-Log conversion.
+    ///
+    /// Worth saying out loud, because that path is the approximate one and the
+    /// V-Log path is not.
+    var isConvertingToVLog: Bool {
+        guard isSourceSpaceRelevant else { return false }
+        switch document.sourceSpace {
+        case .display: return true
+        case .vlog: return false
+        case .auto: return imageSource.flatMap { source in
+            sourceImage.map { _ in autoSourceSpaceIsDisplay(source) }
+        } ?? false
+        }
+    }
+
+    private func autoSourceSpaceIsDisplay(_ source: ImageSource) -> Bool {
+        if let finding = SourceSpaceMetadata.read(source), finding.space != .auto {
+            return finding.space == .display
+        }
+        // The measurement is the engine's; a mismatch here would only ever be
+        // in what the caption says, never in what is rendered.
+        return true
+    }
+
+    /// What to warn about the conversion, or `nil` when none is happening.
+    ///
+    /// These LUTs are built to be fed V-Log straight off the camera. Feeding
+    /// them a finished picture means undoing a render first, and the render
+    /// being undone is a generic neutral one — not the Photo Style that
+    /// actually made this file, which nothing here has. Worth stating, because
+    /// the result looks plausible enough to be mistaken for the real thing.
+    var conversionCaveat: String? {
+        guard isConvertingToVLog else { return nil }
+        return "Approximate: this picture is already rendered, so it is converted back to V-Log against a generic curve — not your camera's own Photo Style. Shoot V-Log for an exact result."
+    }
+
     var sourceSpaceEvidence: String? {
         guard isSourceSpaceRelevant, document.sourceSpace == .auto else { return nil }
         guard let finding = sourceFinding else { return "Auto: measured from the image" }

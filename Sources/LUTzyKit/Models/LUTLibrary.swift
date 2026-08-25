@@ -191,15 +191,27 @@ final class LUTLibrary: ObservableObject {
             }
 
             if isDirectory.boolValue {
-                let category = source.lastPathComponent
+                // Keep the shape of what was imported. Flattening a nested
+                // folder into one directory loses the filing the user did, and
+                // makes a second import of the same tree land differently from
+                // the first.
+                let root = source.resolvingSymlinksInPath().path
+                let top = destination.appendingPathComponent(source.lastPathComponent, isDirectory: true)
                 guard let walker = fm.enumerator(at: source, includingPropertiesForKeys: nil) else {
                     result.failed += 1
                     continue
                 }
                 while let url = walker.nextObject() as? URL {
                     guard url.pathExtension.lowercased() == "cube" else { continue }
-                    copyOne(url, into: destination.appendingPathComponent(category, isDirectory: true),
-                            existing: &existing, result: &result)
+                    let path = url.resolvingSymlinksInPath().path
+                    let relative = path.hasPrefix(root)
+                        ? String(path.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                        : url.lastPathComponent
+                    let subfolder = relative.split(separator: "/").dropLast()
+                    let folder = subfolder.isEmpty
+                        ? top
+                        : top.appendingPathComponent(subfolder.joined(separator: "/"), isDirectory: true)
+                    copyOne(url, into: folder, existing: &existing, result: &result)
                 }
             } else if source.pathExtension.lowercased() == "cube" {
                 copyOne(source, into: destination, existing: &existing, result: &result)
@@ -383,8 +395,12 @@ final class LUTLibrary: ObservableObject {
             let relativePath = path.hasPrefix(rootPath)
                 ? String(path.dropFirst(rootPath.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                 : fileURL.lastPathComponent
-            let components = relativePath.split(separator: "/")
-            let category = components.count > 1 ? String(components[0]) : "General"
+            // The whole relative directory, not just its first component. A
+            // library filed as Fuji/Film and Fuji/BW is filed that way on
+            // purpose, and collapsing both into "Fuji" throws away the
+            // distinction the user made.
+            let components = relativePath.split(separator: "/").dropLast()
+            let category = components.isEmpty ? "General" : components.joined(separator: "/")
 
             do {
                 let lut = try CubeLUT(url: fileURL, category: category)

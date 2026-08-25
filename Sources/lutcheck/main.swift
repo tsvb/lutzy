@@ -485,6 +485,29 @@ do {
     let repeatOK = again == LUTLibrary.ImportResult(imported: 0, duplicates: 2, failed: 0)
     print("import the same folder twice -> \(again) -> \(repeatOK ? "PASS" : "FAIL")")
 
+    // A nested folder keeps its shape. Flattening it loses the filing the
+    // user did, and a second import of the same tree would then land
+    // differently from the first.
+    let nested = root.appendingPathComponent("vendor/Fuji/Film")
+    let nestedBW = root.appendingPathComponent("vendor/Fuji/BW")
+    try? FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: nestedBW, withIntermediateDirectories: true)
+    writeCube(nested.appendingPathComponent("provia.cube"), white: 0.81)
+    writeCube(nestedBW.appendingPathComponent("acros.cube"), white: 0.82)
+
+    let deepLibrary = root.appendingPathComponent("deep")
+    try? FileManager.default.createDirectory(at: deepLibrary, withIntermediateDirectories: true)
+    let deep = LUTLibrary.copyIn([root.appendingPathComponent("vendor/Fuji")], to: deepLibrary)
+    let landedDeep = FileManager.default.fileExists(atPath: deepLibrary.appendingPathComponent("Fuji/Film/provia.cube").path)
+        && FileManager.default.fileExists(atPath: deepLibrary.appendingPathComponent("Fuji/BW/acros.cube").path)
+    let deepOK = deep.imported == 2 && landedDeep
+    print("import keeps a nested folder's shape -> \(deep) -> \(deepOK ? "PASS" : "FAIL")")
+
+    // And a second import of the same tree is a no-op, not a reshuffle.
+    let deepAgain = LUTLibrary.copyIn([root.appendingPathComponent("vendor/Fuji")], to: deepLibrary)
+    let deepRepeatOK = deepAgain.imported == 0 && deepAgain.duplicates == 2
+    print("import the same nested tree twice -> \(deepAgain) -> \(deepRepeatOK ? "PASS" : "FAIL")")
+
     // A *different* LUT that shares a name is kept, under a numbered name.
     let clash = root.appendingPathComponent("clash")
     try? FileManager.default.createDirectory(at: clash, withIntermediateDirectories: true)
@@ -507,7 +530,7 @@ do {
         && AppViewModel.importSummary(LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 0)) == "Nothing to import"
     print("import summary -> \(summaryOK ? "PASS" : "FAIL")")
 
-    importOK = folderOK && repeatOK && clashOK && junkOK && summaryOK
+    importOK = folderOK && repeatOK && clashOK && junkOK && summaryOK && deepOK && deepRepeatOK
 }
 print("import -> \(importOK ? "PASS" : "FAIL")")
 

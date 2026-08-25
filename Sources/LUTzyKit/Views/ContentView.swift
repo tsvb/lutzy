@@ -219,7 +219,22 @@ public struct ContentView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 210)
-            .help("This LUT expects V-Log. Auto reads the file first and measures the image only if the file does not say; override either.")
+            .help("""
+                This LUT expects V-Log. Auto reads the file first and measures \
+                the image only if the file does not say; override either.
+
+                V-Log is exact — the file already holds the code values the LUT \
+                wants. Ordinary is approximate: a rendered picture has to be \
+                converted back, against a generic curve rather than the Photo \
+                Style that made it.
+                """)
+
+            if viewModel.conversionCaveat != nil {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .help(viewModel.conversionCaveat ?? "")
+            }
 
             if let evidence = viewModel.sourceSpaceEvidence {
                 Text(evidence)
