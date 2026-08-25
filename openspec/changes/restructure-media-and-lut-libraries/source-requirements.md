@@ -42,7 +42,7 @@ This file preserves the user's original intent and the evolution of decisions be
 1. LUT Manager is explicitly for LUT management and must not contain image-management features.
 2. Entering LUT Manager must not jump into a stale Viewer folder or an old nested visual-detail location. It should enter a stable All LUTs management overview.
 3. A visual LUT gallery shows many LUTs with a rendered preview, name, vendor or self-made status, and at most three visible tags per card.
-4. Activating a visual LUT opens a detail with several sample images so the user can inspect its effect. The supplied draggable before/after reference is not a mandate to copy that exact control.
+4. Activating a visual LUT opens a detail with several sample images so the user can inspect its effect. The accepted interaction is a draggable vertical Before/After split with sample thumbnails below it; the reference remains non-normative for styling.
 5. Gallery/detail previews must share Viewer's real render and colour pipeline so the same source and LUT do not produce a different RGB result in different parts of the app.
 6. LUT display/discovery and LUT management are separate top-level Workspace destinations named LUT Library and LUT Manager.
 7. LUT display is strictly for the local LUT Library: LUTs already imported into or created by the app. Marketplace, creator network, remote catalogue, and download features are explicitly excluded.
@@ -53,6 +53,7 @@ This file preserves the user's original intent and the evolution of decisions be
 12. Every LUT Library Gallery card uses the same currently selected sample image. Different sample images are available in LUT detail, not assigned as individual LUT cover images.
 13. LUT Library samples are fixed built-in app assets. Users do not add or manage Library samples through Media Library; personal-image testing remains in Viewer.
 14. The built-in set contains four images: skin-tone portrait, outdoor sky/foliage, indoor mixed light, and saturated objects with neutral references.
+15. LUT detail uses a vertically divided Before/After image with a horizontally draggable split. Holding Space temporarily shows the complete original and release restores the comparison.
 
 ### Colour consistency
 
@@ -162,6 +163,10 @@ LUT Library uses only a fixed set of licensed sample images bundled with the app
 ### 2026-08-26 — Four representative sample scenes
 
 The fixed set contains exactly four licensed assets: a skin-tone portrait; an outdoor sky-and-foliage scene; an indoor mixed-light scene; and a saturated-object scene with neutral references. Each asset needs a documented colour profile and source-space assumption.
+
+### 2026-08-26 — LUT detail comparison interaction
+
+The earlier reference with a central Before/After divider and sample thumbnails is accepted as the interaction direction. LUT detail uses a horizontally draggable vertical split; holding Space temporarily reveals the complete original. The reference still does not prescribe pixel-level styling.
 
 ## Reference-image index
 

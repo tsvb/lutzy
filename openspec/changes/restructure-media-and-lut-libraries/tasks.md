@@ -5,6 +5,7 @@
 - [x] 0.3 Confirm every Gallery card uses the same currently selected sample image
 - [x] 0.4 Confirm the sample set is fixed built-in app content and does not accept Media Library additions
 - [x] 0.5 Confirm four samples: skin-tone portrait, outdoor sky/foliage, indoor mixed light, and saturated objects/neutrals
+- [x] 0.6 Confirm a draggable vertical Before/After split plus hold-Space original comparison
 
 ## 1. Navigation and state boundaries
 
@@ -45,7 +46,7 @@
 ## 6. LUT detail and samples
 
 - [ ] 6.1 Add the four fixed licensed scene samples with explicit colour/source-space metadata and no custom-sample management
-- [ ] 6.2 Build visual Library LUT detail with sample selection, complete metadata, and original-versus-LUT comparison
+- [ ] 6.2 Build visual Library LUT detail with sample thumbnails, a draggable vertical Before/After split, hold-Space original, and complete metadata
 - [ ] 6.3 Reuse `EditDocument`, `RenderEngine`, source-space resolution, and render-context cache keys from Viewer
 - [ ] 6.4 Restore visual Library Gallery scope, selection, and scroll context on Back
 

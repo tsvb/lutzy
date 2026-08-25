@@ -97,6 +97,21 @@ Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fi
 - **WHEN** the user leaves LUT detail with Back
 - **THEN** LUT Library restores the originating Gallery source, selection, and scroll context
 
+### Requirement: Draggable Before/After comparison
+LUT detail SHALL compare the original and LUT-rendered result in one aligned large preview using a vertically divided image with a horizontally draggable split position.
+
+#### Scenario: Drag comparison split
+- **WHEN** the user drags the Before/After divider left or right
+- **THEN** the visible proportion changes while both sides remain pixel-aligned to the same sample image
+
+#### Scenario: Hold Space
+- **WHEN** the user holds Space while LUT detail has focus
+- **THEN** the preview temporarily shows the complete original image and restores the prior LUT comparison and split position on release
+
+#### Scenario: Select another sample
+- **WHEN** the user chooses one of the four sample thumbnails below the preview
+- **THEN** both Before and After update to the new sample while the selected LUT remains unchanged
+
 ### Requirement: Explicit origin metadata
 LUT Manager SHALL let users classify a LUT origin as Vendor with a name, Custom, or Unknown, and LUT Library SHALL display that shared metadata against stable LUT identity.
 
