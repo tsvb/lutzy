@@ -618,6 +618,82 @@ if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
 }
 
 
+// --- projects ---------------------------------------------------------------
+// A project is a place: its images are inside it, and reopening it puts back
+// what was on screen. Both halves are checked here, plus the rule that makes
+// projects safe to keep adding to — importing the same pictures twice is a
+// no-op, decided by content rather than by name.
+var projectOK = true
+do {
+    let root = scratch.appendingPathComponent("lutcheck-projects-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = ProjectStore(root: root)
+
+    let first = store.create(named: "Reference frames")
+    let second = store.create(named: "Wedding")
+    let createdOK = store.projects.count == 2 && store.current?.id == second.id
+    print("project create -> \(store.projects.map(\.name)) current \(store.current?.name ?? "none") -> \(createdOK ? "PASS" : "FAIL")")
+
+    // Images live inside the project, not next to it.
+    let images = store.imagesFolder(for: first)
+    let insideOK = images.path.hasPrefix(store.folder(for: first).path + "/")
+    print("project images live inside it -> \(insideOK ? "PASS" : "FAIL")")
+
+    // Import: a folder of two, then the same folder again.
+    let source = root.appendingPathComponent("shoot")
+    try? FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+    _ = writeJPEG(description: nil, to: source.appendingPathComponent("a.jpg"))
+    _ = writeJPEG(description: nil, to: source.appendingPathComponent("b.png"), colourful: true)
+    let imported = AppViewModel.copyImages([source], to: images)
+    let again = AppViewModel.copyImages([source], to: images)
+    let importOnceOK = imported.imported == 2 && again.imported == 0 && again.duplicates == 2
+    print("project image import -> \(imported), again \(again) -> \(importOnceOK ? "PASS" : "FAIL")")
+
+    // A non-image is reported rather than copied in.
+    let junk = root.appendingPathComponent("notes.txt")
+    try? "hello".write(to: junk, atomically: true, encoding: .utf8)
+    let junked = AppViewModel.copyImages([junk], to: images)
+    let junkOK = junked.imported == 0 && junked.failed == 1
+    print("project rejects a non-image -> \(junked) -> \(junkOK ? "PASS" : "FAIL")")
+
+    // The workspace survives a round trip through disk.
+    var session = Project.Session()
+    session.section = .manager
+    session.layout = .grid3x3
+    session.selectedLUT = "/some/lut.cube"
+    session.cellLUTs = ["/a.cube", nil, "/b.cube"]
+    session.imageName = "a.jpg"
+    session.tagFilter = ["高對比", "暖調"]
+    session.browsedCategory = "fuji"
+    session.showingFavouritesOnly = true
+    session.sourceSpace = .vlog
+    store.updateSession(session)
+
+    let reopened = ProjectStore(root: root)
+    let restored = reopened.current?.session
+    let sessionOK = restored == session && reopened.current?.id == second.id
+    print("project session survives a relaunch -> \(sessionOK ? "PASS" : "FAIL")")
+
+    // A project file from before these fields existed must still open.
+    let bare = #"{"id":"\#(UUID().uuidString)","name":"Old","createdAt":"2026-01-01T00:00:00Z","lastOpenedAt":"2026-01-01T00:00:00Z","session":{}}"#
+    let oldFolder = root.appendingPathComponent(UUID().uuidString)
+    try? FileManager.default.createDirectory(at: oldFolder, withIntermediateDirectories: true)
+    try? bare.write(to: oldFolder.appendingPathComponent("project.json"), atomically: true, encoding: .utf8)
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let legacyOK = (try? decoder.decode(Project.self, from: Data(bare.utf8)))?.session == Project.Session()
+    print("project file without the newer fields still opens -> \(legacyOK ? "PASS" : "FAIL")")
+
+    // Deleting the open one moves to another rather than leaving nothing open.
+    store.delete(second)
+    let deleteOK = store.projects.count == 1 && store.current?.id == first.id
+    print("delete the open project -> falls back to \(store.current?.name ?? "none") -> \(deleteOK ? "PASS" : "FAIL")")
+
+    projectOK = createdOK && insideOK && importOnceOK && junkOK && sessionOK && legacyOK && deleteOK
+}
+print("projects -> \(projectOK ? "PASS" : "FAIL")")
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -744,4 +820,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

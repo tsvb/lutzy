@@ -300,18 +300,42 @@ struct PreviewView: View {
 
     // MARK: - Drop
 
+    /// A drop is an import when a project is open.
+    ///
+    /// Copying into the project rather than opening in place is the same rule
+    /// the panel follows, and for the same reason: a project that points at
+    /// files elsewhere breaks the day they move. Without a project there is
+    /// nowhere to import *to*, so the old behaviour stands.
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
-            guard let data = item as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var urls: [URL] = []
+
+        for provider in providers {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                defer { group.leave() }
+                guard let data = item as? Data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                lock.lock()
+                urls.append(url)
+                lock.unlock()
+            }
+        }
+
+        group.notify(queue: .main) {
             Task { @MainActor in
+                guard let first = urls.first else { return }
+                if viewModel.projects.current != nil {
+                    viewModel.importImages(from: urls)
+                    return
+                }
                 var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                    viewModel.openSourceFolder(url: url)
+                if FileManager.default.fileExists(atPath: first.path, isDirectory: &isDir), isDir.boolValue {
+                    viewModel.openSourceFolder(url: first)
                 } else {
                     viewModel.collection.clear()
-                    viewModel.openImage(url: url)
+                    viewModel.openImage(url: first)
                 }
             }
         }

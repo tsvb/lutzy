@@ -45,13 +45,33 @@ enum AppSection: String, CaseIterable, Identifiable, Codable, Sendable {
 struct NavigationSidebar: View {
     @ObservedObject var viewModel: AppViewModel
 
+    @State private var isNaming = false
+    @State private var newProjectName = ""
+    @State private var renaming: Project?
+
     var body: some View {
         List(selection: navigationSelection) {
+            projectSection
             Section("Workspace") {
                 ForEach(AppSection.allCases) { section in
                     Label(section.label, systemImage: section.symbol)
                         .foregroundStyle(section.isAvailable ? .primary : .tertiary)
                         .tag(NavigationTarget.section(section))
+                }
+            }
+
+            if viewModel.projects.current != nil {
+                Section("Images") {
+                    Label("All Images", systemImage: "photo.on.rectangle")
+                        .badge(viewModel.collection.items.count)
+                        .tag(NavigationTarget.section(.viewer))
+                    Button {
+                        viewModel.importImages()
+                    } label: {
+                        Label("Import Images…", systemImage: "plus")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
                 }
             }
 
@@ -90,6 +110,72 @@ struct NavigationSidebar: View {
             .padding(.vertical, 10)
         }
         .frame(minWidth: 170, idealWidth: 190, maxWidth: 240)
+    }
+
+    /// The open project, and a way to switch. At the top because everything
+    /// below it — the images, the workspace, what was on screen last time —
+    /// belongs to whichever one this is.
+    @ViewBuilder
+    private var projectSection: some View {
+        Section("Project") {
+            Menu {
+                ForEach(viewModel.projects.projects) { project in
+                    Button {
+                        viewModel.openProject(project)
+                    } label: {
+                        if project.id == viewModel.projects.current?.id {
+                            Label(project.name, systemImage: "checkmark")
+                        } else {
+                            Text(project.name)
+                        }
+                    }
+                }
+                if viewModel.projects.projects.isEmpty == false { Divider() }
+                Button("New Project…") { newProjectName = ""; isNaming = true }
+                if let current = viewModel.projects.current {
+                    Button("Rename…") { newProjectName = current.name; renaming = current }
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([viewModel.projects.folder(for: current)])
+                    }
+                    Divider()
+                    Button("Delete Project", role: .destructive) { viewModel.deleteProject(current) }
+                }
+            } label: {
+                Label(viewModel.projects.current?.name ?? "No Project", systemImage: "folder.badge.gearshape")
+            }
+        }
+        .sheet(isPresented: $isNaming) {
+            nameSheet(title: "New Project", action: { viewModel.createProject(named: $0) })
+        }
+        .sheet(item: $renaming) { project in
+            nameSheet(title: "Rename Project", action: { viewModel.projects.rename(project, to: $0) })
+        }
+    }
+
+    private func nameSheet(title: String, action: @escaping (String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            TextField("Name", text: $newProjectName)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { commit(action) }
+            HStack {
+                Spacer()
+                Button("Cancel") { isNaming = false; renaming = nil }
+                Button("OK") { commit(action) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+
+    private func commit(_ action: (String) -> Void) {
+        let name = newProjectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard name.isEmpty == false else { return }
+        action(name)
+        isNaming = false
+        renaming = nil
     }
 
     /// One selection for two kinds of row.

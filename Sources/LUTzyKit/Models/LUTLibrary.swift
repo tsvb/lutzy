@@ -330,6 +330,15 @@ final class LUTLibrary: ObservableObject {
         }
     }
 
+    /// Wait for the running scan, if any.
+    ///
+    /// Restoring a project's LUT needs the library to exist first: the scan is
+    /// asynchronous, and asking for a LUT by ID before it lands quietly returns
+    /// nothing, which looks exactly like a project that was saved without one.
+    func scanCompletion() async {
+        await scanTask?.value
+    }
+
     private enum ScanOutcome {
         case success([Category])
         case failure(String)

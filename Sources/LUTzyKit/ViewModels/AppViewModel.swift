@@ -178,7 +178,7 @@ final class AppViewModel: ObservableObject {
 
     /// How the preview area is divided. Stored here rather than in the
     /// extension because Swift extensions cannot hold stored properties.
-    @Published var comparisonLayout: ComparisonLayout = .split
+    @Published var comparisonLayout: ComparisonLayout = .split { didSet { scheduleSessionSave() } }
     /// One LUT reference per cell, in cell order. `nil` is a deliberate choice —
     /// the ungraded picture — not an empty slot.
     @Published var cellLUTIDs: [LUTID?] = []
@@ -190,6 +190,22 @@ final class AppViewModel: ObservableObject {
     /// One in-flight render per cell, so re-picking one cell cancels one render
     /// rather than the whole sheet.
     var cellTasks: [Int: Task<Void, Never>] = [:]
+    /// Coalesces workspace saves. The state a project remembers changes on
+    /// every click in the sidebar, and each one rewriting the project file
+    /// would be the only slow thing about clicking.
+    private var sessionSaveTask: Task<Void, Never>?
+    /// True while a project's workspace is being put back.
+    ///
+    /// Restoring is not a user action, and letting it save would let a *failed*
+    /// restore overwrite what it failed to restore — which is what happened:
+    /// selecting a LUT the library had not finished scanning yet resolved to
+    /// nothing, and the resulting save erased the LUT from the project for
+    /// good.
+    /// A counter, not a flag: a restore runs one synchronous pass and two
+    /// asynchronous ones that finish independently, and whichever finished
+    /// first would clear a boolean while the others were still restoring.
+    var restoreDepth = 0
+    var isRestoringSession: Bool { restoreDepth > 0 }
     /// What V returns to. Remembered so a glance at the single view does not
     /// cost the user their 3×3.
     var lastComparisonLayout: ComparisonLayout = .split
@@ -241,24 +257,28 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - Owned state
 
+    /// Projects, and which one is open. The LUT library is global; images and
+    /// the workspace belong to a project — see `Project`.
+    let projects = ProjectStore()
+
     let library = LUTLibrary()
 
     /// Measured and typed tags for the library, keyed by LUT content.
     let tags = LUTTagStore()
 
     /// Tags a LUT must carry to be listed. Empty means no filtering.
-    @Published var tagFilter: Set<String> = []
+    @Published var tagFilter: Set<String> = [] { didSet { scheduleSessionSave() } }
 
     /// Which folder the sidebar is showing, or `nil` for all of them. Set by
     /// the folder browser; independent of the tag filter, which composes with
     /// it.
-    @Published var browsedCategory: String?
+    @Published var browsedCategory: String? { didSet { scheduleSessionSave() } }
 
     /// Whether the sidebar is showing only starred LUTs.
-    @Published var showingFavouritesOnly = false
+    @Published var showingFavouritesOnly = false { didSet { scheduleSessionSave() } }
 
     /// What the app is being used for: looking, managing, or (later) editing.
-    @Published var section: AppSection = .viewer
+    @Published var section: AppSection = .viewer { didSet { scheduleSessionSave() } }
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -301,6 +321,7 @@ final class AppViewModel: ObservableObject {
             // and an unforwarded child leaves the UI showing pre-scan state
             // forever.
             tags.objectWillChange.eraseToAnyPublisher(),
+            projects.objectWillChange.eraseToAnyPublisher(),
         ] {
             cancellables.append(child.sink { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -312,10 +333,13 @@ final class AppViewModel: ObservableObject {
         wireCoordinators()
         library.restoreFolder()
 
-        // Restore a previously-chosen source folder and open its first image.
-        // Both the LUT scan above and this one run asynchronously, so the
-        // window paints immediately and fills in as the scans land.
-        if collection.restoreSourceFolder() {
+        // A project owns the images and the workspace, so opening one is what
+        // fills the window. Falling back to a loose source folder covers
+        // libraries made before projects existed.
+        if let project = projects.current {
+            loadProjectImages()
+            restoreSession(project.session)
+        } else if collection.restoreSourceFolder() {
             isSourceBrowserPresented = true
             openFirstImageWhenScanned()
         }
@@ -545,6 +569,9 @@ final class AppViewModel: ObservableObject {
     func selectCollectionImage(at index: Int) {
         guard collection.items.indices.contains(index) else { return }
         collection.selectedIndex = index
+        // Which image is open is workspace state; without this it was only
+        // saved when something *else* happened to trigger a save afterwards.
+        scheduleSessionSave()
         let item = collection.items[index]
 
         if let url = item.url {
@@ -581,6 +608,7 @@ final class AppViewModel: ObservableObject {
         if let lut, lut.lutID.isDerived { derivedRegistry.register(lut) }
         document.lut.lutID = lut?.lutID
         applyLUT()
+        scheduleSessionSave()
     }
 
     /// Mutate the document and re-render.
@@ -718,6 +746,32 @@ final class AppViewModel: ObservableObject {
     }
 
     func clearTagFilter() { tagFilter.removeAll() }
+
+    /// Note that the workspace moved, and write it out shortly.
+    func scheduleSessionSave() {
+        guard isRestoringSession == false else { return }
+        sessionSaveTask?.cancel()
+        sessionSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard Task.isCancelled == false else { return }
+            self?.captureSession()
+        }
+    }
+
+    /// Put the viewer back to having nothing open. Used when switching or
+    /// deleting a project, where the previous project's picture must not stay
+    /// on screen under the new project's name.
+    func clearImage() {
+        imageSource = nil
+        sourceImage = nil
+        sourceURL = nil
+        sourceName = ""
+        previewNSImage = nil
+        originalPreviewNSImage = nil
+        diffNSImage = nil
+        cellImages = Array(repeating: nil, count: cellLUTIDs.count)
+        statusMessage = "Open an image to get started"
+    }
 
     /// The library, less anything the filters exclude.
     ///
