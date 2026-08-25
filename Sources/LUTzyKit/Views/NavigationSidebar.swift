@@ -1,237 +1,72 @@
 import SwiftUI
 
-/// What the app is being used for right now.
-///
-/// Each section owns one job. In particular, project images and the global LUT
-/// library have separate destinations even though both support bulk actions.
-enum AppSection: String, CaseIterable, Identifiable, Codable, Sendable {
+/// The app's three durable jobs. LUT scope and image browsing are subordinate
+/// controls inside these modes, never competing sidebar selections.
+enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable {
     case viewer
-    case images
     case manager
     case editor
-
-    /// Images has its own project-scoped navigation group below, so it does not
-    /// also appear in Workspace and create two equivalent sidebar rows.
-    static let workspaceSections: [AppSection] = [.viewer, .manager, .editor]
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .viewer: return "Viewer"
-        case .images: return "Images"
         case .manager: return "LUT Manager"
-        case .editor: return "Editor"
+        case .editor: return "LUT Editor"
         }
     }
 
     var symbol: String {
         switch self {
         case .viewer: return "photo"
-        case .images: return "photo.on.rectangle"
         case .manager: return "square.stack.3d.up"
         case .editor: return "slider.horizontal.3"
         }
     }
+
+    /// `images` was briefly a fourth top-level section. It now belongs inside
+    /// Viewer, but older project sessions must continue to decode rather than
+    /// making the whole project disappear from the store.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let stored = try container.decode(String.self)
+        self = AppSection(rawValue: stored) ?? .viewer
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
-/// The app's navigation column: what you are doing, and what you are looking at.
-///
-/// Two groups, because they answer different questions. **Workspace** is the
-/// mode. **Library** is the scope — every folder, plus the two views across all
-/// of them (everything, and starred), which are exactly the shortcuts a library
-/// gets used through once it is past a hundred files.
+/// Primary navigation intentionally has one kind of selection: app mode.
+/// Scope controls live beside the content they filter, so choosing a LUT
+/// folder can no longer steal the LUT Manager highlight.
 struct NavigationSidebar: View {
     @ObservedObject var viewModel: AppViewModel
 
-    @State private var isNaming = false
-    @State private var newProjectName = ""
-    @State private var renaming: Project?
-
     var body: some View {
-        List(selection: navigationSelection) {
-            projectSection
+        List(selection: selection) {
             Section("Workspace") {
-                ForEach(AppSection.workspaceSections) { section in
+                ForEach(AppSection.allCases) { section in
                     Label(section.label, systemImage: section.symbol)
-                        .tag(NavigationTarget.section(section))
-                }
-            }
-
-            if viewModel.projects.current != nil {
-                Section("Images") {
-                    Label("All Images", systemImage: "photo.on.rectangle")
-                        .badge(viewModel.collection.items.count)
-                        .tag(NavigationTarget.images)
-                    // Both ways in, in one place. They used to be split
-                    // between here and a toolbar menu that said "Import" with
-                    // no tooltip, which meant two places to look for one thing.
-                    Menu {
-                        Button("From Files…") { viewModel.importImages() }
-                        Button("From Photos…") { viewModel.importFromPhotos() }
-                    } label: {
-                        Label("Import Images…", systemImage: "plus")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .help("Copy images into this project")
-                }
-            }
-
-            Section("Library") {
-                Label("All LUTs", systemImage: "square.stack.3d.up")
-                    .badge(viewModel.library.allLUTs.count)
-                    .tag(NavigationTarget.everything)
-                Label("Starred", systemImage: "star")
-                    .badge(viewModel.tags.favouriteCount)
-                    .tag(NavigationTarget.starred)
-            }
-
-            if viewModel.folderTiles.isEmpty == false {
-                Section("Folders") {
-                    ForEach(viewModel.folderTiles, id: \.name) { folder in
-                        Label(folder.name, systemImage: "folder")
-                            .badge(folder.count)
-                            .tag(NavigationTarget.folder(folder.name))
-                    }
+                        .tag(section)
                 }
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            // Importing lives at the bottom of the navigation rather than
-            // buried in a menu: it is the one thing a new library needs, and
-            // the one thing an old one needs repeatedly.
-            Menu {
-                Button("Import LUTs…") { viewModel.importLUTs() }
-                Divider()
-                Button("Use a LUT Folder…") { viewModel.chooseLUTFolder() }
-                if viewModel.library.isManaged == false, let folder = viewModel.library.folderURL {
-                    Text("Currently: \(folder.lastPathComponent)")
-                    Button("Back to the App's Library") { viewModel.library.useManagedFolder() }
-                }
-            } label: {
-                Label("Import LUTs…", systemImage: "plus")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .menuStyle(.borderlessButton)
-            .help("Copy LUTs into the app's library, or point the library at a folder of your own")
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-        }
         .frame(minWidth: 170, idealWidth: 190, maxWidth: 240)
     }
 
-    /// The open project, and a way to switch. At the top because everything
-    /// below it — the images, the workspace, what was on screen last time —
-    /// belongs to whichever one this is.
-    @ViewBuilder
-    private var projectSection: some View {
-        Section("Project") {
-            Menu {
-                ForEach(viewModel.projects.projects) { project in
-                    Button {
-                        viewModel.openProject(project)
-                    } label: {
-                        if project.id == viewModel.projects.current?.id {
-                            Label(project.name, systemImage: "checkmark")
-                        } else {
-                            Text(project.name)
-                        }
-                    }
-                }
-                if viewModel.projects.projects.isEmpty == false { Divider() }
-                Button("New Project…") { newProjectName = ""; isNaming = true }
-                if let current = viewModel.projects.current {
-                    Button("Rename…") { newProjectName = current.name; renaming = current }
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([viewModel.projects.folder(for: current)])
-                    }
-                    Divider()
-                    Button("Delete Project", role: .destructive) { viewModel.deleteProject(current) }
-                }
-            } label: {
-                Label(viewModel.projects.current?.name ?? "No Project", systemImage: "folder.badge.gearshape")
-            }
-        }
-        .sheet(isPresented: $isNaming) {
-            nameSheet(title: "New Project", action: { viewModel.createProject(named: $0) })
-        }
-        .sheet(item: $renaming) { project in
-            nameSheet(title: "Rename Project", action: { viewModel.projects.rename(project, to: $0) })
-        }
-    }
-
-    private func nameSheet(title: String, action: @escaping (String) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            TextField("Name", text: $newProjectName)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { commit(action) }
-            HStack {
-                Spacer()
-                Button("Cancel") { isNaming = false; renaming = nil }
-                Button("OK") { commit(action) }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(16)
-        .frame(width: 320)
-    }
-
-    private func commit(_ action: (String) -> Void) {
-        let name = newProjectName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard name.isEmpty == false else { return }
-        action(name)
-        isNaming = false
-        renaming = nil
-    }
-
-    /// One selection for two kinds of row.
-    ///
-    /// A mode and a scope are independent — browsing the Fuji folder while in
-    /// the viewer is a normal thing to want — but they share a list, so the
-    /// selection reads back whichever of the two the user touched last.
-    private var navigationSelection: Binding<NavigationTarget?> {
+    private var selection: Binding<AppSection?> {
         Binding(
-            get: {
-                if viewModel.section == .images { return .images }
-                if viewModel.showingFavouritesOnly { return .starred }
-                if let folder = viewModel.browsedCategory { return .folder(folder) }
-                return .section(viewModel.section)
-            },
-            set: { target in
-                guard let target else { return }
-                switch target {
-                case .section(let section):
-                    // Just the section. The editor sets itself up in `onAppear`
-                    // rather than here: a click on an already-selected row is
-                    // not a selection change, so a project restored straight
-                    // into the editor would never have run the setup.
-                    viewModel.section = section
-                case .everything:
-                    viewModel.showingFavouritesOnly = false
-                    viewModel.browse(nil)
-                case .images:
-                    viewModel.section = .images
-                case .starred:
-                    viewModel.showingFavouritesOnly = true
-                    viewModel.browse(nil)
-                case .folder(let name):
-                    viewModel.showingFavouritesOnly = false
-                    viewModel.browse(name)
-                }
+            get: { viewModel.section },
+            set: { section in
+                guard let section else { return }
+                if section == .viewer { viewModel.viewerSurface = .preview }
+                viewModel.section = section
             }
         )
     }
-}
-
-/// A row in the navigation column.
-enum NavigationTarget: Hashable {
-    case section(AppSection)
-    case images
-    case everything
-    case starred
-    case folder(String)
 }

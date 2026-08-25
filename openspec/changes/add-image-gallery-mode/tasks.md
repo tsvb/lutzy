@@ -17,6 +17,6 @@
 
 ## 4. Navigation ownership
 
-- [x] 4.1 Rename the sidebar destination to LUT Manager and give Images an independent section
+- [x] 4.1 Rename the sidebar destination to LUT Manager and place Images inside Viewer
 - [x] 4.2 Remove the Images tab and image-management controls from LUT Manager
 - [x] 4.3 Verify saved-section compatibility, navigation behaviour, build, and OpenSpec validation

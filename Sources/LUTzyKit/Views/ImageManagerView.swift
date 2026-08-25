@@ -130,13 +130,11 @@ struct ImageManagerView: View {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
-            Text(viewModel.projects.current == nil ? "No project open" : "No images in this project")
+            Text("No images")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            if viewModel.projects.current != nil {
-                Button("Import Images…") { viewModel.importImages() }
-                    .buttonStyle(.borderedProminent)
-            }
+            Button("Import Images…") { viewModel.importImages() }
+                .buttonStyle(.borderedProminent)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -178,7 +176,7 @@ struct ImageManagerView: View {
             Button("Open in Viewer") { openSelected() }
             Button("Export Selected…") { viewModel.batchExportDialog(named: selection) }
             Divider()
-            Button("Remove from Project", role: .destructive) {
+            Button("Move to Trash", role: .destructive) {
                 viewModel.removeImages(named: selection)
                 selection = []
             }
@@ -230,7 +228,7 @@ struct ImageManagerView: View {
                     Text(row.name)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
-                    Text(row.folder.isEmpty ? "Project root" : row.folder)
+                    Text(row.folder.isEmpty ? "Image library" : row.folder)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -258,7 +256,7 @@ struct ImageManagerView: View {
             Button("Open in Viewer") { open(row) }
             Button("Export Selected…") { viewModel.batchExportDialog(named: actionSelection(for: row)) }
             Divider()
-            Button("Remove from Project", role: .destructive) {
+            Button("Move to Trash", role: .destructive) {
                 viewModel.removeImages(named: actionSelection(for: row))
                 selection = []
                 selectionAnchor = nil
@@ -313,6 +311,7 @@ struct ImageManagerView: View {
 
     private func open(_ row: Row) {
         viewModel.selectCollectionImage(at: row.index)
+        viewModel.viewerSurface = .preview
         viewModel.section = .viewer
     }
 

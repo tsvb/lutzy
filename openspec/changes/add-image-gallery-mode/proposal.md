@@ -9,7 +9,7 @@ The project image manager currently offers only a dense table. Users need both a
 - Add a responsive thumbnail gallery with clear selected, loading, and empty states.
 - Preserve selection, open, export-selected, and remove actions across both modes.
 - Remember the chosen presentation between visits.
-- Give Images its own project-scoped sidebar destination and keep the explicitly named LUT Manager limited to the global LUT library.
+- Keep Images as a Viewer-owned surface and keep the explicitly named LUT Manager limited to the global LUT library.
 
 ## Capabilities
 

@@ -718,7 +718,7 @@ do {
 
     // The workspace survives a round trip through disk.
     var session = Project.Session()
-    session.section = .images
+    session.section = .manager
     session.layout = .grid3x3
     session.selectedLUT = "/some/lut.cube"
     session.cellLUTs = ["/a.cube", nil, "/b.cube"]
@@ -753,10 +753,26 @@ do {
 }
 print("projects -> \(projectOK ? "PASS" : "FAIL")")
 
-let navigationOwnershipOK = AppSection.manager.label == "LUT Manager"
-    && AppSection.images.label == "Images"
-    && AppSection.workspaceSections == [.viewer, .manager, .editor]
-print("sidebar keeps Images separate from LUT Manager -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
+let formerImagesSection = try? JSONDecoder().decode(AppSection.self, from: Data(#""images""#.utf8))
+let navigationOwnershipOK = AppSection.allCases == [.viewer, .manager, .editor]
+    && AppSection.viewer.label == "Viewer"
+    && AppSection.manager.label == "LUT Manager"
+    && AppSection.editor.label == "LUT Editor"
+    && formerImagesSection == .viewer
+print("sidebar has three stable modes and migrates former Images to Viewer -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
+
+let implicitRoot = scratch.appendingPathComponent("lutcheck-implicit-images-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: implicitRoot) }
+let implicitProjects = ProjectStore(root: implicitRoot.appendingPathComponent("Projects"))
+let startedWithoutWorkspace = implicitProjects.current == nil
+let implicitVM = AppViewModel(
+    projects: implicitProjects,
+    tags: LUTTagStore(fileURL: implicitRoot.appendingPathComponent("tags.json")))
+let implicitWorkspaceOK = startedWithoutWorkspace
+    && implicitProjects.current != nil
+    && implicitProjects.currentImagesFolder != nil
+    && implicitVM.viewerSurface == .preview
+print("fresh install gets an implicit image workspace -> \(implicitWorkspaceOK ? "PASS" : "FAIL")")
 
 
 // --- image manager selection ----------------------------------------------

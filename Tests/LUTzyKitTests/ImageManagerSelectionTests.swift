@@ -59,9 +59,15 @@ final class ImageManagerSelectionTests: XCTestCase {
         XCTAssertEqual(result.anchor, "b")
     }
 
-    func testImagesAndLUTManagerHaveSeparateNavigationOwnership() {
-        XCTAssertEqual(AppSection.images.label, "Images")
+    func testPrimaryNavigationHasExactlyThreeNamedModes() {
+        XCTAssertEqual(AppSection.allCases, [.viewer, .manager, .editor])
+        XCTAssertEqual(AppSection.viewer.label, "Viewer")
         XCTAssertEqual(AppSection.manager.label, "LUT Manager")
-        XCTAssertEqual(AppSection.workspaceSections, [.viewer, .manager, .editor])
+        XCTAssertEqual(AppSection.editor.label, "LUT Editor")
+    }
+
+    func testFormerImagesSectionDecodesAsViewer() throws {
+        let decoded = try JSONDecoder().decode(AppSection.self, from: Data(#""images""#.utf8))
+        XCTAssertEqual(decoded, .viewer)
     }
 }

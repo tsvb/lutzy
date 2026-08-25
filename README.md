@@ -224,6 +224,7 @@ what is still outstanding.
 
 ## 🏗 Architecture notes
 
+- **Three stable workspaces.** Primary navigation contains only Viewer, LUT Manager, and LUT Editor. Image List/Gallery lives inside Viewer; All LUTs, Starred, folders, and LUT import live inside the LUT Library column, so changing library scope never steals the selected workspace.
 - **MVVM with coordinators.** [`AppViewModel`](Sources/LUTzyKit/ViewModels/AppViewModel.swift) holds the image, LUT, and preview state, and owns four collaborators: `LUTLibrary`, `ImageCollection`, [`ExportCoordinator`](Sources/LUTzyKit/ViewModels/ExportCoordinator.swift), and [`DeriveCoordinator`](Sources/LUTzyKit/ViewModels/DeriveCoordinator.swift). The coordinators report *what* happened through `onStatus`/`onError` closures; deciding how to present it stays with the view model. Views observe, and the menu bar talks to it via `NotificationCenter`.
 - **Panels are a seam, not a dependency.** Every operation that needs a file dialog is split into a `perform…` core taking an explicit URL and a thin `…Dialog` wrapper that runs the panel. `NSOpenPanel`/`NSSavePanel` can't run headless, so this is what makes export and save testable at all.
 - **Core Image end to end.** RAW demosaicing (`CIRAWFilter`), LUT application (`CIColorCubeWithColorSpace`), scaling (`CILanczosScaleTransform`), and all export encoding run through one Metal-backed `CIContext`.

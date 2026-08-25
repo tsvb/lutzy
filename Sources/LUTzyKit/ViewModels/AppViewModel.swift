@@ -290,9 +290,13 @@ final class AppViewModel: ObservableObject {
     /// Whether the sidebar is showing only starred LUTs.
     @Published var showingFavouritesOnly = false { didSet { scheduleSessionSave() } }
 
-    /// What the app is being used for: viewing, managing project images,
-    /// managing the global LUT library, or editing a LUT.
+    /// Which of the three top-level jobs owns the detail column.
     @Published var section: AppSection = .viewer { didSet { scheduleSessionSave() } }
+
+    /// Viewer has a subordinate image-library surface; it is not another app
+    /// mode and therefore never competes for the primary sidebar selection.
+    enum ViewerSurface: String, Hashable, Sendable { case preview, images }
+    @Published var viewerSurface: ViewerSurface = .preview
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -331,6 +335,13 @@ final class AppViewModel: ObservableObject {
         self.projects = projectStore ?? ProjectStore()
         self.tags = tagStore ?? LUTTagStore()
         self.export = ExportCoordinator(engine: engine)
+
+        // Project switching is no longer exposed, but its on-disk layout is a
+        // safe compatibility seam for existing images. A fresh install gets
+        // one implicit destination so Import Images works immediately.
+        if self.projects.current == nil {
+            self.projects.create(named: "Image Library")
+        }
 
         // Forward nested ObservableObject changes so SwiftUI views update.
         for child in [
@@ -1211,7 +1222,7 @@ final class AppViewModel: ObservableObject {
             if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil { removed += 1 }
         }
         guard removed > 0 else {
-            statusMessage = "Nothing removed — those images are not in the project"
+            statusMessage = "Nothing removed — those images are not in the image library"
             return
         }
         loadProjectImages()

@@ -42,7 +42,8 @@ struct LUTSidebar: View {
                 return cat
             }
             let filtered = cat.luts.filter { $0.name.lowercased().contains(query) }
-            return filtered.isEmpty ? nil : LUTLibrary.Category(id: cat.id, name: cat.name, luts: filtered)
+            return filtered.isEmpty
+                ? nil : LUTLibrary.Category(id: cat.id, name: cat.name, luts: filtered)
         }
     }
 
@@ -50,14 +51,16 @@ struct LUTSidebar: View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 8) {
-                Text("LUTs")
+                Text("LUT Library")
                     .font(.headline)
                     .foregroundColor(.secondary)
                 Spacer()
                 if filteredCategories.count > 1 {
                     Button(action: toggleAll) {
-                        Image(systemName: allExpanded ? "rectangle.compress.vertical"
-                                                       : "rectangle.expand.vertical")
+                        Image(
+                            systemName: allExpanded
+                                ? "rectangle.compress.vertical"
+                                : "rectangle.expand.vertical")
                     }
                     .buttonStyle(.borderless)
                     .foregroundColor(.secondary)
@@ -99,25 +102,7 @@ struct LUTSidebar: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
 
-            if viewModel.browsedCategory != nil || viewModel.showingFavouritesOnly {
-                HStack(spacing: 6) {
-                    Image(systemName: viewModel.showingFavouritesOnly ? "star.fill" : "folder.fill")
-                        .font(.caption2)
-                    Text(viewModel.browsedCategory ?? "Starred").font(.caption).lineLimit(1)
-                    Spacer()
-                    Button {
-                        viewModel.browse(nil)
-                        viewModel.showingFavouritesOnly = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Show the whole library")
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
-            }
+            scopeMenu
 
             tagFilterBar
 
@@ -138,6 +123,9 @@ struct LUTSidebar: View {
         // wider sidebar means more of the vocabulary per row rather than just
         // more whitespace.
         .frame(minWidth: 220, idealWidth: 260, maxWidth: 460)
+        .safeAreaInset(edge: .bottom) {
+            importMenu
+        }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             importDrop(providers)
         }
@@ -155,6 +143,100 @@ struct LUTSidebar: View {
         .sheet(item: $movingLUT) { lut in
             newFolderSheet(for: lut)
         }
+    }
+
+    private var scopeLabel: String {
+        if viewModel.showingFavouritesOnly { return "Starred" }
+        return viewModel.browsedCategory ?? "All LUTs"
+    }
+
+    private var scopeSymbol: String {
+        if viewModel.showingFavouritesOnly { return "star.fill" }
+        return viewModel.browsedCategory == nil ? "square.stack.3d.up" : "folder.fill"
+    }
+
+    /// LUT scope belongs to the LUT column, not primary navigation. The active
+    /// scope remains visible while the top-level mode highlight stays put.
+    private var scopeMenu: some View {
+        Menu {
+            Button {
+                viewModel.showingFavouritesOnly = false
+                viewModel.browse(nil)
+            } label: {
+                Label(
+                    "All LUTs",
+                    systemImage: viewModel.browsedCategory == nil
+                        && !viewModel.showingFavouritesOnly
+                        ? "checkmark"
+                        : "square.stack.3d.up"
+                )
+            }
+            Button {
+                viewModel.browse(nil)
+                viewModel.showingFavouritesOnly = true
+            } label: {
+                Label(
+                    "Starred", systemImage: viewModel.showingFavouritesOnly ? "checkmark" : "star")
+            }
+
+            if viewModel.folderTiles.isEmpty == false {
+                Divider()
+                Section("Folders") {
+                    ForEach(viewModel.folderTiles, id: \.name) { folder in
+                        Button {
+                            viewModel.showingFavouritesOnly = false
+                            viewModel.browse(folder.name)
+                        } label: {
+                            Label(
+                                "\(folder.name)  \(folder.count)",
+                                systemImage: viewModel.browsedCategory == folder.name
+                                    ? "checkmark" : "folder"
+                            )
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: scopeSymbol)
+                    .frame(width: 14)
+                Text(scopeLabel)
+                    .lineLimit(1)
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+        }
+        .menuStyle(.borderlessButton)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .help("Choose which part of the LUT library to show")
+    }
+
+    private var importMenu: some View {
+        Menu {
+            Button("Import LUTs…") { viewModel.importLUTs() }
+            Divider()
+            Button("Use a LUT Folder…") { viewModel.chooseLUTFolder() }
+            if viewModel.library.isManaged == false, let folder = viewModel.library.folderURL {
+                Text("Currently: \(folder.lastPathComponent)")
+                Button("Back to the App's Library") { viewModel.library.useManagedFolder() }
+            }
+        } label: {
+            Label("Import LUTs…", systemImage: "plus")
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Copy LUTs into the app's library, or point the library at a folder of your own")
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 
     /// A LUT's tags: what was measured, what was typed, and a way to add more.
@@ -243,7 +325,8 @@ struct LUTSidebar: View {
             provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
                 defer { group.leave() }
                 guard let data = item as? Data,
-                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                    let url = URL(dataRepresentation: data, relativeTo: nil)
+                else { return }
                 lock.lock()
                 urls.append(url)
                 lock.unlock()
@@ -370,14 +453,18 @@ struct LUTSidebar: View {
                 Text(tag)
                 if let count {
                     Text("\(count)")
-                        .foregroundStyle(active ? Color.white.opacity(0.75) : Color(nsColor: .tertiaryLabelColor))
+                        .foregroundStyle(
+                            active ? Color.white.opacity(0.75) : Color(nsColor: .tertiaryLabelColor)
+                        )
                 }
             }
             .font(.caption2)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(active ? Color.accentColor.opacity(0.85) : Color.primary.opacity(0.08),
-                        in: Capsule())
+            .background(
+                active ? Color.accentColor.opacity(0.85) : Color.primary.opacity(0.08),
+                in: Capsule()
+            )
             .foregroundColor(active ? .white : .primary)
         }
         .buttonStyle(.plain)
@@ -415,10 +502,12 @@ struct LUTSidebar: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Spacer()
-            Image(systemName: viewModel.library.scanError == nil
-                  ? "cube.transparent" : "exclamationmark.triangle")
-                .font(.system(size: 32))
-                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+            Image(
+                systemName: viewModel.library.scanError == nil
+                    ? "cube.transparent" : "exclamationmark.triangle"
+            )
+            .font(.system(size: 32))
+            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
             Text(viewModel.library.scanError ?? "No LUTs yet")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -447,19 +536,23 @@ struct LUTSidebar: View {
     }
 
     private var lutList: some View {
-        List(selection: Binding(
-            get: { viewModel.selectedLUT },
-            set: { viewModel.selectLUT($0) }
-        )) {
+        List(
+            selection: Binding(
+                get: { viewModel.selectedLUT },
+                set: { viewModel.selectLUT($0) }
+            )
+        ) {
             ForEach(filteredCategories) { category in
                 Section(isExpanded: isExpandedBinding(category.id)) {
                     ForEach(category.luts) { lut in
-                        LUTRow(lut: lut,
-                               isSelected: viewModel.selectedLUT == lut,
-                               isFavourite: viewModel.tags.isFavourite(lut),
-                               toggleFavourite: { viewModel.tags.toggleFavourite(lut) })
-                            .tag(lut)
-                            .contextMenu { tagMenu(for: lut) }
+                        LUTRow(
+                            lut: lut,
+                            isSelected: viewModel.selectedLUT == lut,
+                            isFavourite: viewModel.tags.isFavourite(lut),
+                            toggleFavourite: { viewModel.tags.toggleFavourite(lut) }
+                        )
+                        .tag(lut)
+                        .contextMenu { tagMenu(for: lut) }
                     }
                 } header: {
                     HStack {
@@ -500,9 +593,9 @@ struct LUTSidebar: View {
     private func toggleAll() {
         let ids = Set(filteredCategories.map(\.id))
         if allExpanded {
-            collapsed.formUnion(ids)   // everything open → collapse all
+            collapsed.formUnion(ids)  // everything open → collapse all
         } else {
-            collapsed.subtract(ids)    // some closed → expand all
+            collapsed.subtract(ids)  // some closed → expand all
         }
         persistCollapsed()
     }

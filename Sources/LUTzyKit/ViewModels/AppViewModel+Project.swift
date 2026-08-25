@@ -58,7 +58,7 @@ extension AppViewModel {
     /// whole point of a project is that it still opens next year.
     func importImages() {
         guard projects.current != nil else {
-            statusMessage = "Create a project first"
+            statusMessage = "Image library unavailable"
             return
         }
         let panel = NSOpenPanel()
@@ -73,7 +73,7 @@ extension AppViewModel {
 
     func importImages(from urls: [URL]) {
         guard let destination = projects.currentImagesFolder else {
-            statusMessage = "Create a project first"
+            statusMessage = "Image library unavailable"
             return
         }
         statusMessage = "Importing images…"
