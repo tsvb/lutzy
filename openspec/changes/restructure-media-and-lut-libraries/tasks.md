@@ -2,6 +2,8 @@
 
 - [x] 0.1 Confirm visual LUT browsing is local-only and excludes online download, creator, and marketplace scope
 - [x] 0.2 Confirm LUT Library and LUT Manager are separate top-level Workspace destinations
+- [x] 0.3 Confirm every Gallery card uses the same currently selected sample image
+- [ ] 0.4 Confirm whether the sample set is fixed app content or accepts Media Library additions
 
 ## 1. Navigation and state boundaries
 
@@ -34,7 +36,7 @@
 
 - [ ] 5.1 Add Vendor, Custom, and Unknown origin metadata with stable persistence and editing
 - [ ] 5.2 Keep LUT Manager's table focused on organisation and expose Gallery through the confirmed separate visual-LUT destination
-- [ ] 5.3 Build lazy Gallery cards with preview, name, origin, a maximum of three tags, and loading state
+- [ ] 5.3 Build lazy Gallery cards over one shared selected sample, with name, origin, a maximum of three tags, and loading state
 - [ ] 5.4 Build a persistent right-side Manager Inspector for single and multi-selection metadata editing
 - [ ] 5.5 Replace the add-only Tag sheet with visible tag chips, direct add/remove, and common/mixed multi-selection states
 - [ ] 5.6 Keep Manager mutations metadata-only and route every transform-changing action to LUT Editor

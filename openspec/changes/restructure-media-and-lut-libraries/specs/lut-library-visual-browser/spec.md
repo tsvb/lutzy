@@ -52,6 +52,17 @@ Each LUT Library Gallery card SHALL show a rendered sample preview, LUT name, ex
 - **WHEN** a card preview is not ready or an off-screen render was cancelled
 - **THEN** the card keeps stable geometry and shows a loading or unavailable state
 
+### Requirement: Shared Gallery comparison sample
+Every visible LUT Library Gallery card SHALL render its LUT against the same currently selected sample image rather than using a per-LUT cover image.
+
+#### Scenario: Compare gallery cards
+- **WHEN** multiple LUT cards are visible in Gallery
+- **THEN** their source pixels, source-space interpretation, base document, and intensity are identical and only the applied LUT differs
+
+#### Scenario: Change Gallery sample
+- **WHEN** the user chooses another Gallery sample
+- **THEN** every visible card updates to that same sample while preserving source, search, selection, and scroll context
+
 ### Requirement: LUT detail with multiple samples
 Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fixed sample images, full metadata, and an original-versus-LUT comparison for the selected sample.
 

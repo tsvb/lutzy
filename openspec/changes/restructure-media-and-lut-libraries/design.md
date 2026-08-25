@@ -135,7 +135,7 @@ Card activation opens a LUT Library detail rather than switching to Viewer or Ma
 
 ### Use shared sample images and the production render path
 
-LUT Library Gallery uses the selected sample image for comparable cards. LUT detail exposes the complete fixed sample set and an original-versus-LUT comparison for the chosen sample. The exact comparison control may reuse the app's current layouts; a draggable split is not required by the reference image.
+LUT Library Gallery uses one shared selected sample image across every visible LUT card. Per-LUT cover images are not used: keeping the source constant makes card-to-card differences attributable to the LUT rather than the photograph. LUT detail exposes the complete sample set and an original-versus-LUT comparison for the chosen sample. The exact comparison control may reuse the app's current layouts; a draggable split is not required by the reference image.
 
 Every LUT Library Gallery and detail preview goes through the same `EditDocument`, source-space resolution, `RenderEngine`, colour profile, and LUT intensity semantics as Viewer. Preview caching may differ, but the rendered RGB result for the same source, document, and LUT must not.
 
@@ -163,6 +163,8 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 ## Open Questions
 
-The primary information architecture is resolved. Remaining grilling questions concern visual-Library sample behaviour and implementation details, not Workspace ownership.
+The primary information architecture and shared Gallery comparison sample are resolved. One sample-scope question remains before implementation:
 
-Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.
+1. Is the sample set fixed app content only, or may users add samples from Media Library?
+
+Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; video playback is future work.

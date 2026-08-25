@@ -50,6 +50,7 @@ This file preserves the user's original intent and the evolution of decisions be
 9. Current LUT Manager metadata editing is inconvenient, especially tags. The add-only Tag sheet does not provide enough visibility or correction control.
 10. “Edit LUT” in Manager means metadata and organisation only. Any operation that changes colour values or the LUT transform belongs exclusively to LUT Editor.
 11. Use a persistent right-side Manager Inspector as the first design to test. It supports full single-selection metadata, direct Tag chips, and common/mixed multi-selection editing. The interaction may be refined after inspecting the implemented app.
+12. Every LUT Library Gallery card uses the same currently selected sample image. Different sample images are available in LUT detail, not assigned as individual LUT cover images.
 
 ### Colour consistency
 
@@ -147,6 +148,10 @@ The first Manager metadata interaction will use a persistent right-side Inspecto
 ### 2026-08-26 — Five separate Workspace destinations
 
 Workspace contains Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor. LUT Library and LUT Manager are separate top-level destinations rather than Gallery/Table modes or children of a shared LUT destination.
+
+### 2026-08-26 — One shared Gallery sample
+
+All LUT Library Gallery cards render the same currently selected sample image so users compare LUT effects against constant source pixels. Per-LUT cover images are excluded; additional samples are switched in LUT detail.
 
 ## Reference-image index
 
