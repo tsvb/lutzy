@@ -790,7 +790,7 @@ final class AppViewModel: ObservableObject {
     /// the result looks plausible enough to be mistaken for the real thing.
     var conversionCaveat: String? {
         guard isConvertingToVLog else { return nil }
-        return "Approximate: this picture is already rendered, so it is converted back to V-Log against a generic curve — not your camera's own Photo Style. Shoot V-Log for an exact result."
+        return "Approximate: this picture is already rendered, so the render is undone before the LUT sees it — exactly, but against a generic neutral curve rather than the Photo Style that actually made this file, which nothing here has. Shoot V-Log for a result with no assumption in it."
     }
 
     var sourceSpaceEvidence: String? {

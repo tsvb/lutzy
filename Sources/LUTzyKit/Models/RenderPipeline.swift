@@ -248,7 +248,12 @@ enum RenderPipeline {
         // becomes V-Log code values (unless it already is V-Log), the cube is
         // indexed with those codes directly, and the LUT's own output codes are
         // decoded back into the linear working space the rest of the graph uses.
-        let prepared = sourceIsVLog ? VLogInputAdapter.recoverCodeValues(image) : VLogInputAdapter.encode(image)
+        // No adaptation, no LUT. A V-Log cube indexed with display values is
+        // worse than an ungraded picture, and worse still for being silent.
+        guard let prepared = sourceIsVLog
+                ? VLogInputAdapter.recoverCodeValues(image)
+                : VLogInputAdapter.encode(image)
+        else { return image }
         let cubeFilter = cache?.filter(for: lut, space: space) ?? lut.makeFilter(space: space)
         guard let graded = lut.apply(to: prepared, intensity: 1.0, using: cubeFilter) else { return image }
         let decoded = VLogInputAdapter.decodeOutput(graded)

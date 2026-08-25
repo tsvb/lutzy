@@ -204,9 +204,9 @@ public struct ContentView: View {
                 the image only if the file does not say; override either.
 
                 V-Log is exact — the file already holds the code values the LUT \
-                wants. Ordinary is approximate: a rendered picture has to be \
-                converted back, against a generic curve rather than the Photo \
-                Style that made it.
+                wants. Ordinary undoes the rendering first, which is exact \
+                maths against a generic neutral curve — but that curve is not \
+                the Photo Style that made your file.
                 """)
 
             if viewModel.conversionCaveat != nil {

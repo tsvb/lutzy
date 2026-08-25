@@ -1,5 +1,6 @@
 import AppKit
 import CoreImage
+import simd
 import ImageIO
 import UniformTypeIdentifiers
 import Foundation
@@ -17,32 +18,42 @@ func adapterVLog(linearInput: Float) -> Float {
                 bytesPerRow: 16, size: CGSize(width: 1, height: 1),
                 format: .RGBAf, colorSpace: linear)
     }
-    let out = VLogInputAdapter.encode(img)
+    guard let out = VLogInputAdapter.encode(img) else { return -1 }
     var px = [Float](repeating: 0, count: 4)
     ctx.render(out, toBitmap: &px, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
                format: .RGBAf, colorSpace: linear)
     return px[0]
 }
 
-// Expected: linear_to_vlog(REC709_TO_VGAMUT · [x,x,x]), from lutcraft.
-let cases: [(Float, Float)] = [
-    (0.0, 0.12500), (0.0272, 0.24936), (0.1473, 0.40337), (0.2140, 0.44070), (1.0, 0.59912),
+// Expected values from lutcraft's own forward transform, inverted exactly.
+// The adapter's input is display *linear* — a picture that has already been
+// rendered — so the render is undone before the V-Gamut matrix and the V-Log
+// encode. Tolerance is tight on purpose: a closed-form inverse that needed a
+// loose one would not be closed-form.
+let adapterCases: [(input: Float, expected: Float)] = [
+    (0.0272, 0.34409),
+    (0.1473, 0.43340),
+    (0.2140, 0.45912),
+    (1.0000, 1.00000),
 ]
-var maxErr: Float = 0
-for (lin, expect) in cases {
-    let got = adapterVLog(linearInput: lin)
-    let err = abs(got - expect)
-    maxErr = max(maxErr, err)
-    print(String(format: "linear %.4f -> V-Log %.5f  (expect %.5f, err %.5f)", lin, got, expect, err))
+var adapterOK = true
+var adapterWorst: Float = 0
+for probe in adapterCases {
+    let got = adapterVLog(linearInput: probe.input)
+    let error = abs(got - probe.expected)
+    adapterWorst = max(adapterWorst, error)
+    adapterOK = adapterOK && error < 0.0005
+    print(String(format: "display linear %.4f -> V-Log %.5f  (expect %.5f, err %.5f)",
+                 probe.input, got, probe.expected, error))
 }
+print(String(format: "adapter max error %.6f -> %@", adapterWorst, adapterOK ? "PASS" : "FAIL"))
 
+// Which space a LUT declares it wants, by tag and by name.
 let vlogTag = CubeLUT.resolveInputSpace(photoStyle: "VLOG", name: "x")
 let stdTag = CubeLUT.resolveInputSpace(photoStyle: "STD", name: "x")
 let byName = CubeLUT.resolveInputSpace(photoStyle: nil, name: "fuji-vlog-velvia")
 let plain = CubeLUT.resolveInputSpace(photoStyle: nil, name: "teal-orange")
 let tagsOK = vlogTag == .vlog && stdTag == .display && byName == .vlog && plain == .display
-let adapterOK = maxErr < 0.01
-print("adapter max error \(maxErr) -> \(adapterOK ? "PASS" : "FAIL")")
 print("tag detection -> \(tagsOK ? "PASS" : "FAIL")")
 
 // --- source-space detection -------------------------------------------------
@@ -254,13 +265,15 @@ print("metadata reading -> \(metadataOK ? "PASS" : "FAIL")")
 // Core Image does — sampling it tetrahedrally instead moves them by ~0.01 and
 // says nothing about whether the wiring is right.
 if FileManager.default.fileExists(atPath: vlogLUT) {
-    // display 0.42 -> linear 0.1473 -> V-Log 0.4034 -> cube -> 0.3243
+    // display 0.42 -> linear 0.1473 -> undo the render -> scene 0.19907 ->
+    // V-Log 0.43341 -> cube -> 0.42357. The old expectation here was 0.3243,
+    // computed when the adapter skipped the inverse entirely; it was the bug.
     let adapted = pipelineGrey(lutPath: vlogLUT, sourceSpace: .display, input: 0.42) ?? -1
     // already V-Log 0.42 -> cube -> 0.3786, untouched on the way in
     let recovered = pipelineGrey(lutPath: vlogLUT, sourceSpace: .vlog, input: 0.42) ?? -1
-    let adaptedOK = abs(adapted - 0.3243) < 0.01
+    let adaptedOK = abs(adapted - 0.42357) < 0.005
     let recoveredOK = abs(recovered - 0.3786) < 0.01
-    print(String(format: "display 0.42 through adapter -> %.4f (want 0.3243) -> %@",
+    print(String(format: "display 0.42 through adapter -> %.4f (want 0.42357) -> %@",
                  adapted, adaptedOK ? "PASS" : "FAIL"))
     print(String(format: "V-Log 0.42 straight in       -> %.4f (want 0.3786) -> %@",
                  recovered, recoveredOK ? "PASS" : "FAIL"))
@@ -292,15 +305,25 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
     return Array(px[0..<3])
 }
 
+// Expected values are lutcraft's, computed through the same corrected chain
+// (undo the render, V-Gamut, V-Log, then provia). They agree to 0.0008, which
+// is Core Image sampling the cube trilinearly where lutcraft samples it
+// tetrahedrally — not slack in the conversion.
 var colourOK = true
 if FileManager.default.fileExists(atPath: vlogLUT) {
-    for probe in [(Float(0.80), Float(0.20), Float(0.20)), (0.20, 0.70, 0.30), (0.15, 0.30, 0.85)] {
-        guard let out = pipelineColour(lutPath: vlogLUT, sourceSpace: .display, rgb: probe) else { continue }
-        let spread = out.max()! - out.min()!
-        let ok = spread > 0.02
+    let colourCases: [(rgb: (Float, Float, Float), expected: [Float])] = [
+        ((0.80, 0.20, 0.20), [0.9191, 0.2138, 0.1981]),
+        ((0.20, 0.70, 0.30), [0.2761, 0.7067, 0.1453]),
+        ((0.15, 0.30, 0.85), [0.2117, 0.3095, 0.9440]),
+    ]
+    for probe in colourCases {
+        guard let out = pipelineColour(lutPath: vlogLUT, sourceSpace: .display, rgb: probe.rgb) else { continue }
+        let error = zip(out, probe.expected).map { abs($0 - $1) }.max() ?? 1
+        let ok = error < 0.002
         colourOK = colourOK && ok
-        print(String(format: "colour in (%.2f %.2f %.2f) -> out (%.4f %.4f %.4f) spread %.4f  %@",
-                     probe.0, probe.1, probe.2, out[0], out[1], out[2], spread, ok ? "ok" : "NEUTRAL — colour lost"))
+        print(String(format: "colour in (%.2f %.2f %.2f) -> out (%.4f %.4f %.4f), want (%.4f %.4f %.4f), err %.4f  %@",
+                     probe.rgb.0, probe.rgb.1, probe.rgb.2, out[0], out[1], out[2],
+                     probe.expected[0], probe.expected[1], probe.expected[2], error, ok ? "ok" : "WRONG"))
     }
     print("colour through the V-Log path -> \(colourOK ? "PASS" : "FAIL")")
 }
@@ -1014,6 +1037,96 @@ do {
 print("switching -> \(switchOK ? "PASS" : "FAIL")")
 
 
+// --- undoing the render -----------------------------------------------------
+// The display-to-V-Log conversion, against golden vectors computed from
+// lutcraft's own forward transform. This is the path that made ordinary photos
+// look horrible, so the bar is tight: the whole point of a closed-form inverse
+// is that it does not need a loose tolerance.
+var inverseOK = true
+if let table = try? String(contentsOfFile: "Fixtures/inverse-vectors.tsv", encoding: .utf8) {
+    // Rec.709 -> V-Gamut at full precision, straight from the Python.
+    let matrix: [Float] = [
+        0.58519614652135366, 0.32264162246936384, 0.092162231009282308,
+        0.078588567446848251, 0.81962711468982441, 0.10178431786332748,
+        0.022794237910300354, 0.11421702369120433, 0.8629887383984951,
+    ]
+    func toVLog(_ srgb: SIMD3<Float>) -> SIMD3<Float> {
+        let linear = SIMD3<Float>(OKLab.srgbToLinear(srgb.x),
+                                  OKLab.srgbToLinear(srgb.y),
+                                  OKLab.srgbToLinear(srgb.z))
+        let scene = NeutralRender.sceneLinear(linear)
+        let vg = SIMD3<Float>(
+            matrix[0] * scene.x + matrix[1] * scene.y + matrix[2] * scene.z,
+            matrix[3] * scene.x + matrix[4] * scene.y + matrix[5] * scene.z,
+            matrix[6] * scene.x + matrix[7] * scene.y + matrix[8] * scene.z)
+        func encode(_ x: Float) -> Float {
+            let v = max(x, 0)
+            return v < 0.01 ? 5.6 * v + 0.125
+                            : 0.241514 * log10(max(v + 0.00873, 1e-30)) / 1.0 + 0.598206
+        }
+        return simd_clamp(SIMD3<Float>(encode(vg.x), encode(vg.y), encode(vg.z)), .zero, .one)
+    }
+
+    var worst: Float = 0
+    var worstAt = ""
+    var checked = 0
+    for line in table.split(separator: "\n") where line.hasPrefix("#") == false {
+        let f = line.split(separator: "\t").compactMap { Float($0) }
+        guard f.count == 6 else { continue }
+        checked += 1
+        let got = toVLog(SIMD3<Float>(f[0], f[1], f[2]))
+        let want = SIMD3<Float>(f[3], f[4], f[5])
+        let error = max(abs(got.x - want.x), max(abs(got.y - want.y), abs(got.z - want.z)))
+        if error > worst {
+            worst = error
+            worstAt = String(format: "sRGB(%.3f %.3f %.3f)", f[0], f[1], f[2])
+        }
+    }
+    inverseOK = checked > 100 && worst < 0.001
+    print(String(format: "inverse %d golden vectors -> worst %.6f at %@ -> %@",
+                 checked, worst, worstAt, inverseOK ? "PASS" : "FAIL"))
+
+    // Round trip: undoing the render and redoing it has to come back.
+    var roundTrip: Float = 0
+    for step in 0...64 {
+        let v = Float(step) / 64 * NeutralRender.displayCeiling
+        let scene = NeutralRender.sceneLinear(SIMD3<Float>(repeating: v))
+        roundTrip = max(roundTrip, abs(NeutralRender.curveLinear(scene.x) - v))
+    }
+    let roundTripOK = roundTrip < 1e-5
+    print(String(format: "inverse neutral round trip -> worst %.2e -> %@", roundTrip, roundTripOK ? "PASS" : "FAIL"))
+
+    // The cases that produce NaN if unhandled. A NaN reaches the cube as an
+    // index and takes the pixel with it.
+    let awkward: [SIMD3<Float>] = [
+        .zero,
+        SIMD3(repeating: 1),                                  // past the ceiling
+        SIMD3(repeating: NeutralRender.displayCeiling),        // exactly at it
+        SIMD3(1, 1, 0),                                        // a tie at the top
+        SIMD3(.nan, 0.5, 0.5),
+        SIMD3(.infinity, 0.5, 0.5),
+        SIMD3(-0.5, 0.5, 2.0),                                 // over- and under-range
+    ]
+    var finiteOK = true
+    for input in awkward {
+        let scene = NeutralRender.sceneLinear(input)
+        let ok = scene.x.isFinite && scene.y.isFinite && scene.z.isFinite
+            && scene.min() >= 0 && scene.max() <= NeutralRender.sceneCeiling + 1e-3
+        if ok == false { finiteOK = false; print("inverse awkward input \(input) -> \(scene)") }
+    }
+    // Ties must come out equal, not merely close: two channels that were the
+    // same colour going in cannot come out a different colour.
+    let tie = NeutralRender.sceneLinear(SIMD3(0.6, 0.6, 0.2))
+    finiteOK = finiteOK && tie.x == tie.y
+    print("inverse handles black, ceiling, ties, NaN and overrange -> \(finiteOK ? "PASS" : "FAIL")")
+
+    inverseOK = inverseOK && roundTripOK && finiteOK
+    print("inverse -> \(inverseOK ? "PASS" : "FAIL")")
+} else {
+    print("inverse -> SKIP (no golden vectors)")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -1150,4 +1263,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
