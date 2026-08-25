@@ -731,7 +731,14 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
     let imageURL = scratch.appendingPathComponent("lutcheck-grid.png")
     defer { try? FileManager.default.removeItem(at: imageURL) }
 
-    let vm = AppViewModel()
+    // Scratch stores: a check must not read the user's projects, and must
+    // certainly not write to them.
+    let vmProjects = ProjectStore(root: scratch.appendingPathComponent("lutcheck-vm-projects-\(UUID().uuidString)"))
+    let vmTags = LUTTagStore(fileURL: scratch.appendingPathComponent("lutcheck-vm-tags-\(UUID().uuidString).json"))
+    defer {
+        try? FileManager.default.removeItem(at: scratch.appendingPathComponent("lutcheck-vm-projects"))
+    }
+    let vm = AppViewModel(projects: vmProjects, tags: vmTags)
     vm.library.scan(URL(fileURLWithPath: lutFolder))
     vm.openImage(url: imageURL)
 

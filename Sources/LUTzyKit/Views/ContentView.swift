@@ -164,13 +164,13 @@ public struct ContentView: View {
         }
         .help("Compare against the original, against another LUT, or several LUTs at once (V toggles the last two)")
 
-        // Source folder browser
+        // The project's images, as a browser beside the picture.
         Button {
             viewModel.toggleSourceBrowser()
         } label: {
-            Label("Source", systemImage: "sidebar.leading")
+            Label("Images", systemImage: "sidebar.leading")
         }
-        .help("Show the source folder file browser")
+        .help("Show this project's images as a browser")
         .disabled(viewModel.collection.items.isEmpty)
 
         // Info inspector (histogram + EXIF)
@@ -231,34 +231,6 @@ public struct ContentView: View {
         }
 
         Divider()
-
-        // Import menu
-        Menu {
-            Button("Open Image...") {
-                viewModel.openImageDialog()
-            }
-            Divider()
-            Button("Import from Photos...") {
-                viewModel.importFromPhotos()
-            }
-            Button("Open Source Folder...") {
-                viewModel.chooseSourceFolder()
-            }
-            if !viewModel.collection.items.isEmpty {
-                Button("Refresh Source Folder") {
-                    viewModel.refreshSource()
-                }
-            }
-        } label: {
-            Label("Import", systemImage: "photo.on.rectangle")
-        }
-
-        // LUT folder
-        Button {
-            viewModel.chooseLUTFolder()
-        } label: {
-            Label("LUT Folder", systemImage: "folder")
-        }
 
         // Export. The file format lives here rather than in its own permanent
         // segmented control: it is a property of the export, it is decided once

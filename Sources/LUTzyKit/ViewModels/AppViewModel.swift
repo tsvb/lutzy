@@ -259,12 +259,12 @@ final class AppViewModel: ObservableObject {
 
     /// Projects, and which one is open. The LUT library is global; images and
     /// the workspace belong to a project — see `Project`.
-    let projects = ProjectStore()
+    let projects: ProjectStore
 
     let library = LUTLibrary()
 
     /// Measured and typed tags for the library, keyed by LUT content.
-    let tags = LUTTagStore()
+    let tags: LUTTagStore
 
     /// Tags a LUT must carry to be listed. Empty means no filtering.
     @Published var tagFilter: Set<String> = [] { didSet { scheduleSessionSave() } }
@@ -306,8 +306,16 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(engine: any RenderEngining = RenderEngine.shared) {
+    /// The stores are injectable so a test can point them at a scratch
+    /// directory. Without that, `lutcheck` built a view model against the
+    /// user's own projects and tags — it inherited their workspace, and worse,
+    /// its own actions wrote back into them.
+    init(engine: any RenderEngining = RenderEngine.shared,
+         projects projectStore: ProjectStore? = nil,
+         tags tagStore: LUTTagStore? = nil) {
         self.engine = engine
+        self.projects = projectStore ?? ProjectStore()
+        self.tags = tagStore ?? LUTTagStore()
         self.export = ExportCoordinator(engine: engine)
 
         // Forward nested ObservableObject changes so SwiftUI views update.

@@ -65,13 +65,18 @@ struct NavigationSidebar: View {
                     Label("All Images", systemImage: "photo.on.rectangle")
                         .badge(viewModel.collection.items.count)
                         .tag(NavigationTarget.section(.viewer))
-                    Button {
-                        viewModel.importImages()
+                    // Both ways in, in one place. They used to be split
+                    // between here and a toolbar menu that said "Import" with
+                    // no tooltip, which meant two places to look for one thing.
+                    Menu {
+                        Button("From Files…") { viewModel.importImages() }
+                        Button("From Photos…") { viewModel.importFromPhotos() }
                     } label: {
                         Label("Import Images…", systemImage: "plus")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.borderless)
+                    .menuStyle(.borderlessButton)
+                    .help("Copy images into this project")
                 }
             }
 
@@ -99,13 +104,20 @@ struct NavigationSidebar: View {
             // Importing lives at the bottom of the navigation rather than
             // buried in a menu: it is the one thing a new library needs, and
             // the one thing an old one needs repeatedly.
-            Button {
-                viewModel.importLUTs()
+            Menu {
+                Button("Import LUTs…") { viewModel.importLUTs() }
+                Divider()
+                Button("Use a LUT Folder…") { viewModel.chooseLUTFolder() }
+                if viewModel.library.isManaged == false, let folder = viewModel.library.folderURL {
+                    Text("Currently: \(folder.lastPathComponent)")
+                    Button("Back to the App's Library") { viewModel.library.useManagedFolder() }
+                }
             } label: {
                 Label("Import LUTs…", systemImage: "plus")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.borderless)
+            .menuStyle(.borderlessButton)
+            .help("Copy LUTs into the app's library, or point the library at a folder of your own")
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
