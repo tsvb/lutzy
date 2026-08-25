@@ -774,6 +774,23 @@ let folderHierarchyOK = sonyFolder?.count == 9
     && LUTFolderHierarchy.contains(categoryPath: "Sony Pictures", in: "Sony") == false
 print("viewer folder hierarchy rolls up descendants without prefix collisions -> \(folderHierarchyOK ? "PASS" : "FAIL")")
 
+let deepFolderParts = (1...12).map { "Level \($0)" }
+let deepFolderPath = deepFolderParts.joined(separator: "/")
+var deepFolderCandidates = LUTFolderHierarchy.tree(from: [deepFolderPath: 2])
+var preservedDepth = 0
+for (index, part) in deepFolderParts.enumerated() {
+    guard let node = deepFolderCandidates.first,
+          deepFolderCandidates.count == 1,
+          node.name == part,
+          node.path == deepFolderParts.prefix(index + 1).joined(separator: "/"),
+          node.count == 2
+    else { break }
+    preservedDepth += 1
+    deepFolderCandidates = node.children
+}
+let deepFolderOK = preservedDepth == deepFolderParts.count && deepFolderCandidates.isEmpty
+print("viewer folder hierarchy preserves \(preservedDepth)/\(deepFolderParts.count) nested levels -> \(deepFolderOK ? "PASS" : "FAIL")")
+
 let implicitRoot = scratch.appendingPathComponent("lutcheck-implicit-images-\(UUID().uuidString)")
 defer { try? FileManager.default.removeItem(at: implicitRoot) }
 let implicitProjects = ProjectStore(root: implicitRoot.appendingPathComponent("Projects"))
@@ -1446,4 +1463,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && folderHierarchyOK && deepFolderOK ? 0 : 1)

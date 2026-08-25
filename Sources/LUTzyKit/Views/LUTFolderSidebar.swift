@@ -63,7 +63,8 @@ struct LUTFolderSidebar: View {
                     LUTFolderBranch(
                         node: node,
                         selectedPath: viewModel.browsedCategory,
-                        select: viewModel.browse
+                        select: viewModel.browse,
+                        depth: 0
                     )
                 }
             }
@@ -146,37 +147,109 @@ private struct LUTFolderBranch: View {
     let node: LUTFolderNode
     let selectedPath: String?
     let select: (String?) -> Void
+    let depth: Int
 
-    @State private var isExpanded = true
+    @State private var isExpanded: Bool
+
+    init(
+        node: LUTFolderNode,
+        selectedPath: String?,
+        select: @escaping (String?) -> Void,
+        depth: Int
+    ) {
+        self.node = node
+        self.selectedPath = selectedPath
+        self.select = select
+        self.depth = depth
+
+        // Keep a large library legible on first open: reveal its packages, not
+        // every folder inside every package. A restored deep selection is the
+        // exception — all of its ancestors open so the selected row is visible.
+        let containsSelection = selectedPath.map {
+            LUTFolderHierarchy.contains(categoryPath: $0, in: node.path)
+        } ?? false
+        _isExpanded = State(initialValue: depth == 0 || containsSelection)
+    }
 
     var body: some View {
-        if node.children.isEmpty {
-            rowButton
-        } else {
-            DisclosureGroup(isExpanded: $isExpanded) {
-                ForEach(node.children) { child in
-                    LUTFolderBranch(node: child, selectedPath: selectedPath, select: select)
+        VStack(alignment: .leading, spacing: 2) {
+            branchRow
+
+            if node.children.isEmpty == false, isExpanded {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(node.children) { child in
+                        LUTFolderBranch(
+                            node: child,
+                            selectedPath: selectedPath,
+                            select: select,
+                            depth: depth + 1
+                        )
+                    }
                 }
-            } label: {
-                rowButton
+                .padding(.leading, 14)
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.11))
+                        .frame(width: 1)
+                        .padding(.vertical, 3)
+                        .offset(x: 7)
+                }
+            }
+        }
+        .onChange(of: selectedPath) { _, selectedPath in
+            guard let selectedPath else { return }
+            if LUTFolderHierarchy.contains(categoryPath: selectedPath, in: node.path) {
+                isExpanded = true
             }
         }
     }
 
-    private var rowButton: some View {
-        Button {
-            select(node.path)
-        } label: {
-            LUTFolderRow(
-                name: node.name,
-                count: node.count,
-                symbol: selectedPath == node.path ? "folder.fill" : "folder",
-                selected: selectedPath == node.path
-            )
+    private var branchRow: some View {
+        let selected = selectedPath == node.path
+
+        return HStack(spacing: 0) {
+            if node.children.isEmpty {
+                Color.clear
+                    .frame(width: 18, height: 28)
+            } else {
+                Button {
+                    isExpanded.toggle()
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(isExpanded ? "Collapse \(node.name)" : "Expand \(node.name)")
+                .accessibilityLabel(isExpanded ? "Collapse \(node.name)" : "Expand \(node.name)")
+            }
+
+            Button {
+                select(node.path)
+            } label: {
+                LUTFolderRow(
+                    name: node.name,
+                    count: node.count,
+                    symbol: selected ? "folder.fill" : "folder",
+                    selected: selected,
+                    drawsSelectionBackground: false
+                )
+            }
+            .buttonStyle(.plain)
+            .help(node.path)
+            .accessibilityLabel("\(node.name), \(node.count) LUTs")
+            .accessibilityAddTraits(selected ? .isSelected : [])
         }
-        .buttonStyle(.plain)
-        .help(node.path)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background(
+            selected ? Color.accentColor.opacity(0.16) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 6)
+        )
     }
+
 }
 
 private struct LUTFolderRow: View {
@@ -184,6 +257,7 @@ private struct LUTFolderRow: View {
     let count: Int
     let symbol: String
     let selected: Bool
+    var drawsSelectionBackground = true
 
     var body: some View {
         HStack(spacing: 7) {
@@ -192,6 +266,7 @@ private struct LUTFolderRow: View {
                 .foregroundStyle(selected ? Color.accentColor : Color.secondary)
             Text(name)
                 .lineLimit(1)
+                .truncationMode(.middle)
             Spacer(minLength: 6)
             Text("\(count)")
                 .font(.caption2.monospacedDigit())
@@ -200,9 +275,10 @@ private struct LUTFolderRow: View {
         .font(.subheadline)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background(
-            selected ? Color.accentColor.opacity(0.16) : Color.clear,
+            drawsSelectionBackground && selected ? Color.accentColor.opacity(0.16) : Color.clear,
             in: RoundedRectangle(cornerRadius: 6)
         )
     }

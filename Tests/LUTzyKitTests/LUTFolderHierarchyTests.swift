@@ -25,4 +25,21 @@ final class LUTFolderHierarchyTests: XCTestCase {
         XCTAssertFalse(LUTFolderHierarchy.contains(categoryPath: "Panasonic/S1H", in: "Sony"))
         XCTAssertTrue(LUTFolderHierarchy.contains(categoryPath: "Panasonic/S1H", in: nil))
     }
+
+    func testTreePreservesEveryComponentOfADeepFolderPath() throws {
+        let components = (1...12).map { "Level \($0)" }
+        let path = components.joined(separator: "/")
+        var candidates = LUTFolderHierarchy.tree(from: [path: 3])
+
+        for (index, component) in components.enumerated() {
+            let node = try XCTUnwrap(candidates.first)
+            XCTAssertEqual(node.name, component)
+            XCTAssertEqual(node.path, components.prefix(index + 1).joined(separator: "/"))
+            XCTAssertEqual(node.count, 3)
+            XCTAssertEqual(candidates.count, 1)
+            candidates = node.children
+        }
+
+        XCTAssertTrue(candidates.isEmpty)
+    }
 }
