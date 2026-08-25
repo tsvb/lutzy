@@ -44,21 +44,46 @@ Workspace is global navigation. Media selection, LUT source selection, and Manag
 
 ### Media item
 
-A media item has a stable identifier, backing URL or imported-file reference, display name, media kind (`image` or `video`), containing location, and lightweight file metadata. The model is media-kind aware even though Viewer playback remains image-only in this change.
+A durable Media Library manifest stored in Application Support is authoritative for media identity and logical hierarchy. A media record has a stable `MediaRecordID`, display name, kind (`image` or `video`), full logical relative path, backing locator, content fingerprint, and lightweight file metadata. UI selection and saved sessions use `MediaRecordID`; `ImageCollection.Item`'s scan-time UUID is not reused.
+
+New imports are copied into one managed Media Library root. Folder imports preserve the complete relative hierarchy rather than flattening descendants. Name collisions receive a unique backing filename while retaining the original display name; content-identical new imports are reported as duplicates and do not create another managed record. Supported videos receive records and remain browseable even though playback is deferred.
+
+Legacy project files are not moved. Migration enumerates every `ProjectStore.projects` Images folder, not only `current`, and records each file with an internal legacy origin key composed from project UUID and normalized relative path. The Media Library presents one aggregated logical hierarchy based on relative paths without restoring Project as a navigation level. When duplicate display names collide in the same logical location, both records remain and receive a secondary legacy-source disambiguator only where needed.
+
+Migration is idempotent: the legacy origin key finds the same manifest record on every launch. Old current-project `session.imageName` maps to a MediaRecordID only when exactly one record in that project matches; an ambiguous or missing basename leaves no active selection and never deletes a record.
+
+### LUT record
+
+An on-disk LUT has a durable UUID-backed `LUTRecordID` stored in a LUT catalog. The record separates identity from its current file locator and content fingerprint. Viewer documents, comparison-grid cells, Collections, origin, display-name override, typed tags, and Starred state reference `LUTRecordID`, not a path or content hash. In-memory unsaved derived LUTs retain a transient `derived://` reference until save creates or adopts a durable record.
+
+Metadata semantics are deliberately split:
+
+- Record-level: display-name override, Vendor/Custom/Unknown origin, user-authored tags, Starred, and Collection membership. Identical files may differ independently.
+- Content-level: measured metrics and measured tags. Identical transforms may safely share objective analysis by content fingerprint.
+
+On first migration, every scanned file receives a distinct LUTRecordID even if two files have identical contents. Existing content-hash keyed typed tags and favourite state are copied to each matching record so no user metadata is lost; later edits diverge per record. Existing measured data remains content-level.
+
+Catalog reconciliation follows deterministic rules:
+
+1. An exact known locator reuses its record ID and refreshes its fingerprint/availability.
+2. A successful Manager move or rename atomically updates the file locator while retaining the record ID; a catalog-update failure must report failure and avoid publishing a second identity.
+3. Missing files leave unavailable records in the catalog.
+4. An unmatched file may reuse a missing record only when exactly one missing record has the same fingerprint. Zero or multiple candidates create a new record, so identical present files are never collapsed.
+5. Reconnection and rescan never delete record metadata silently.
 
 ### LUT source
 
-Viewer and LUT Manager select exactly one LUT source at a time:
+Viewer, LUT Library, and LUT Manager each select exactly one LUT source at a time:
 
 - `folder(path?)`: a physical folder; `nil` means All LUTs. A selected parent includes descendant folders, preserving the current recursive behaviour.
 - `collection(id)`: a user-defined virtual collection.
 - `starred`: a built-in virtual source derived from favourite metadata.
 
-Viewer and LUT Manager keep independent LUT-source state. A source chosen while auditioning looks in Viewer does not silently become Manager's scope.
+Viewer, LUT Library, and LUT Manager keep independent LUT-source state. A source chosen in one Workspace never silently becomes another Workspace's scope.
 
 ### LUT collection
 
-A collection has a stable identifier, non-empty display name, creation/update metadata, and a set of stable LUT identities. One LUT may belong to zero, one, or many collections. Membership is independent of path so moving or renaming the LUT does not remove it from the collection.
+A collection has a stable identifier, non-empty display name, creation/update metadata, and a set of LUTRecordIDs. One LUT record may belong to zero, one, or many collections. Membership is independent of path and content duplicates so moving or renaming the file does not remove it and an identical second file does not join implicitly.
 
 ### LUT origin
 
@@ -70,11 +95,29 @@ Origin metadata is explicit rather than inferred as fact from a folder name. It 
 
 Folder names may be offered as an editing suggestion, but are not authoritative origin metadata.
 
+Manager display name is a record-level override, not a file rename. When the override is absent, UI falls back to the current filename-derived `CubeLUT.name`. Clearing the field removes the override and restores that fallback. Rescan, relaunch, and physical folder moves preserve the override without changing the `.cube` filename.
+
 ### Visual Library sample set
 
 LUT Library ships with exactly four fixed, representative, licensed sample images: a skin-tone portrait; an outdoor scene containing sky and foliage; an indoor mixed-light scene; and a scene containing saturated objects plus neutral references. The set has one selected sample shared across Gallery and LUT detail. Sample assets declare the source-space assumptions needed for deterministic rendering. Users cannot add, remove, reorder, or replace samples from Media Library; personal-media auditioning remains a Viewer responsibility.
 
 ## Decisions
+
+### Use durable catalogs instead of scan-time identity
+
+Filesystem path remains a locator and content hash remains a transform fingerprint; neither is a durable user-facing record identity. The new LUT and media manifests own stable IDs and survive rescans. This prevents path changes from breaking references and prevents identical files from being forced to share descriptive metadata.
+
+Alternative: use path everywhere. Rejected because Manager folder moves and external renames invalidate Collections, sessions, and comparison cells.
+
+Alternative: use content hash everywhere. Rejected because two separately imported but identical files may belong to different vendors, folders, Collections, and user vocabularies.
+
+### Aggregate every legacy media container without moving it
+
+Media Library indexes all legacy project Images folders into one virtual hierarchy. Legacy project UUID is retained only as an internal backing-origin component and an optional collision disambiguator; it does not restore project switching or a Project navigation level. New imports use the global managed Media Library root.
+
+Alternative: expose only `ProjectStore.current`. Rejected because hidden projects would become unreachable even though their files still exist.
+
+Alternative: physically merge legacy directories. Rejected because migration would create unnecessary destructive/collision risk and violates the preservation requirement.
 
 ### Add Media Library and split LUT Library from LUT Manager
 
@@ -137,19 +180,29 @@ Card activation opens a LUT Library detail rather than switching to Viewer or Ma
 
 LUT Library Gallery uses one shared selected sample image across every visible LUT card. Per-LUT cover images are not used: keeping the source constant makes card-to-card differences attributable to the LUT rather than the photograph. LUT detail exposes the complete sample set through thumbnails below a large preview. The preview uses a vertically divided Before/After image with a horizontally draggable split position. Holding Space temporarily shows the complete original; releasing Space restores the LUT comparison. The reference supplies this interaction direction, not a pixel-level visual style.
 
-Every LUT Library Gallery and detail preview goes through the same `EditDocument`, source-space resolution, `RenderEngine`, colour profile, and LUT intensity semantics as Viewer. Preview caching may differ, but the rendered RGB result for the same source, document, and LUT must not.
+LUT Library owns an immutable sample baseline instead of inheriting the mutable Viewer document. Each sample render uses neutral develop/adjustments, the selected LUT at 100% intensity, the sample's declared display source space, and the application's current working/output space. Gallery and detail may create separate requests, but they use that same baseline and never inherit Viewer exposure, adjustments, source-space override, selected LUT, or intensity.
+
+Every LUT Library Gallery and detail preview goes through the same `EditDocument`, source-space resolution, `RenderEngine`, colour profile, and LUT transform semantics as Viewer. Cross-surface parity is tested by passing the exact Library baseline request to both surfaces; preview caching may differ, but output RGB must agree within the renderer's existing tolerance.
 
 Alternative: pre-bake decorative thumbnails. Rejected because they would not prove the LUT's real effect and could drift from Viewer colour handling.
+
+### Give shortcuts one active owner
+
+Keyboard routing is Workspace- and focus-aware. Viewer comparison/navigation shortcuts operate only while Viewer is active. LUT detail owns Space down/up only while its comparison has focus. Media Library, LUT Manager, LUT Editor text inputs, search fields, and sheets do not trigger hidden Viewer or Library actions.
+
+Temporary-original state is explicitly cleared when its owning Workspace/detail disappears, so a lost key-up cannot leave a hidden or later-restored surface showing Original.
 
 ## State and Migration
 
 1. Add decodable Media Library and LUT Library `AppSection` cases while continuing to decode all existing section values.
-2. Reuse existing project-backed image files as initial Media Library contents; do not move, merge, or delete them.
-3. Retire the persisted Viewer image-presentation preference. An old `imageManager.presentation` value is ignored rather than mapped to Media Library because Gallery and Columns have different meanings.
-4. Keep LUT Manager at All LUTs on entry and keep visual Gallery state owned by LUT Library.
-5. Reuse existing folder hierarchy, typed/measured tags, and favourite metadata.
-6. Add collection membership and LUT origin metadata with tolerant decoding; existing LUTs begin with no collections and Unknown origin.
-7. Keep collection references to temporarily missing LUTs so reconnecting or rescanning a library can restore membership; show or omit unavailable members consistently without deleting metadata silently.
+2. Create the media manifest and global managed Media Library root, then idempotently index every legacy project Images folder without moving, merging, or deleting files.
+3. Replace saved basename-only image selection with MediaRecordID. Migrate the old current-project basename only on an unambiguous match.
+4. Retire the persisted Viewer image-presentation preference. An old `imageManager.presentation` value is ignored rather than mapped to Media Library because Gallery and Columns have different meanings.
+5. Create one LUT catalog record per scanned file, including identical-content duplicates, then migrate typed tags and favourites from content-hash storage to each corresponding record. Keep measured metrics/tags content-level.
+6. Migrate persisted path-based Viewer and comparison-cell references to LUTRecordID through exact scanned locator matching. Unresolved legacy paths remain non-destructive missing references rather than selecting another identical LUT.
+7. Add Collection membership, origin, display-name override, and record-level tag/favourite metadata with tolerant decoding; existing LUTs begin with no Collections, Unknown origin, and no display-name override.
+8. Keep missing LUT and media records so reconnecting or rescanning can restore them; never delete metadata silently.
+9. Keep LUT Manager at All LUTs on entry and keep visual Gallery state owned by LUT Library.
 
 ## Risks / Trade-offs
 
@@ -157,6 +210,8 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 - **Columns may be mistaken for a thumbnail grid.** → Use Finder terminology, column disclosure behaviour, and accessibility labels that describe hierarchy traversal.
 - **Video import may imply playback.** → Label unsupported Viewer actions clearly and keep playback outside acceptance criteria.
 - **Vendor metadata is missing for existing LUTs.** → Use Unknown and provide explicit metadata editing; never present an inferred folder name as confirmed fact.
+- **Legacy projects can contain colliding paths and basenames.** → Aggregate by stable records, keep legacy origin internally, show a secondary disambiguator only for collisions, and never guess an ambiguous saved selection.
+- **External LUT moves can be ambiguous when contents are duplicated.** → Reconnect by fingerprint only for exactly one missing candidate; otherwise create a distinct record and preserve the missing one.
 - **Many LUT Library previews can be expensive.** → Render lazily, cancel off-screen work, key caches by sample/render context/LUT identity, and keep card geometry stable while loading.
 - **Sample previews could disagree with Viewer.** → Pin cross-surface parity tests to the same source/document/LUT inputs and avoid a separate thumbnail colour path.
 - **Fixed samples may not represent every workflow.** → Start with a small varied set; custom sample management can be scoped separately after the core interaction is validated.

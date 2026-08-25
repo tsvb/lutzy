@@ -23,7 +23,15 @@ The Inspector SHALL display existing tags as individually removable chips and SH
 - **THEN** the tag is persisted once, appears as a chip, and does not create a duplicate value
 
 ### Requirement: Single-selection metadata editing
-For one selected LUT, the Inspector SHALL allow editing of display name, origin, typed tags, Collection membership, physical folder, and Starred state.
+For one selected LUT, the Inspector SHALL allow editing of a record-level display-name override, origin, typed tags, Collection membership, physical folder, and Starred state.
+
+#### Scenario: Set display-name override
+- **WHEN** the user enters a non-empty display name
+- **THEN** the override persists by LUTRecordID, all UI uses it, and the physical `.cube` filename remains unchanged
+
+#### Scenario: Clear display-name override
+- **WHEN** the user clears or resets the display-name override
+- **THEN** UI falls back to the current filename-derived LUT name after rescan and relaunch
 
 #### Scenario: Edit origin and collection
 - **WHEN** the user assigns a vendor and changes Collection membership

@@ -10,7 +10,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - Replace Viewer's whole-surface Images mode with a secondary column that shows media at the top and LUT sources below it.
 - Keep Viewer's right side stable: comparison/preview above and the LUT gallery below.
 - Let Media Library import images and videos and browse them in Finder-like List or Columns presentations.
-- Organise Viewer and LUT Manager LUT sources into physical Folders, metadata-backed Collections, and the built-in Starred filter.
+- Organise Viewer, LUT Library, and LUT Manager sources into physical Folders, metadata-backed Collections, and the built-in Starred filter.
 - Add manual Collections that can group LUTs across physical folders without moving or copying files.
 - Keep LUT Manager focused on physical organisation, metadata, collections, and bulk actions.
 - Put visual LUT browsing in a separate LUT Library surface rather than presenting it as a Manager table mode.
@@ -30,6 +30,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - `lut-virtual-collections`: Defines physical folders, manual metadata collections, and Starred as distinct LUT source types.
 - `lut-library-visual-browser`: Defines the separation between visual LUT discovery and management, gallery card metadata, LUT details, and sample-image rendering.
 - `lut-manager-metadata-inspector`: Defines single- and multi-selection metadata editing through a persistent Manager Inspector.
+- `lut-record-identity`: Defines durable record identity, file-locator reconciliation, legacy metadata migration, and document/session references.
 
 ### Modified Capabilities
 
@@ -37,6 +38,6 @@ None. The repository has no archived base specifications; this change supersedes
 
 ## Impact
 
-This affects primary navigation, Viewer composition, image-management ownership, media persistence, LUT scope state, LUT metadata, LUT Library presentation, LUT Manager responsibility, sample assets, and render-preview caching. Likely implementation areas include `AppSection`, `NavigationSidebar`, `ContentView`, `ImageManagerView`, `LUTFolderSidebar`, `LUTSidebar`, `LibraryManagerView`, `AppViewModel`, `ProjectStore`, `LUTTagStore`, and new collection/origin stores.
+This affects primary navigation, Viewer composition, image-management ownership, media persistence, LUT identity and scope state, LUT metadata, LUT Library presentation, LUT Manager responsibility, sample assets, keyboard ownership, and render-preview caching. Likely implementation areas include `AppSection`, `NavigationSidebar`, `ContentView`, `ImageManagerView`, `LUTFolderSidebar`, `LUTSidebar`, `LibraryManagerView`, `AppViewModel`, `ProjectStore`, `LUTSettings`, `LUTTagStore`, and new durable media/LUT record stores.
 
 Existing image files, LUT files, folder hierarchy, tags, favourites, and colour transforms are preserved. This change does not require moving user LUTs or deleting the current project-backed image storage.

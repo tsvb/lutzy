@@ -8,53 +8,64 @@
 - [x] 0.6 Confirm a draggable vertical Before/After split plus hold-Space original comparison
 - [x] 0.7 Confirm card tags prioritise user-authored tags, then measured tags, with stable alphabetical ordering
 
-## 1. Navigation and state boundaries
+## 1. Durable records and migration
 
-- [ ] 1.1 Add Media Library and LUT Library to `AppSection` and keep tolerant decoding for all existing saved section values
-- [ ] 1.2 Give Viewer, Media Library, visual LUT browsing, LUT Manager, and LUT Editor independent local navigation state
-- [ ] 1.3 Make LUT Manager enter at All LUTs and restore Gallery context only inside the visual LUT surface
+- [ ] 1.1 Add a persisted LUT catalog with distinct LUTRecordID, file locator, fingerprint, availability, record metadata, and content-level measured data
+- [ ] 1.2 Migrate one record per scanned LUT file, copy legacy typed tags/favourites to every fingerprint match, and migrate exact path-based document/grid references
+- [ ] 1.3 Reconcile exact locators, Manager moves, missing records, unique fingerprint reconnects, and ambiguous duplicate contents without merging identities
+- [ ] 1.4 Add a durable media manifest and one global managed Media Library root with stable MediaRecordID and full logical relative paths
+- [ ] 1.5 Idempotently aggregate every legacy project Images folder without moving files and migrate unambiguous basename sessions to MediaRecordID
 
-## 2. Media model and Media Library
+## 2. Navigation and state boundaries
 
-- [ ] 2.1 Introduce stable image/video media records over the existing project-backed storage
-- [ ] 2.2 Support mixed image/video import with folder context and partial-failure reporting
-- [ ] 2.3 Build shared-selection List and Finder-like Columns presentations
-- [ ] 2.4 Open supported images in Viewer while keeping videos browseable without promising playback
+- [ ] 2.1 Add Media Library and LUT Library to `AppSection` and keep tolerant decoding for all existing saved section values
+- [ ] 2.2 Give Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor independent local navigation state
+- [ ] 2.3 Make LUT Manager enter at All LUTs and restore Gallery context only inside LUT Library
+- [ ] 2.4 Route Viewer and LUT-detail shortcuts by Workspace/focus and clear temporary-original state when its owner disappears
 
-## 3. Viewer composition
+## 3. Media Library
 
-- [ ] 3.1 Replace the Viewer folder-only secondary column with Media above LUT source groups
-- [ ] 3.2 Add Folders, Collections, and Starred source sections without listing individual LUTs in the folder tree
-- [ ] 3.3 Remove the Viewer Images/Back toggle, `viewerSurface == .images` route, and obsolete List/Gallery preference
-- [ ] 3.4 Keep the existing comparison region and LUT gallery mounted while media or LUT source changes
+- [ ] 3.1 Support mixed image/video copy import with complete nested hierarchy, durable records, duplicate detection, unique backing names, and partial-failure reporting
+- [ ] 3.2 Build shared-selection List and Finder-like Columns presentations over the media manifest
+- [ ] 3.3 Show colliding legacy names without hiding records and use legacy-source detail only as a disambiguator
+- [ ] 3.4 Open supported images in Viewer by MediaRecordID while keeping videos browseable without promising playback
 
-## 4. LUT collections
+## 4. Viewer composition
 
-- [ ] 4.1 Add tolerant persistence for manual Collection definitions and stable LUT membership
-- [ ] 4.2 Add Manager create, rename, delete, add-member, and remove-member workflows with no filesystem side effects
-- [ ] 4.3 Preserve many-to-many membership across LUT moves, renames, rescans, and temporary unavailability
-- [ ] 4.4 Keep Starred backed by favourite metadata and separate from user Collections
+- [ ] 4.1 Replace the Viewer folder-only secondary column with Media above LUT source groups
+- [ ] 4.2 Add Folders, Collections, and Starred source sections without listing individual LUTs in the folder tree
+- [ ] 4.3 Remove the Viewer Images/Back toggle, `viewerSurface == .images` route, and obsolete List/Gallery preference
+- [ ] 4.4 Keep the existing comparison region and LUT gallery mounted while media or LUT source changes
 
-## 5. LUT origin and visual Library
+## 5. LUT sources and Collections
 
-- [ ] 5.1 Add Vendor, Custom, and Unknown origin metadata with stable persistence and editing
-- [ ] 5.2 Keep LUT Manager's table focused on organisation and expose Gallery through the confirmed separate visual-LUT destination
-- [ ] 5.3 Build lazy Gallery cards over one shared selected sample, with name, origin, a maximum of three tags, and loading state
-- [ ] 5.4 Build a persistent right-side Manager Inspector for single and multi-selection metadata editing
-- [ ] 5.5 Replace the add-only Tag sheet with visible tag chips, direct add/remove, and common/mixed multi-selection states
-- [ ] 5.6 Keep Manager mutations metadata-only and route every transform-changing action to LUT Editor
+- [ ] 5.1 Add independent Folder/Collection/Starred source state and descendant-inclusive filtering for Viewer, LUT Library, and LUT Manager
+- [ ] 5.2 Add tolerant persistence for manual Collection definitions keyed by LUTRecordID
+- [ ] 5.3 Add Manager create, rename, delete, add-member, and remove-member workflows with no filesystem side effects
+- [ ] 5.4 Preserve many-to-many membership across moves, renames, rescans, relaunches, temporary unavailability, and identical-content records
+- [ ] 5.5 Keep Starred record-level and separate from user Collections
 
-## 6. LUT detail and samples
+## 6. LUT Manager metadata
 
-- [ ] 6.1 Add the four fixed licensed scene samples with explicit colour/source-space metadata and no custom-sample management
-- [ ] 6.2 Build visual Library LUT detail with sample thumbnails, a draggable vertical Before/After split, hold-Space original, and complete metadata
-- [ ] 6.3 Reuse `EditDocument`, `RenderEngine`, source-space resolution, and render-context cache keys from Viewer
-- [ ] 6.4 Restore visual Library Gallery scope, selection, and scroll context on Back
+- [ ] 6.1 Add record-level display-name override, Vendor/Custom/Unknown origin, typed tags, and Starred persistence
+- [ ] 6.2 Keep LUT Manager's table focused on organisation and expose Gallery only through LUT Library
+- [ ] 6.3 Build a persistent right-side Manager Inspector for single and multi-selection metadata editing
+- [ ] 6.4 Replace the add-only Tag sheet with visible tag chips, direct add/remove, and common/mixed multi-selection states
+- [ ] 6.5 Keep Manager mutations metadata-only, leave filenames unchanged for display-name edits, and route transform-changing actions to LUT Editor
 
-## 7. Migration and verification
+## 7. LUT Library and sample detail
 
-- [ ] 7.1 Verify existing media, folder hierarchy, tags, favourites, and LUT files are not moved or deleted
-- [ ] 7.2 Add focused tests for navigation isolation, media presentation parity, collection safety, origin persistence, and Gallery card limits
-- [ ] 7.3 Add pixel/RGB parity checks between Viewer and LUT Library for display-space and V-Log preview inputs
-- [ ] 7.4 Verify lazy rendering cancellation, stable placeholders, keyboard navigation, VoiceOver labels, and narrow-window behaviour
-- [ ] 7.5 Run debug/release builds, `lutcheck`, strict OpenSpec validation, and running-app interface inspection
+- [ ] 7.1 Add the four fixed licensed scene samples with stable identity and explicit colour/source-space metadata
+- [ ] 7.2 Build source-filtered lazy Gallery cards over one shared sample, with effective name, origin, prioritised three-tag limit, and loading state
+- [ ] 7.3 Render Gallery/detail from an isolated neutral 100%-intensity Library baseline through the production RenderEngine
+- [ ] 7.4 Build LUT detail with sample thumbnails, a draggable vertical Before/After split, hold-Space original, and complete metadata
+- [ ] 7.5 Restore LUT Library source, selection, sample, and Gallery scroll context on Back
+
+## 8. Verification
+
+- [ ] 8.1 Add migration tests for duplicate-content LUTs, move/rename/relaunch, unavailable reconnect, legacy typed tags/favourites, and path-based session/grid references
+- [ ] 8.2 Add media tests for two legacy projects with colliding names/subfolders, idempotent migration, nested mixed imports, videos, duplicates, and relaunch identity
+- [ ] 8.3 Add focused tests for Workspace/source isolation, Collection safety, display-name fallback, Inspector mixed state, tag priority, and keyboard ownership/cleanup
+- [ ] 8.4 Add pixel/RGB parity checks between Viewer and LUT Library using the exact neutral Library request for display-space and V-Log LUTs
+- [ ] 8.5 Verify lazy rendering cancellation, stable placeholders, VoiceOver labels, narrow-window behaviour, and no hidden shortcut mutations
+- [ ] 8.6 Run debug/release builds, `lutcheck`, strict OpenSpec validation, running-app interface inspection, and fresh sub-agent review

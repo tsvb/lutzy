@@ -71,6 +71,17 @@ Every visible LUT Library Gallery card SHALL render its LUT against the same cur
 - **WHEN** the user chooses another Gallery sample
 - **THEN** every visible card updates to that same sample while preserving source, search, selection, and scroll context
 
+### Requirement: Isolated neutral Library baseline
+LUT Library SHALL render every sample from its own immutable baseline with neutral develop and adjustments, the candidate LUT at 100% intensity, the sample's declared display source space, and the application's current working/output space.
+
+#### Scenario: Enter after editing in Viewer
+- **WHEN** Viewer currently has exposure adjustments, a source-space override, a selected LUT, or non-100% intensity
+- **THEN** LUT Library ignores those values and renders from the neutral Library baseline
+
+#### Scenario: Compare Library and Viewer pipeline
+- **WHEN** the exact Library source and baseline document are deliberately submitted through Viewer and LUT Library rendering paths
+- **THEN** output RGB agrees within the renderer's existing documented tolerance
+
 ### Requirement: Fixed built-in sample set
 LUT Library SHALL use exactly four fixed, licensed sample images bundled with the application: a skin-tone portrait, an outdoor sky-and-foliage scene, an indoor mixed-light scene, and a saturated-object scene with neutral references. It SHALL NOT import, add, remove, reorder, or replace samples through Media Library.
 
@@ -119,6 +130,25 @@ LUT detail SHALL compare the original and LUT-rendered result in one aligned lar
 #### Scenario: Select another sample
 - **WHEN** the user chooses one of the four sample thumbnails below the preview
 - **THEN** both Before and After update to the new sample while the selected LUT remains unchanged
+
+### Requirement: Workspace-owned keyboard shortcuts
+Keyboard shortcuts SHALL be routed to the active Workspace and focused interaction so hidden Viewer or LUT Library state is not mutated.
+
+#### Scenario: Hold Space in LUT detail
+- **WHEN** LUT Library detail comparison has focus and receives Space down/up
+- **THEN** only the detail's temporary-original state changes
+
+#### Scenario: Use Viewer shortcuts
+- **WHEN** Viewer is active and no text field or sheet owns input
+- **THEN** Viewer comparison and media/LUT navigation shortcuts retain their existing behaviour
+
+#### Scenario: Type outside Viewer or detail
+- **WHEN** Media Library, LUT Manager, LUT Editor, a search field, a metadata text field, or a sheet owns input
+- **THEN** Viewer and LUT-detail shortcuts do not fire and the event remains available to the active control
+
+#### Scenario: Leave while Space is held
+- **WHEN** the owning Workspace or LUT detail disappears before key-up is delivered
+- **THEN** temporary-original state is cleared immediately and is not restored as stuck on a later visit
 
 ### Requirement: Explicit origin metadata
 LUT Manager SHALL let users classify a LUT origin as Vendor with a name, Custom, or Unknown, and LUT Library SHALL display that shared metadata against stable LUT identity.

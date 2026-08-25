@@ -173,6 +173,33 @@ The earlier reference with a central Before/After divider and sample thumbnails 
 
 Cards display at most three Tags. User-authored Tags fill the available slots first in stable alphabetical order, followed by measured Tags in stable alphabetical order. Full Tags remain visible in detail and Manager; no manual card-tag ordering feature is added.
 
+## Implementation contracts added after independent gate review
+
+These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.
+
+### Durable LUT records
+
+- Each on-disk LUT file has its own UUID-backed LUTRecordID, separate from path and content fingerprint.
+- Identical-content files remain independent for display-name override, origin, typed Tags, Starred, and Collection membership.
+- Measured metrics/Tags remain content-level because they objectively describe the transform.
+- Manager moves preserve record identity; missing records remain; fingerprint reconnect occurs only for exactly one missing candidate.
+- Existing path-based documents/grid cells migrate only by exact locator match. Existing content-hash typed Tags and favourites are copied to every matching record without collapsing files.
+
+### Durable aggregated Media Library
+
+- A persistent manifest owns MediaRecordID, kind, logical path, backing locator, fingerprint, and metadata.
+- New imports copy into one global managed root and preserve complete nested hierarchy; videos are durable browseable records.
+- Migration indexes every legacy project Images folder, not only the hidden current project, without moving files or restoring Project navigation.
+- Legacy origin uses project UUID plus relative path internally. Colliding visible names remain separate and gain a secondary source label only when disambiguation is required.
+- New sessions persist MediaRecordID. Old basename-only selection migrates only on one exact project-local match.
+
+### Additional review closures
+
+- Viewer, LUT Library, and LUT Manager each own independent Folder/Collection/Starred source state.
+- Manager display name is a metadata override; it never renames the `.cube` file and clears back to filename-derived fallback.
+- LUT Library renders from an isolated neutral baseline at 100% intensity and never inherits Viewer edits.
+- Keyboard shortcuts have one active Workspace/focus owner and clear temporary-original state when that owner disappears.
+
 ## Reference-image index
 
 The following files are non-normative references. Their recorded purpose is limited to the note beside each path.

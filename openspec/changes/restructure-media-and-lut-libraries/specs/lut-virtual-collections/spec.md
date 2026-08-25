@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Distinct LUT source types
-Viewer and LUT Manager SHALL present physical Folders, manual Collections, and the built-in Starred source as visibly distinct groups.
+Viewer, LUT Library, and LUT Manager SHALL each present physical Folders, manual Collections, and the built-in Starred source as visibly distinct groups with independent active-source state.
 
 #### Scenario: Browse physical hierarchy
 - **WHEN** the user expands Folders
@@ -10,6 +10,14 @@ Viewer and LUT Manager SHALL present physical Folders, manual Collections, and t
 #### Scenario: Browse virtual sources
 - **WHEN** the user views Collections or Starred
 - **THEN** those sources are shown outside the physical folder hierarchy and do not imply filesystem locations
+
+#### Scenario: Filter LUT Library Gallery
+- **WHEN** the user selects a Folder, Collection, or Starred source in LUT Library
+- **THEN** the Gallery shows exactly matching available LUT records, with parent folders including descendants, and Viewer and Manager sources remain unchanged
+
+#### Scenario: Independent source counts
+- **WHEN** records become unavailable or metadata membership changes
+- **THEN** each Workspace refreshes visible counts from the same records without changing another Workspace's selected source
 
 ### Requirement: Manual collection creation
 LUT Manager SHALL let the user create a non-empty named Collection from one or more selected LUTs without moving or copying any LUT file.
@@ -52,7 +60,7 @@ LUT Manager SHALL provide create, rename, delete, add-member, and remove-member 
 - **THEN** the change applies to exactly the selected LUTs without changing files, folders, tags, or Starred state
 
 ### Requirement: Stable membership across library changes
-Collection membership SHALL use stable LUT identity so a rename or move preserves membership, and temporarily unavailable LUTs SHALL NOT be silently removed from collection metadata.
+Collection membership SHALL use LUTRecordID so a rename or move preserves membership, identical-content files remain independent, and temporarily unavailable LUTs SHALL NOT be silently removed from collection metadata.
 
 #### Scenario: Move a member LUT
 - **WHEN** a Collection member is moved to another physical folder through LUT Manager
@@ -61,6 +69,10 @@ Collection membership SHALL use stable LUT identity so a rename or move preserve
 #### Scenario: Reconnect a missing LUT
 - **WHEN** a previously unavailable member becomes available again after a library rescan or reconnection
 - **THEN** its Collection membership is restored without manual re-adding
+
+#### Scenario: Import identical content
+- **WHEN** a second LUT record has identical transform contents to a Collection member
+- **THEN** the new record does not join that Collection unless explicitly added
 
 ### Requirement: Starred remains built in
 Starred SHALL remain a single non-deletable source derived from the existing favourite flag and SHALL NOT be stored as a user Collection.
