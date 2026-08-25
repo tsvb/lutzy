@@ -812,6 +812,58 @@ if let base = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
 }
 
 
+// --- exporting a chosen subset ----------------------------------------------
+// The manager's reason to exist. Export All could only ever say "all of them";
+// this checks that naming a few picks exactly those, that a name which is not
+// in the collection is ignored rather than exporting something else, and that
+// an empty pick exports nothing at all rather than everything.
+var subsetOK = true
+if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
+    let root = scratch.appendingPathComponent("lutcheck-subset-\(UUID().uuidString)")
+    let images = root.appendingPathComponent("Images")
+    let out = root.appendingPathComponent("out")
+    try? FileManager.default.createDirectory(at: images, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    for name in ["one", "two", "three"] {
+        _ = writeJPEG(description: nil, to: images.appendingPathComponent("\(name).png"), colourful: true)
+    }
+
+    let vmProjects = ProjectStore(root: root.appendingPathComponent("Projects"))
+    let vmTags = LUTTagStore(fileURL: root.appendingPathComponent("tags.json"))
+    let vm = AppViewModel(projects: vmProjects, tags: vmTags)
+    vm.collection.loadFromFolder(images)
+    await vm.collection.scanCompletion()
+
+    let loadedOK = vm.collection.items.count == 3
+    // Two of the three, by name.
+    let wanted = Set(vm.collection.items.prefix(2).map(\.displayName))
+    let items = vm.collection.items
+        .filter { wanted.contains($0.displayName) }
+        .map { ExportCoordinator.BatchItem(url: $0.url, data: $0.imageData, name: $0.displayName) }
+    let picked = Set(items.map(\.name))
+    let pickOK = items.count == 2 && picked == wanted
+
+    let outcome = await vm.export.performBatchExport(items, document: EditDocument(), lut: lut, to: out)
+    let written = Set(((try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? [])
+        .map { ($0 as NSString).deletingPathExtension })
+    // Exported names carry the LUT's name, so compare on the stem.
+    let wroteOnlyTheseOK = written.count == 2 && wanted.allSatisfy { name in
+        written.contains { $0.hasPrefix((name as NSString).deletingPathExtension) }
+    }
+    print("subset export -> loaded \(vm.collection.items.count), picked \(items.count), wrote \(written.count) (\(outcome.exported) reported) -> \(loadedOK && pickOK && wroteOnlyTheseOK ? "PASS" : "FAIL")")
+
+    // A name that is not there must select nothing rather than fall back to all.
+    let ghost = vm.collection.items.filter { Set(["not-a-file"]).contains($0.displayName) }
+    let ghostOK = ghost.isEmpty
+    print("subset export ignores an unknown name -> \(ghostOK ? "PASS" : "FAIL")")
+
+    subsetOK = loadedOK && pickOK && wroteOnlyTheseOK && ghostOK
+    print("subset export -> \(subsetOK ? "PASS" : "FAIL")")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -862,21 +914,24 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 
     // Both the scan and the open are asynchronous; wait for them rather than
     // guessing at a sleep.
-    func settle(_ what: String, _ done: @MainActor () -> Bool) -> Bool {
+    // Awaits rather than pumping a run loop. Blocking the thread inside an
+    // async main starves the very main-actor work being waited for — the
+    // scan's continuation never runs, and every wait times out.
+    func settle(_ what: String, _ done: @MainActor () -> Bool) async -> Bool {
         for _ in 0..<400 {
             if done() { return true }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            try? await Task.sleep(for: .milliseconds(20))
         }
         print("grid \(what) -> FAIL (timed out)")
         return false
     }
 
-    if settle("library scan", { vm.library.allLUTs.count >= 9 }),
-       settle("image open", { vm.imageSource != nil }) {
+    if await settle("library scan", { vm.library.allLUTs.count >= 9 }),
+       await settle("image open", { vm.imageSource != nil }) {
         vm.setLayout(.grid3x3)
         let filled = vm.cellLUTIDs.count == 9
         let distinct = Set(vm.cellLUTIDs.compactMap { $0 }).count
-        let rendered = settle("cell renders", { vm.cellImages.allSatisfy { $0 != nil } })
+        let rendered = await settle("cell renders", { vm.cellImages.allSatisfy { $0 != nil } })
         gridOK = filled && distinct == 9 && rendered
         print("grid 3x3 -> \(vm.cellLUTIDs.count) cells, \(distinct) distinct LUTs, \(vm.cellImages.compactMap { $0 }.count) rendered -> \(gridOK ? "PASS" : "FAIL")")
 
@@ -945,4 +1000,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

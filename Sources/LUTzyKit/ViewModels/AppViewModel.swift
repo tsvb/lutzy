@@ -289,8 +289,15 @@ final class AppViewModel: ObservableObject {
     /// Whether the sidebar is showing only starred LUTs.
     @Published var showingFavouritesOnly = false { didSet { scheduleSessionSave() } }
 
-    /// What the app is being used for: looking, managing, or (later) editing.
+    /// What the app is being used for: looking, managing, or editing.
     @Published var section: AppSection = .viewer { didSet { scheduleSessionSave() } }
+
+    /// Which of the two things the manager is managing. Held here rather than
+    /// in the view so navigation can point straight at one — "All Images"
+    /// means show me the images, not put me in the viewer.
+    @Published var managerTab: ManagerTab = .luts
+
+    enum ManagerTab: String, Hashable, Codable, Sendable { case luts, images }
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -1175,6 +1182,45 @@ final class AppViewModel: ObservableObject {
     func batchExportDialog() {
         let request = batchExportRequest
         export.batchExportDialog(items: request.items, document: request.document, lut: request.lut)
+    }
+
+    /// Export a chosen subset rather than the whole filmstrip.
+    ///
+    /// The manager's reason to exist: "these six, with this look" is the
+    /// ordinary way a set gets used, and Export All could only ever say "all of
+    /// them". Names rather than indices, because the table is filtered and
+    /// sorted independently of the collection's own order.
+    func batchExportDialog(named names: Set<String>) {
+        guard names.isEmpty == false else { return }
+        let items = collection.items
+            .filter { names.contains($0.displayName) }
+            .map { ExportCoordinator.BatchItem(url: $0.url, data: $0.imageData, name: $0.displayName) }
+        guard items.isEmpty == false else {
+            statusMessage = "Nothing selected to export"
+            return
+        }
+        export.batchExportDialog(items: items, document: document, lut: selectedLUT)
+    }
+
+    /// Remove images from the open project.
+    ///
+    /// Moves the files to the Trash, the same rule LUT removal follows: they
+    /// are inside the project, and the project is the app's to manage.
+    func removeImages(named names: Set<String>) {
+        var removed = 0
+        for item in collection.items where names.contains(item.displayName) {
+            guard let url = item.url,
+                  let folder = projects.currentImagesFolder,
+                  url.standardizedFileURL.path.hasPrefix(folder.standardizedFileURL.path + "/")
+            else { continue }
+            if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil { removed += 1 }
+        }
+        guard removed > 0 else {
+            statusMessage = "Nothing removed — those images are not in the project"
+            return
+        }
+        loadProjectImages()
+        statusMessage = "Moved \(removed) image\(removed == 1 ? "" : "s") to the Trash"
     }
 
     /// What Export All would write, without running a panel. Internal for the same reason

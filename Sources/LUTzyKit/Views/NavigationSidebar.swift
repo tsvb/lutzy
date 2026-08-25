@@ -63,7 +63,7 @@ struct NavigationSidebar: View {
                 Section("Images") {
                     Label("All Images", systemImage: "photo.on.rectangle")
                         .badge(viewModel.collection.items.count)
-                        .tag(NavigationTarget.section(.viewer))
+                        .tag(NavigationTarget.images)
                     // Both ways in, in one place. They used to be split
                     // between here and a toolbar menu that said "Import" with
                     // no tooltip, which meant two places to look for one thing.
@@ -197,6 +197,7 @@ struct NavigationSidebar: View {
     private var navigationSelection: Binding<NavigationTarget?> {
         Binding(
             get: {
+                if viewModel.section == .manager && viewModel.managerTab == .images { return .images }
                 if viewModel.showingFavouritesOnly { return .starred }
                 if let folder = viewModel.browsedCategory { return .folder(folder) }
                 return .section(viewModel.section)
@@ -213,6 +214,9 @@ struct NavigationSidebar: View {
                 case .everything:
                     viewModel.showingFavouritesOnly = false
                     viewModel.browse(nil)
+                case .images:
+                    viewModel.managerTab = .images
+                    viewModel.section = .manager
                 case .starred:
                     viewModel.showingFavouritesOnly = true
                     viewModel.browse(nil)
@@ -228,6 +232,7 @@ struct NavigationSidebar: View {
 /// A row in the navigation column.
 enum NavigationTarget: Hashable {
     case section(AppSection)
+    case images
     case everything
     case starred
     case folder(String)
