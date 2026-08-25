@@ -52,6 +52,7 @@ This file preserves the user's original intent and the evolution of decisions be
 11. Use a persistent right-side Manager Inspector as the first design to test. It supports full single-selection metadata, direct Tag chips, and common/mixed multi-selection editing. The interaction may be refined after inspecting the implemented app.
 12. Every LUT Library Gallery card uses the same currently selected sample image. Different sample images are available in LUT detail, not assigned as individual LUT cover images.
 13. LUT Library samples are fixed built-in app assets. Users do not add or manage Library samples through Media Library; personal-image testing remains in Viewer.
+14. The built-in set contains four images: skin-tone portrait, outdoor sky/foliage, indoor mixed light, and saturated objects with neutral references.
 
 ### Colour consistency
 
@@ -157,6 +158,10 @@ All LUT Library Gallery cards render the same currently selected sample image so
 ### 2026-08-26 — Fixed built-in samples
 
 LUT Library uses only a fixed set of licensed sample images bundled with the app. There is no Add Sample, custom sample collection, or Media Library sample membership in this scope. Viewer remains the place to test LUTs on personal media.
+
+### 2026-08-26 — Four representative sample scenes
+
+The fixed set contains exactly four licensed assets: a skin-tone portrait; an outdoor sky-and-foliage scene; an indoor mixed-light scene; and a saturated-object scene with neutral references. Each asset needs a documented colour profile and source-space assumption.
 
 ## Reference-image index
 

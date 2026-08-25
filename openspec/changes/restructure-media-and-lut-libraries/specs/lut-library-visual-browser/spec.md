@@ -64,11 +64,15 @@ Every visible LUT Library Gallery card SHALL render its LUT against the same cur
 - **THEN** every visible card updates to that same sample while preserving source, search, selection, and scroll context
 
 ### Requirement: Fixed built-in sample set
-LUT Library SHALL use a fixed set of licensed sample images bundled with the application and SHALL NOT import, add, remove, reorder, or replace samples through Media Library.
+LUT Library SHALL use exactly four fixed, licensed sample images bundled with the application: a skin-tone portrait, an outdoor sky-and-foliage scene, an indoor mixed-light scene, and a saturated-object scene with neutral references. It SHALL NOT import, add, remove, reorder, or replace samples through Media Library.
 
 #### Scenario: Open on a fresh installation
 - **WHEN** the user opens LUT Library before importing personal media
-- **THEN** the complete built-in sample set is available for Gallery and LUT detail
+- **THEN** all four built-in scene types are available for Gallery and LUT detail
+
+#### Scenario: Validate sample assets
+- **WHEN** the app bundles or updates the four samples
+- **THEN** each asset has documented licensing, embedded or declared colour profile, source-space expectation, and stable identity
 
 #### Scenario: Look for custom sample management
 - **WHEN** the user browses LUT Library or Media Library

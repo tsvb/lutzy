@@ -72,7 +72,7 @@ Folder names may be offered as an editing suggestion, but are not authoritative 
 
 ### Visual Library sample set
 
-LUT Library ships with a small, fixed set of representative, licensed sample images. The set contains multiple scene types and has one selected sample shared across Gallery and LUT detail. Sample assets declare the source-space assumptions needed for deterministic rendering. Users cannot add, remove, reorder, or replace samples from Media Library; personal-media auditioning remains a Viewer responsibility.
+LUT Library ships with exactly four fixed, representative, licensed sample images: a skin-tone portrait; an outdoor scene containing sky and foliage; an indoor mixed-light scene; and a scene containing saturated objects plus neutral references. The set has one selected sample shared across Gallery and LUT detail. Sample assets declare the source-space assumptions needed for deterministic rendering. Users cannot add, remove, reorder, or replace samples from Media Library; personal-media auditioning remains a Viewer responsibility.
 
 ## Decisions
 
@@ -163,6 +163,6 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 ## Open Questions
 
-The primary information architecture, shared Gallery comparison sample, and fixed built-in sample scope are resolved. Remaining grilling questions concern sample composition and interaction details.
+The primary information architecture, shared Gallery comparison sample, fixed built-in sample scope, and four-scene sample composition are resolved. Remaining grilling questions concern comparison interaction details.
 
 Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; video playback is future work.
