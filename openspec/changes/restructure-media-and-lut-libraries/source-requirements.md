@@ -46,6 +46,8 @@ This file preserves the user's original intent and the evolution of decisions be
 5. Gallery/detail previews must share Viewer's real render and colour pipeline so the same source and LUT do not produce a different RGB result in different parts of the app.
 6. The latest direction leans toward separating LUT display/discovery from LUT management. The behavioural separation is recorded; its final top-level placement and label remain subject to the requested grilling session.
 7. LUT display is strictly for the local LUT Library: LUTs already imported into or created by the app. Marketplace, creator network, remote catalogue, and download features are explicitly excluded.
+8. LUT Library may Star, add a LUT to an existing Collection, and open it in Viewer. LUT Manager owns Collection creation/rename/deletion, complete membership editing, names, origin, tags, folder movement, and deletion.
+9. Current LUT Manager metadata editing is inconvenient, especially tags. The add-only Tag sheet does not provide enough visibility or correction control.
 
 ### Colour consistency
 
@@ -108,6 +110,9 @@ These excerpts preserve the user's wording. Line breaks were normalised only for
 > 到底是要把lut展示 跟lut管理拆開 還是怎樣  
 > 好像拆開比較好？
 
+> 可以啊 Manager那邊要不要能編輯collection?  
+> 另外就是manager那邊好像 lut編輯也不太方便？ 尤其是tag
+
 ## Requirement evolution and supersession
 
 | Earlier direction | Current direction | Status |
@@ -122,6 +127,10 @@ These excerpts preserve the user's wording. Line breaks were normalised only for
 ### 2026-08-26 — Local LUT Library only
 
 The visual LUT space operates on the same local LUT set as LUT Manager. It is not a marketplace and does not include online download, creator, account, licensing, rating, or remote-catalogue features. The remaining question is only how local LUT display and local LUT management should be separated in the interface.
+
+### 2026-08-26 — Display and management write boundary
+
+LUT Library is allowed to Star, add to an existing Collection, and open a LUT in Viewer. LUT Manager owns Collection structure, full membership editing, LUT metadata, folder moves, and deletion. Manager must improve metadata editing beyond the current add-only Tag sheet; the exact editing interaction remains open.
 
 ## Reference-image index
 

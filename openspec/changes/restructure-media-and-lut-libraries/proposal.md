@@ -14,6 +14,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - Add manual Collections that can group LUTs across physical folders without moving or copying files.
 - Keep LUT Manager focused on physical organisation, metadata, collections, and bulk actions.
 - Put visual LUT browsing in a separate LUT Library surface rather than presenting it as a Manager table mode.
+- Let LUT Library perform only lightweight curation—Star, add to an existing Collection, and open in Viewer—while LUT Manager owns Collection structure and metadata editing.
 - Keep LUT Library local-only: it displays LUTs already imported into or created by the app and has no marketplace, download catalogue, or creator-network scope.
 - Show a LUT preview, name, vendor or Custom origin, and no more than three tags on each LUT Library gallery card.
 - Open a LUT detail from the visual Library with multiple sample images and an original-versus-graded comparison rendered through the same colour pipeline as Viewer.

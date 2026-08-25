@@ -22,6 +22,17 @@ The application SHALL provide a visual LUT Library for discovery and sample-base
 - **WHEN** the user enters LUT Manager
 - **THEN** the existing table and organisation actions are available without sample-based detail replacing the management surface
 
+### Requirement: Lightweight LUT Library actions
+LUT Library SHALL allow Star, Add to Existing Collection, and Open in Viewer, and SHALL route structural or metadata editing to LUT Manager.
+
+#### Scenario: Curate while browsing
+- **WHEN** the user stars a LUT or adds it to an existing Collection from LUT Library
+- **THEN** the local metadata updates without exposing Collection deletion, folder movement, or LUT deletion in the visual surface
+
+#### Scenario: Request full editing
+- **WHEN** the user invokes an edit action for origin, tags, name, Collection structure, folder location, or deletion from LUT Library
+- **THEN** the application opens the corresponding LUT in LUT Manager rather than duplicating the management form
+
 ### Requirement: Gallery card content
 Each LUT Library Gallery card SHALL show a rendered sample preview, LUT name, explicit vendor name or Custom/Unknown origin, and no more than three tags.
 

@@ -13,6 +13,7 @@ The requested screenshots demonstrate useful relationships—media beside the wo
 - Put media selection and LUT source selection together in Viewer's secondary column without mixing their data models.
 - Separate physical LUT hierarchy from cross-folder metadata groupings.
 - Separate visual LUT discovery from the Manager's current bulk-oriented table.
+- Make existing and selected LUT metadata easy to inspect, add, remove, and batch-correct in Manager, especially tags and Collection membership.
 - Make LUT previews agree with Viewer by using the same render and colour-management path.
 - Preserve user files and existing metadata during migration.
 
@@ -122,7 +123,9 @@ Collections are manual in this change. The condition-builder shown in one refere
 
 ### Preserve Manager table work and add a separate visual Library path
 
-LUT Manager remains the place for folder moves, collection membership, tagging, origin editing, removal, and other batch work. LUT Library consumes the same source-filtered LUT data for browsing without exposing destructive bulk controls. Gallery cards prioritise the rendered look, then show the LUT name, confirmed vendor name or Custom/Unknown origin, and up to three tags. Extra tags remain available in detail and Manager metadata editing; the card may show a non-tag overflow count.
+LUT Manager remains the place for folder moves, Collection creation/rename/deletion, full membership editing, tagging, origin editing, removal, and other batch work. LUT Library consumes the same source-filtered LUT data for browsing without exposing destructive bulk controls. Its only write actions are Star, add to an existing Collection, and open in Viewer. Gallery cards prioritise the rendered look, then show the LUT name, confirmed vendor name or Custom/Unknown origin, and up to three tags. Extra tags remain available in detail and Manager metadata editing; the card may show a non-tag overflow count.
+
+The current Manager `Tag…` action only adds one value through a sheet. It does not make existing tags directly inspectable or removable and is insufficient as the primary metadata-editing workflow. The final editing component—persistent inspector, inline table editing, or another model—remains a grilling decision, but it must support both single-LUT and multi-LUT correction without hiding current values.
 
 Card activation opens a LUT Library detail rather than switching to Viewer or Manager. Back returns to the same Gallery context.
 
@@ -159,5 +162,7 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 The requested grilling session must resolve one product-level decision before implementation:
 
 1. Should the local **LUT Library** surface be its own Workspace destination, or a distinct Browse child under a broader LUT destination?
+2. Does “editing a LUT in Manager” mean metadata only, with colour-transform editing remaining exclusively in LUT Editor?
+3. Which Manager interaction should replace the add-only Tag sheet: a persistent inspector, inline table editing, or another explicit model?
 
 All other assumptions are explicit: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.

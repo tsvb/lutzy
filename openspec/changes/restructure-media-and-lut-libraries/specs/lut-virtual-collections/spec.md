@@ -12,7 +12,7 @@ Viewer and LUT Manager SHALL present physical Folders, manual Collections, and t
 - **THEN** those sources are shown outside the physical folder hierarchy and do not imply filesystem locations
 
 ### Requirement: Manual collection creation
-The application SHALL let the user create a non-empty named Collection from one or more selected LUTs without moving or copying any LUT file.
+LUT Manager SHALL let the user create a non-empty named Collection from one or more selected LUTs without moving or copying any LUT file.
 
 #### Scenario: Create a cross-folder collection
 - **WHEN** the user selects LUTs from different camera-brand folders and creates “Low Saturation”
@@ -39,6 +39,17 @@ Deleting a Collection SHALL delete only the Collection definition and membership
 #### Scenario: Delete collection
 - **WHEN** the user confirms deletion of a Collection
 - **THEN** no LUT file, tag, favourite flag, or other Collection membership is removed
+
+### Requirement: Collection structure editing in Manager
+LUT Manager SHALL provide create, rename, delete, add-member, and remove-member actions for Collections, including batch membership changes for selected LUTs.
+
+#### Scenario: Rename collection
+- **WHEN** the user gives a Collection a valid new name in LUT Manager
+- **THEN** its identity and memberships remain unchanged while every source list displays the new name
+
+#### Scenario: Batch membership edit
+- **WHEN** the user selects multiple LUTs in Manager and adds or removes an existing Collection membership
+- **THEN** the change applies to exactly the selected LUTs without changing files, folders, tags, or Starred state
 
 ### Requirement: Stable membership across library changes
 Collection membership SHALL use stable LUT identity so a rename or move preserves membership, and temporarily unavailable LUTs SHALL NOT be silently removed from collection metadata.

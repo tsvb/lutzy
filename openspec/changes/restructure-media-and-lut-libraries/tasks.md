@@ -26,7 +26,7 @@
 ## 4. LUT collections
 
 - [ ] 4.1 Add tolerant persistence for manual Collection definitions and stable LUT membership
-- [ ] 4.2 Add create, rename, delete, add-member, and remove-member workflows with no filesystem side effects
+- [ ] 4.2 Add Manager create, rename, delete, add-member, and remove-member workflows with no filesystem side effects
 - [ ] 4.3 Preserve many-to-many membership across LUT moves, renames, rescans, and temporary unavailability
 - [ ] 4.4 Keep Starred backed by favourite metadata and separate from user Collections
 
@@ -35,6 +35,7 @@
 - [ ] 5.1 Add Vendor, Custom, and Unknown origin metadata with stable persistence and editing
 - [ ] 5.2 Keep LUT Manager's table focused on organisation and expose Gallery through the confirmed separate visual-LUT destination
 - [ ] 5.3 Build lazy Gallery cards with preview, name, origin, a maximum of three tags, and loading state
+- [ ] 5.4 Replace the add-only Tag sheet with a confirmed single- and multi-selection metadata editing workflow that exposes existing tags and supports removal
 
 ## 6. LUT detail and samples
 
