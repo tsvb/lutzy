@@ -95,28 +95,8 @@ public struct ContentView: View {
         case .manager:
             LibraryManagerView(viewModel: viewModel)
         case .editor:
-            comingSoon
+            EditorView(viewModel: viewModel)
         }
-    }
-
-    /// The editor, before it exists.
-    ///
-    /// Listed and explained rather than hidden: the app's shape is easier to
-    /// learn if what is missing is visible, and this says what it will do
-    /// rather than teasing that something will.
-    private var comingSoon: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 40, weight: .thin))
-                .foregroundStyle(.tertiary)
-            Text("LUT Editor")
-                .font(.title3)
-            Text("Not built yet. It will edit a LUT's curve and colour directly,\nrather than only deriving one from a graded JPEG.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var viewerContent: some View {

@@ -717,6 +717,101 @@ do {
 print("projects -> \(projectOK ? "PASS" : "FAIL")")
 
 
+// --- the editor -------------------------------------------------------------
+// Baking has to be exact where it claims to change nothing, and the .cube it
+// writes has to be one the camera will take. Both are checked against the real
+// LUT rather than a fixture, since the grid and the header are what the DC-S9
+// actually reads.
+var editorOK = true
+if let base = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
+    // A neutral edit must be the identity, to within the float round trip
+    // through sRGB decode and encode. Anything larger means the editor moves
+    // the picture while claiming not to.
+    let untouched = LookBaker.bake(base: base, edit: .neutral)
+    let sampled = base.sample((0..<untouched.count).flatMap { index -> [Float] in
+        let n = LookBaker.size, m = Float(n - 1)
+        let r = index % n, g = (index / n) % n, b = index / (n * n)
+        return [Float(r) / m, Float(g) / m, Float(b) / m]
+    })
+    var worst: Float = 0
+    for (index, colour) in untouched.enumerated() {
+        worst = max(worst, abs(colour.x - sampled[index * 3]))
+        worst = max(worst, abs(colour.y - sampled[index * 3 + 1]))
+        worst = max(worst, abs(colour.z - sampled[index * 3 + 2]))
+    }
+    let identityOK = worst < 0.002
+    print(String(format: "editor a neutral edit changes nothing -> worst %.5f -> %@", worst, identityOK ? "PASS" : "FAIL"))
+
+    // Each control has to move the thing it names, in the direction it names.
+    func measure(_ edit: LookEdit) -> (lightness: Float, chroma: Float, black: Float) {
+        let baked = LookBaker.bake(base: base, edit: edit)
+        let n = LookBaker.size, m = n - 1
+        func at(_ r: Int, _ g: Int, _ b: Int) -> SIMD3<Float> { baked[(b * n + g) * n + r] }
+        let mid = at(m / 2, m / 2, m / 2)
+        let lab = OKLab.fromLinear(SIMD3<Float>(
+            OKLab.srgbToLinear(mid.x), OKLab.srgbToLinear(mid.y), OKLab.srgbToLinear(mid.z)))
+        // A saturated grid corner, for chroma.
+        let red = at(m, m / 4, m / 4)
+        let redLab = OKLab.fromLinear(SIMD3<Float>(
+            OKLab.srgbToLinear(red.x), OKLab.srgbToLinear(red.y), OKLab.srgbToLinear(red.z)))
+        let black = at(4, 4, 4)
+        return (lab.x, sqrt(redLab.y * redLab.y + redLab.z * redLab.z), (black.x + black.y + black.z) / 3)
+    }
+
+    let plain = measure(.neutral)
+    var brighter = LookEdit.neutral; brighter.exposure = 1
+    var punchier = LookEdit.neutral; punchier.saturation = 1.6
+    var duller = LookEdit.neutral; duller.saturation = 0.3
+    var lifted = LookEdit.neutral; lifted.blackLift = 0.1
+
+    let exposureOK = measure(brighter).lightness > plain.lightness + 0.05
+    let upOK = measure(punchier).chroma > plain.chroma * 1.2
+    let downOK = measure(duller).chroma < plain.chroma * 0.6
+    let liftOK = measure(lifted).black > plain.black + 0.05
+    print("editor exposure raises lightness -> \(exposureOK ? "PASS" : "FAIL")")
+    print("editor saturation moves chroma both ways -> \(upOK && downOK ? "PASS" : "FAIL")")
+    print("editor black lift raises the shadows -> \(liftOK ? "PASS" : "FAIL")")
+
+    // Stacking a V-Log LUT after a V-Log LUT is the mistake the type check
+    // exists to prevent: the second would read a finished picture as scene
+    // light. It must be refused rather than applied.
+    let stackedWithVLog = LookBaker.bake(base: base, edit: .neutral, stacked: base, stackAmount: 1)
+    let refusedOK = zip(stackedWithVLog, untouched).allSatisfy { $0 == $1 }
+    print("editor refuses to stack a V-Log LUT after one -> \(refusedOK ? "PASS" : "FAIL")")
+
+    // What it writes has to be a cube the camera reads: 33 points and the tag.
+    let text = try? CubeWriter.text(entries: untouched, size: LookBaker.size, title: "Test look")
+    let headerOK = (text?.contains("#LUMIXPHOTOSTYLE VLOG") ?? false)
+        && (text?.contains("LUT_3D_SIZE 33") ?? false)
+    // And it must refuse a grid the camera cannot take.
+    var tooBig = false
+    do {
+        _ = try CubeWriter.text(entries: Array(repeating: SIMD3<Float>(0, 0, 0), count: 65 * 65 * 65),
+                                size: 65, title: "Too big")
+    } catch { tooBig = true }
+    print("editor writes a camera-legal cube -> header \(headerOK), refuses 65 points \(tooBig) -> \(headerOK && tooBig ? "PASS" : "FAIL")")
+
+    // Round trip: what was written must parse back to what was baked.
+    let roundTripURL = scratch.appendingPathComponent("lutcheck-edited.cube")
+    try? CubeWriter.write(entries: untouched, size: LookBaker.size, title: "Round trip", to: roundTripURL)
+    defer { try? FileManager.default.removeItem(at: roundTripURL) }
+    var roundTripOK = false
+    if let reread = try? CubeLUT(url: roundTripURL) {
+        let probe: [Float] = [0.2, 0.5, 0.8, 0.42, 0.42, 0.42, 0.9, 0.1, 0.3]
+        let a = base.sample(probe), b = reread.sample(probe)
+        let diff = zip(a, b).map { abs($0 - $1) }.max() ?? 1
+        roundTripOK = reread.inputSpace == .vlog && diff < 0.002
+        print(String(format: "editor round trip through a file -> inputSpace %@, worst %.5f -> %@",
+                     String(describing: reread.inputSpace), diff, roundTripOK ? "PASS" : "FAIL"))
+    } else {
+        print("editor round trip through a file -> FAIL (could not reread)")
+    }
+
+    editorOK = identityOK && exposureOK && upOK && downOK && liftOK && refusedOK && headerOK && tooBig && roundTripOK
+    print("editor -> \(editorOK ? "PASS" : "FAIL")")
+}
+
+
 // --- comparison layouts -----------------------------------------------------
 // The grid renders one cell per slot and reads them back by row-major index, so
 // a layout whose rows × columns disagreed with its cell count would silently
@@ -850,4 +945,4 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 
-exit(projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)
+exit(editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK ? 0 : 1)

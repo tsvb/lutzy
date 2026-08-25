@@ -47,14 +47,19 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         size: Int,
         name: String,
         category: String = "Derived",
-        sourceURL: URL? = nil
+        sourceURL: URL? = nil,
+        inputSpace: LUTInputSpace = .display
     ) {
         precondition(cube.count == size * size * size, "cube count must equal size^3")
         self.size = size
         self.name = name
         self.category = category
-        self.inputSpace = .display
-        self.photoStyleTag = nil
+        // An edited V-Log look is still a V-Log look: baking adjustments into
+        // it changes what it produces, never what it expects. Defaulting to
+        // display and letting the editor pass `.vlog` keeps the recipe
+        // extractor's behaviour unchanged.
+        self.inputSpace = inputSpace
+        self.photoStyleTag = inputSpace == .vlog ? "VLOG" : nil
         self.url = sourceURL ?? URL(fileURLWithPath: "/dev/null")
 
         var floats = [Float]()

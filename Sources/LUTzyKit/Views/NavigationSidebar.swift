@@ -33,7 +33,7 @@ enum AppSection: String, CaseIterable, Identifiable, Codable, Sendable {
     /// The editor is listed before it exists on purpose: it says where the app
     /// is going, and an empty section that explains itself is better than a
     /// feature appearing one day with no warning.
-    var isAvailable: Bool { self != .editor }
+    var isAvailable: Bool { true }
 }
 
 /// The app's navigation column: what you are doing, and what you are looking at.
@@ -55,7 +55,6 @@ struct NavigationSidebar: View {
             Section("Workspace") {
                 ForEach(AppSection.allCases) { section in
                     Label(section.label, systemImage: section.symbol)
-                        .foregroundStyle(section.isAvailable ? .primary : .tertiary)
                         .tag(NavigationTarget.section(section))
                 }
             }
@@ -206,7 +205,10 @@ struct NavigationSidebar: View {
                 guard let target else { return }
                 switch target {
                 case .section(let section):
-                    guard section.isAvailable else { return }
+                    // Just the section. The editor sets itself up in `onAppear`
+                    // rather than here: a click on an already-selected row is
+                    // not a selection change, so a project restored straight
+                    // into the editor would never have run the setup.
                     viewModel.section = section
                 case .everything:
                     viewModel.showingFavouritesOnly = false

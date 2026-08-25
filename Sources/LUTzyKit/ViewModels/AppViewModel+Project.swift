@@ -212,6 +212,12 @@ extension AppViewModel {
         // project opens, so each restore waits for the one it depends on.
         // Restoring the LUT before the library lands silently selects nothing,
         // which looks exactly like a project saved without one.
+        //
+        // Only the LUT and the image are deferred. Anything set synchronously
+        // above is already applied; re-applying it once the scan lands would
+        // undo whatever the user did in the meantime — measured: opening the
+        // editor during startup switched the preview to its before/after
+        // layout, and the late restore put the viewer's 3x3 back.
         if let raw = session.selectedLUT {
             // Raised here, not inside the task: the synchronous pass releases
             // its own hold as soon as it returns, and a hold taken only once
@@ -225,10 +231,6 @@ extension AppViewModel {
                 // clearing it — the file may come back.
                 guard let lut = library.allLUTs.first(matching: LUTID(raw: raw)) else { return }
                 selectLUT(lut)
-                // The layout comes back with it: split and compare fall back to
-                // a single view while there is nothing to compare against, so
-                // restoring it before the LUT would land on the fallback.
-                comparisonLayout = session.layout
             }
         }
 

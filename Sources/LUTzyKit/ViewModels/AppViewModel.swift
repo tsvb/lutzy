@@ -210,6 +210,18 @@ final class AppViewModel: ObservableObject {
     /// cost the user their 3×3.
     var lastComparisonLayout: ComparisonLayout = .split
 
+    // MARK: - Editor (see AppViewModel+Editor)
+
+    /// The LUT being edited, the adjustments on it, and an optional second LUT
+    /// stacked after them.
+    @Published var editorBaseID: LUTID?
+    @Published var editorEdit: LookEdit = .neutral
+    @Published var editorStackID: LUTID?
+    @Published var editorStackAmount: Float = 1
+    /// The baked result, held so the editor can save exactly what is on screen.
+    @Published var editedLUT: CubeLUT?
+    var editorPreviewTask: Task<Void, Never>?
+
     /// Inspector visibility. Computing the histogram is gated on this — plus on the Info tab being
     /// the one on screen — so we don't tally pixels for a panel nobody's looking at.
     @Published var isInspectorPresented: Bool = false {
