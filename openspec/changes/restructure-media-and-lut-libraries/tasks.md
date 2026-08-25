@@ -1,6 +1,6 @@
 ## 0. Product decision gate
 
-- [ ] 0.1 Confirm whether visual LUT browsing is local-only or includes an online download/creator catalogue
+- [x] 0.1 Confirm visual LUT browsing is local-only and excludes online download, creator, and marketplace scope
 - [ ] 0.2 Confirm whether LUT Library is its own Workspace destination or a distinct Browse child under a broader LUT destination, then update the provisional navigation spec before implementation
 
 ## 1. Navigation and state boundaries

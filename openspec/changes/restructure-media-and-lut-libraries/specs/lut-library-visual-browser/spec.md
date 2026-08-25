@@ -1,5 +1,16 @@
 ## ADDED Requirements
 
+### Requirement: Local LUT scope only
+LUT Library SHALL display only LUTs already imported into or created by the local application and SHALL NOT introduce a remote catalogue, marketplace, creator network, or download workflow.
+
+#### Scenario: Browse while offline
+- **WHEN** the user opens LUT Library without a network connection
+- **THEN** every locally available LUT remains browseable with no missing remote sections or account prompts
+
+#### Scenario: Inspect a reference-inspired section
+- **WHEN** LUT Library groups or highlights local LUTs visually
+- **THEN** the section is derived from local library metadata and does not imply that the LUT can be downloaded from a remote service
+
 ### Requirement: Separate discovery and management responsibilities
 The application SHALL provide a visual LUT Library for discovery and sample-based evaluation separately from LUT Manager's table-based file, metadata, collection, and bulk-management work.
 

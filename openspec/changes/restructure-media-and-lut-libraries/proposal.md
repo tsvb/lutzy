@@ -2,7 +2,7 @@
 
 Viewer currently opens image management by replacing the entire preview workbench with a List/Gallery surface. That transition is visually disruptive, and it mixes two different jobs: choosing media to inspect and managing a media library. At the same time, physical LUT folders cannot represent cross-folder concepts such as “Low Saturation”, while LUT Manager's table is efficient for bulk work but does not let users judge looks visually.
 
-The application needs a clearer ownership model: Workspace chooses the job, Viewer keeps its comparison workbench stable, Media Library owns media import and browsing, LUT Library owns visual discovery, and LUT Manager owns structured metadata and file work.
+The application needs a clearer ownership model for the same local LUT set: Workspace chooses the job, Viewer keeps its comparison workbench stable, Media Library owns media import and browsing, LUT Library owns visual discovery, and LUT Manager owns structured metadata and file work.
 
 ## What Changes
 
@@ -14,6 +14,7 @@ The application needs a clearer ownership model: Workspace chooses the job, View
 - Add manual Collections that can group LUTs across physical folders without moving or copying files.
 - Keep LUT Manager focused on physical organisation, metadata, collections, and bulk actions.
 - Put visual LUT browsing in a separate LUT Library surface rather than presenting it as a Manager table mode.
+- Keep LUT Library local-only: it displays LUTs already imported into or created by the app and has no marketplace, download catalogue, or creator-network scope.
 - Show a LUT preview, name, vendor or Custom origin, and no more than three tags on each LUT Library gallery card.
 - Open a LUT detail from the visual Library with multiple sample images and an original-versus-graded comparison rendered through the same colour pipeline as Viewer.
 - Treat supplied screenshots as non-normative references for hierarchy and interaction, not pixel-level designs to reproduce.

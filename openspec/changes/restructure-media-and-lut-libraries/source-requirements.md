@@ -45,6 +45,7 @@ This file preserves the user's original intent and the evolution of decisions be
 4. Activating a visual LUT opens a detail with several sample images so the user can inspect its effect. The supplied draggable before/after reference is not a mandate to copy that exact control.
 5. Gallery/detail previews must share Viewer's real render and colour pipeline so the same source and LUT do not produce a different RGB result in different parts of the app.
 6. The latest direction leans toward separating LUT display/discovery from LUT management. The behavioural separation is recorded; its final top-level placement and label remain subject to the requested grilling session.
+7. LUT display is strictly for the local LUT Library: LUTs already imported into or created by the app. Marketplace, creator network, remote catalogue, and download features are explicitly excluded.
 
 ### Colour consistency
 
@@ -115,6 +116,12 @@ These excerpts preserve the user's wording. Line breaks were normalised only for
 | Viewer owns an Images List/Gallery surface | Remove the whole-surface Viewer browser; put media in the secondary column | Superseded |
 | LUT Manager may gain Gallery as another presentation | Separate visual discovery responsibility from management; decide final navigation placement | Provisional split |
 | Collections may resemble the reference's Smart Collections | Manual metadata Collections only | Confirmed |
+
+## Confirmed follow-up decisions
+
+### 2026-08-26 — Local LUT Library only
+
+The visual LUT space operates on the same local LUT set as LUT Manager. It is not a marketplace and does not include online download, creator, account, licensing, rating, or remote-catalogue features. The remaining question is only how local LUT display and local LUT management should be separated in the interface.
 
 ## Reference-image index
 

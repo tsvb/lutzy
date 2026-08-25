@@ -25,7 +25,7 @@ The requested screenshots demonstrate useful relationships—media beside the wo
 - Letting users add or manage custom visual-Library sample images in this change.
 - Changing LUT interpolation, V-Log conversion, colour-space policy, or export rendering.
 - Removing LUT Manager's table or LUT Editor's existing file-oriented list.
-- Adding an online marketplace, creator accounts, downloads, ratings, or remote catalogue APIs. The latest mobile screenshot is treated only as a possible local-library presentation reference until product scope says otherwise.
+- Adding an online marketplace, creator accounts, downloads, ratings, or remote catalogue APIs. Product scope is explicitly limited to LUTs already local to the app; the mobile screenshot is only a local-library presentation reference.
 
 ## Information Architecture
 
@@ -79,7 +79,7 @@ LUT Manager ships with a small, fixed set of representative, licensed sample ima
 
 Media management is a durable job, not a temporary Viewer mode. Visual LUT discovery is also becoming materially different from management: it uses large renders, samples, and explanatory detail, while Manager uses dense rows and batch actions. The provisional architecture therefore has five Workspace destinations: Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor.
 
-“LUT Library” is a working label for the visual discovery surface. The first product-grilling decision is whether this deserves its own Workspace row or should remain a distinct child surface under a broader LUT destination. The behavioural separation remains either way; the reference does not justify turning the app into a marketplace.
+“LUT Library” is a working label for the visual discovery surface. It only browses LUTs already imported into or created by the app. The remaining product-grilling decision is whether this deserves its own Workspace row or should remain a distinct child surface under a broader LUT destination.
 
 Alternative: keep media management behind the current Viewer toolbar button. Rejected because it is the layout-changing interaction the redesign is intended to remove and leaves no coherent home for future video assets.
 
@@ -158,7 +158,6 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 The requested grilling session must resolve one product-level decision before implementation:
 
-1. Is the visual LUT surface a local installed-LUT browser, or the beginning of an online download/creator catalogue?
-2. If it is local, should the working **LUT Library** surface be its own Workspace destination, or a distinct Browse child under a broader LUT destination?
+1. Should the local **LUT Library** surface be its own Workspace destination, or a distinct Browse child under a broader LUT destination?
 
-All other assumptions are explicit: Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.
+All other assumptions are explicit: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.
