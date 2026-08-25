@@ -22,8 +22,8 @@ Manager-controlled move or rename operations SHALL retain LUTRecordID and SHALL 
 - **WHEN** a file operation cannot be reconciled with a durable catalog update
 - **THEN** the operation reports failure and does not expose old and new locators as two records
 
-### Requirement: Conservative scan reconciliation
-The catalog SHALL retain unavailable records and SHALL reconnect an unmatched file by content fingerprint only when exactly one unavailable record is a candidate.
+### Requirement: Conservative scan-batch reconciliation
+The catalog SHALL retain unavailable records, SHALL group all unmatched files and unavailable records by fingerprint before assigning identities, and SHALL reconnect only a bucket containing exactly one unmatched file and exactly one unavailable record.
 
 #### Scenario: Unique external move
 - **WHEN** one record is unavailable and exactly one unmatched file has the same fingerprint
@@ -32,6 +32,10 @@ The catalog SHALL retain unavailable records and SHALL reconnect an unmatched fi
 #### Scenario: Ambiguous duplicate content
 - **WHEN** zero or multiple unavailable records share the unmatched file's fingerprint
 - **THEN** the file receives a new LUTRecordID and no unavailable record is deleted or merged automatically
+
+#### Scenario: One missing record and two identical unmatched files
+- **WHEN** one record is unavailable and the same scan batch finds two unmatched files with that record's fingerprint
+- **THEN** both files receive distinct new LUTRecordIDs, the unavailable record remains unchanged, and enumeration order does not decide which file inherits its metadata
 
 ### Requirement: Explicit metadata identity levels
 User-authored metadata SHALL be stored per LUTRecordID, while measured metrics and measured tags MAY be shared per content fingerprint.
@@ -62,3 +66,25 @@ Viewer documents, selected LUT state, and comparison-grid cells SHALL persist LU
 - **WHEN** an old path reference has no exact scanned locator during migration
 - **THEN** it remains a non-destructive missing reference and does not select a content-identical substitute
 
+### Requirement: Transactional adoption of saved derived LUTs
+Saving an unsaved `derived://` LUT SHALL create or adopt a resolvable durable record as part of the save operation, and the active document SHALL replace its transient reference only after that record is persisted.
+
+#### Scenario: Save to a new locator
+- **WHEN** a derived LUT is saved to a locator not owned by an existing catalog record
+- **THEN** the catalog persists a new LUTRecordID for that locator and the active document replaces `derived://` with the new record ID
+
+#### Scenario: Overwrite a known locator
+- **WHEN** a derived LUT overwrites a locator owned by an existing record
+- **THEN** the document adopts the existing LUTRecordID, its record-level metadata is preserved, its fingerprint is refreshed, and measured/render caches associated with the replaced content are invalidated
+
+#### Scenario: Save outside configured scan roots
+- **WHEN** a derived LUT is saved to a new locator outside all configured scan roots
+- **THEN** an explicitly catalogued external record is persisted with a resolvable locator and any required security-scoped bookmark, without waiting for a folder rescan
+
+#### Scenario: Catalog adoption fails
+- **WHEN** the file is written but the durable record or required locator permission cannot be persisted
+- **THEN** the document keeps its transient reference, reports a retryable registration error, and is never pointed at a transient or dangling durable ID
+
+#### Scenario: Relaunch after derived save
+- **WHEN** the app relaunches after a successful new-locator, overwrite, or outside-root save
+- **THEN** the saved document reference resolves the adopted durable LUTRecordID and its current content

@@ -182,8 +182,9 @@ These are engineering contracts derived from the confirmed product requirements 
 - Each on-disk LUT file has its own UUID-backed LUTRecordID, separate from path and content fingerprint.
 - Identical-content files remain independent for display-name override, origin, typed Tags, Starred, and Collection membership.
 - Measured metrics/Tags remain content-level because they objectively describe the transform.
-- Manager moves preserve record identity; missing records remain; fingerprint reconnect occurs only for exactly one missing candidate.
+- Manager moves preserve record identity; missing records remain; fingerprint reconnect occurs only for a complete scan bucket containing exactly one missing record and exactly one unmatched file.
 - Existing path-based documents/grid cells migrate only by exact locator match. Existing content-hash typed Tags and favourites are copied to every matching record without collapsing files.
+- Saving `derived://` to a new path persists a durable record before replacing the document reference. Overwriting a known locator adopts its existing record and metadata while refreshing content-level caches; a new outside-root path is stored as an explicit external locator/bookmark. Persistence failure leaves the document transient and retryable rather than dangling.
 
 ### Durable aggregated Media Library
 

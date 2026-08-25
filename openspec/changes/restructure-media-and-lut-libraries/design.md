@@ -63,13 +63,20 @@ Metadata semantics are deliberately split:
 
 On first migration, every scanned file receives a distinct LUTRecordID even if two files have identical contents. Existing content-hash keyed typed tags and favourite state are copied to each matching record so no user metadata is lost; later edits diverge per record. Existing measured data remains content-level.
 
-Catalog reconciliation follows deterministic rules:
+Catalog reconciliation follows deterministic scan-batch rules:
 
 1. An exact known locator reuses its record ID and refreshes its fingerprint/availability.
 2. A successful Manager move or rename atomically updates the file locator while retaining the record ID; a catalog-update failure must report failure and avoid publishing a second identity.
 3. Missing files leave unavailable records in the catalog.
-4. An unmatched file may reuse a missing record only when exactly one missing record has the same fingerprint. Zero or multiple candidates create a new record, so identical present files are never collapsed.
+4. Reconciliation groups all unmatched files and unavailable records by fingerprint before assigning identities. A reconnect is allowed only for a bucket containing exactly one unmatched file and exactly one unavailable record. Every other cardinality is ambiguous: each unmatched file receives a distinct new record and every unavailable record is retained, so enumeration order cannot choose which duplicate inherits metadata.
 5. Reconnection and rescan never delete record metadata silently.
+
+Saving an unsaved `derived://` LUT is a catalog transaction rather than a later scan side effect:
+
+1. Saving to a new locator creates and persists a new LUTRecordID before the active document replaces its transient reference.
+2. Saving over a locator already owned by the catalog adopts that existing LUTRecordID, preserves its record-level metadata, refreshes the fingerprint, and invalidates content analysis and rendered-preview caches for the old fingerprint.
+3. A new locator outside configured scan roots still becomes an explicitly catalogued external record. The catalog persists the normalized locator and, when required by the platform sandbox, the security-scoped bookmark granted by the save panel; a background folder scan is not required for it to resolve after relaunch.
+4. File replacement and catalog persistence use a recovery marker so interruption can be reconciled on next launch. The application must not replace a document's transient reference or report the catalog adoption complete until the durable record can be resolved. If catalog persistence fails, the written file may remain at the requested locator, but the document stays on its transient reference and exposes a retryable registration error rather than a dangling record.
 
 ### LUT source
 

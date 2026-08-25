@@ -12,9 +12,10 @@
 
 - [ ] 1.1 Add a persisted LUT catalog with distinct LUTRecordID, file locator, fingerprint, availability, record metadata, and content-level measured data
 - [ ] 1.2 Migrate one record per scanned LUT file, copy legacy typed tags/favourites to every fingerprint match, and migrate exact path-based document/grid references
-- [ ] 1.3 Reconcile exact locators, Manager moves, missing records, unique fingerprint reconnects, and ambiguous duplicate contents without merging identities
+- [ ] 1.3 Reconcile complete fingerprint buckets per scan batch; reconnect only one-unavailable/one-unmatched buckets and keep all other duplicate cases independent of enumeration order
 - [ ] 1.4 Add a durable media manifest and one global managed Media Library root with stable MediaRecordID and full logical relative paths
 - [ ] 1.5 Idempotently aggregate every legacy project Images folder without moving files and migrate unambiguous basename sessions to MediaRecordID
+- [ ] 1.6 Make derived-LUT save create or adopt a durable record transactionally, preserve metadata on known-locator overwrite, register outside-root locators/bookmarks, and recover or report persistence failures without publishing a dangling reference
 
 ## 2. Navigation and state boundaries
 
@@ -63,9 +64,10 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Add migration tests for duplicate-content LUTs, move/rename/relaunch, unavailable reconnect, legacy typed tags/favourites, and path-based session/grid references
+- [ ] 8.1 Add migration tests for duplicate-content LUTs, move/rename/relaunch, one-missing/two-unmatched scan buckets, unavailable reconnect, legacy typed tags/favourites, and path-based session/grid references
 - [ ] 8.2 Add media tests for two legacy projects with colliding names/subfolders, idempotent migration, nested mixed imports, videos, duplicates, and relaunch identity
 - [ ] 8.3 Add focused tests for Workspace/source isolation, Collection safety, display-name fallback, Inspector mixed state, tag priority, and keyboard ownership/cleanup
 - [ ] 8.4 Add pixel/RGB parity checks between Viewer and LUT Library using the exact neutral Library request for display-space and V-Log LUTs
 - [ ] 8.5 Verify lazy rendering cancellation, stable placeholders, VoiceOver labels, narrow-window behaviour, and no hidden shortcut mutations
 - [ ] 8.6 Run debug/release builds, `lutcheck`, strict OpenSpec validation, running-app interface inspection, and fresh sub-agent review
+- [ ] 8.7 Add derived-save tests for new locators, known-locator overwrite with metadata retention/cache invalidation, outside-root relaunch resolution, and catalog-persistence failure without a dangling document reference
