@@ -58,6 +58,7 @@ extension AppViewModel {
     private func showBaseAgainstEdit() {
         cellLUTIDs = [editorBaseID]
         cellImages = [nil]
+        activeGridCellIndex = nil
         comparisonLayout = .compare
         renderAllCells()
     }

@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Several LUTs on the same frame at once — a contact sheet for choosing.
 ///
-/// Each cell is independently assignable and independently rendered. The cell
-/// is the control: clicking it adopts its LUT as the selection (the move from
-/// surveying to working), and its menu re-assigns it without disturbing the
-/// others.
+/// A click makes one cell the target for the lower LUT gallery. A drag can
+/// bypass that focus and replace any cell directly. The visual gallery is the
+/// picker; repeating the whole library in nine menus made a 3×3 slower to use
+/// precisely when it was meant to make comparison faster.
 struct ComparisonGridView: View {
     @ObservedObject var viewModel: AppViewModel
 
@@ -13,15 +13,19 @@ struct ComparisonGridView: View {
 
     var body: some View {
         let layout = viewModel.comparisonLayout
-        // A fixed grid, not an adaptive one: the user asked for 3×3, so it is
-        // 3×3 at every window size. Cells get smaller; they do not re-flow.
+        // A fixed grid, not an adaptive one: 3×3 remains 3×3 at every window
+        // size. Cells get smaller; they do not silently re-flow.
         VStack(spacing: 2) {
             ForEach(0..<layout.rows, id: \.self) { row in
                 HStack(spacing: 2) {
                     ForEach(0..<layout.columns, id: \.self) { column in
                         let index = row * layout.columns + column
                         if index < viewModel.cellLUTIDs.count {
-                            cell(index)
+                            ComparisonGridCell(
+                                index: index,
+                                viewModel: viewModel,
+                                background: bgColor
+                            )
                         } else {
                             bgColor
                         }
@@ -30,79 +34,112 @@ struct ComparisonGridView: View {
             }
         }
         .padding(8)
+        .onAppear { viewModel.ensureActiveGridCell() }
+    }
+}
+
+private struct ComparisonGridCell: View {
+    let index: Int
+    @ObservedObject var viewModel: AppViewModel
+    let background: Color
+
+    @State private var isDropTargeted = false
+
+    private var lut: CubeLUT? {
+        guard viewModel.cellLUTs.indices.contains(index) else { return nil }
+        return viewModel.cellLUTs[index]
     }
 
-    private func cell(_ index: Int) -> some View {
-        let lut = viewModel.cellLUTs[index]
-        let isSelected = lut?.lutID == viewModel.selectedLUT?.lutID
+    private var image: NSImage? {
+        guard viewModel.cellImages.indices.contains(index) else { return nil }
+        return viewModel.cellImages[index]
+    }
 
-        // The picture takes the tap (which adopts the cell), and the name
-        // plate sits *above* that gesture rather than inside it. With both in
-        // one stack the cell's own tap swallowed every click on the menu, so
-        // the per-cell LUT could not be changed at all — the one thing the
-        // grid exists for.
-        return ZStack {
-            bgColor
+    private var isActive: Bool { viewModel.activeGridCellIndex == index }
 
-            if let image = viewModel.cellImages[index] {
+    var body: some View {
+        ZStack {
+            background
+
+            if let image {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
                 ProgressView().controlSize(.small)
             }
+
+            if isDropTargeted {
+                Color.accentColor.opacity(0.13)
+                VStack(spacing: 7) {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.title2)
+                    Text("Drop to replace Cell \(index + 1)")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8))
+            }
         }
         .contentShape(Rectangle())
-        .onTapGesture { viewModel.adoptCell(index) }
-        .overlay(alignment: .bottom) {
-            CellLabel(
-                name: lut?.name ?? "No LUT",
-                isSelected: isSelected,
-                choose: { viewModel.setCell(index, to: $0) },
-                luts: viewModel.library.allLUTs
-            )
-            .padding(6)
+        .onTapGesture { viewModel.activateGridCell(index) }
+        .dropDestination(for: String.self) { rawIDs, _ in
+            guard let rawID = rawIDs.first else { return false }
+            return viewModel.assignDraggedLUT(rawID: rawID, to: index)
+        } isTargeted: {
+            isDropTargeted = $0
+        }
+        .overlay(alignment: .bottomLeading) {
+            cellPlate
+                .padding(7)
+                .allowsHitTesting(false)
         }
         .clipped()
-        .overlay(
-            // The selection ring is the only thing distinguishing the cell the
-            // inspector is describing from the eight it is not.
+        .overlay {
             RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2)
-        )
-    }
-}
-
-/// A cell's name plate, which is also its LUT picker.
-///
-/// One control rather than a label plus a button: the name is what the user is
-/// reading when they decide to change it, so it is what they should be able to
-/// click.
-private struct CellLabel: View {
-    let name: String
-    let isSelected: Bool
-    let choose: (CubeLUT?) -> Void
-    let luts: [CubeLUT]
-
-    var body: some View {
-        Menu {
-            Button("No LUT") { choose(nil) }
-            Divider()
-            ForEach(luts) { lut in
-                Button(lut.name) { choose(lut) }
+                .strokeBorder(
+                    isActive || isDropTargeted ? Color.accentColor : .clear,
+                    lineWidth: isDropTargeted ? 3 : 2
+                )
+        }
+        .contextMenu {
+            Button("Show Original in Cell \(index + 1)") {
+                viewModel.assignGridCell(index, to: nil)
             }
-        } label: {
-            Text(name)
-                .font(.caption)
-                .fontWeight(isSelected ? .semibold : .regular)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Cell \(index + 1), \(lut?.name ?? "Original")")
+        .accessibilityValue(isActive ? "Active assignment target" : "")
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { viewModel.activateGridCell(index) }
+    }
+
+    private var cellPlate: some View {
+        HStack(spacing: 7) {
+            Text("CELL \(index + 1)")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(isActive ? Color.accentColor : Color.white.opacity(0.7))
+
+            Rectangle()
+                .fill(Color.white.opacity(0.24))
+                .frame(width: 1, height: 11)
+
+            Text(lut?.name ?? "Original")
+                .font(.caption.weight(isActive ? .semibold : .regular))
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+
+            if isActive {
+                Image(systemName: "scope")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Color.accentColor)
+            }
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 6))
     }
 }

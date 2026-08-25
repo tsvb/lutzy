@@ -184,6 +184,10 @@ final class AppViewModel: ObservableObject {
     @Published var cellLUTIDs: [LUTID?] = []
     /// The rasterized cells, index-parallel to `cellLUTIDs`.
     @Published var cellImages: [NSImage?] = []
+    /// The grid cell that receives a click from the LUT contact sheet. Dragging
+    /// directly onto a cell bypasses this target and uses the drop destination.
+    /// This is transient workspace focus, not project data.
+    @Published var activeGridCellIndex: Int?
     /// Invalidates the lazily-rendered LUT contact sheet without tying it to
     /// the currently selected LUT. Picking a card changes the main preview,
     /// but should not make every other card render again.
@@ -639,13 +643,13 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - LUT selection
 
-    func selectLUT(_ lut: CubeLUT?) {
+    func selectLUT(_ lut: CubeLUT?, renderGridCells: Bool = true) {
         // A derived LUT is in no library, so nothing but the registry can resolve it later. Remember
         // it rather than replacing the last one: a document made now must still resolve after the
         // user derives again.
         if let lut, lut.lutID.isDerived { derivedRegistry.register(lut) }
         document.lut.lutID = lut?.lutID
-        applyLUT()
+        applyLUT(renderGridCells: renderGridCells)
         scheduleSessionSave()
     }
 
@@ -722,23 +726,23 @@ final class AppViewModel: ObservableObject {
         guard let current = selectedLUT,
               let idx = library.allLUTs.firstIndex(of: current),
               idx > 0 else { return }
-        selectLUT(library.allLUTs[idx - 1])
+        chooseLUTFromGallery(library.allLUTs[idx - 1])
     }
 
     func selectNextLUT() {
         guard let current = selectedLUT else {
-            if let first = library.allLUTs.first { selectLUT(first) }
+            if let first = library.allLUTs.first { chooseLUTFromGallery(first) }
             return
         }
         guard let idx = library.allLUTs.firstIndex(of: current),
               idx < library.allLUTs.count - 1 else { return }
-        selectLUT(library.allLUTs[idx + 1])
+        chooseLUTFromGallery(library.allLUTs[idx + 1])
     }
 
     // MARK: - LUT application
 
-    private func applyLUT() {
-        schedulePreview(refreshGallery: false)
+    private func applyLUT(renderGridCells: Bool = true) {
+        schedulePreview(refreshGallery: false, renderGridCells: renderGridCells)
     }
 
     /// What space the open image is treated as, for a V-Log LUT.
@@ -1030,7 +1034,7 @@ final class AppViewModel: ObservableObject {
     ///
     /// Any in-flight render is cancelled first, so a slider drag drops stale work rather than
     /// queueing it.
-    private func schedulePreview(refreshGallery: Bool = true) {
+    private func schedulePreview(refreshGallery: Bool = true, renderGridCells: Bool = true) {
         previewTask?.cancel()
 
         if refreshGallery { lutGalleryRevision &+= 1 }
@@ -1072,7 +1076,7 @@ final class AppViewModel: ObservableObject {
         // changes the frame — a new image, develop, an adjustment, intensity —
         // invalidates every cell. `renderAllCells` returns immediately unless a
         // multi-cell layout is actually on screen.
-        renderAllCells()
+        if renderGridCells { renderAllCells() }
     }
 
     /// Rasterize the comparison baseline for the side-by-side left panel. Only needs to re-run when

@@ -44,6 +44,22 @@ struct LUTPreviewGalleryView: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
+            if viewModel.comparisonLayout.isGrid {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.16))
+                    .frame(width: 1, height: 16)
+                Label(
+                    "Assigning to Cell \((viewModel.activeGridCellIndex ?? 0) + 1)",
+                    systemImage: "scope"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                Text("Click a look or drag it onto any cell")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
             Spacer(minLength: 12)
 
             HStack(spacing: 5) {
@@ -200,8 +216,21 @@ private struct LUTPreviewCard: View {
                 )
         }
         .contentShape(RoundedRectangle(cornerRadius: 6))
-        .onTapGesture { viewModel.selectLUT(lut) }
+        .onTapGesture { viewModel.chooseLUTFromGallery(lut) }
+        .draggable(lut.lutID.raw) {
+            Label(lut.name, systemImage: "cube.fill")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
+        }
         .onHover { isHovering = $0 }
+        .help(
+            viewModel.comparisonLayout.isGrid
+                ? "Click to assign to Cell \((viewModel.activeGridCellIndex ?? 0) + 1), or drag onto another cell"
+                : "Apply \(lut.name)"
+        )
         .contextMenu {
             Button(isFavourite ? "Unstar" : "Star") {
                 viewModel.tags.toggleFavourite(lut)
@@ -213,7 +242,7 @@ private struct LUTPreviewCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(lut.name)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction { viewModel.selectLUT(lut) }
+        .accessibilityAction { viewModel.chooseLUTFromGallery(lut) }
         .task(id: renderIdentity) {
             preview = nil
             guard viewModel.sourceImage != nil else { return }

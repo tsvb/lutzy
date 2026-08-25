@@ -1267,9 +1267,11 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
         vm.setLayout(.grid3x3)
         let filled = vm.cellLUTIDs.count == 9
         let distinct = Set(vm.cellLUTIDs.compactMap { $0 }).count
+        let initialTargetOK = vm.activeGridCellIndex == 0
         let rendered = await settle("cell renders", { vm.cellImages.allSatisfy { $0 != nil } })
-        gridOK = filled && distinct == 9 && rendered
+        gridOK = filled && distinct == 9 && initialTargetOK && rendered
         print("grid 3x3 -> \(vm.cellLUTIDs.count) cells, \(distinct) distinct LUTs, \(vm.cellImages.compactMap { $0 }.count) rendered -> \(gridOK ? "PASS" : "FAIL")")
+        print("grid initial assignment target -> Cell 1 -> \(initialTargetOK ? "PASS" : "FAIL")")
 
         // The cells must differ in *pixels*, not merely be labelled with
         // different LUTs: a grid that ignored its per-cell LUT would pass every
@@ -1327,6 +1329,114 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
         let isolatedOK = vm.cellLUTIDs.first == .some(nil) && Array(vm.cellLUTIDs.dropFirst()) == others
         gridOK = gridOK && isolatedOK
         print("grid re-picking one cell leaves the rest -> \(isolatedOK ? "PASS" : "FAIL")")
+
+        // The crop and the original-cell replacement above started renders.
+        // Finish those before taking identity snapshots for the next action.
+        for task in Array(vm.cellTasks.values) { await task.value }
+
+        // A visual-gallery click goes to the active cell, while a drag payload
+        // names its exact destination. Neither path may reshuffle neighbours.
+        vm.activateGridCell(2)
+        let activationOK = vm.activeGridCellIndex == 2
+            && vm.selectedLUT?.lutID == vm.cellLUTIDs[2]
+        let clickCandidate = vm.library.allLUTs.first {
+            vm.cellLUTIDs.contains(.some($0.lutID)) == false
+        }
+        let clickBefore = vm.cellLUTIDs
+        let clickImagesBefore = vm.cellImages
+        if let clickCandidate {
+            vm.chooseLUTFromGallery(clickCandidate)
+        }
+        if let task = vm.cellTasks[2] { await task.value }
+        let clickTargetRendered: Bool = {
+            guard let before = clickImagesBefore[2], let after = vm.cellImages[2] else { return false }
+            return before !== after
+        }()
+        let clickNeighboursStable = vm.cellImages.indices.allSatisfy { offset in
+            guard offset != 2 else { return true }
+            switch (clickImagesBefore[offset], vm.cellImages[offset]) {
+            case let (before?, after?): return before === after
+            case (nil, nil): return true
+            default: return false
+            }
+        }
+        let clickOK = clickCandidate != nil
+            && vm.activeGridCellIndex == 2
+            && vm.cellLUTIDs[2] == clickCandidate?.lutID
+            && clickTargetRendered
+            && clickNeighboursStable
+            && vm.cellLUTIDs.enumerated().allSatisfy { offset, id in
+                offset == 2 || id == clickBefore[offset]
+            }
+        gridOK = gridOK && activationOK && clickOK
+        print("grid cell activation selects assignment target -> \(activationOK ? "PASS" : "FAIL")")
+        print("gallery click replaces active cell only -> \(clickOK ? "PASS" : "FAIL")")
+        print("gallery click preserves neighbour render instances -> \(clickNeighboursStable ? "PASS" : "FAIL")")
+
+        let keyboardBefore = vm.cellLUTIDs
+        var keyboardExpected: LUTID?
+        if let current = vm.selectedLUT,
+           let currentIndex = vm.library.allLUTs.firstIndex(of: current) {
+            if currentIndex < vm.library.allLUTs.count - 1 {
+                keyboardExpected = vm.library.allLUTs[currentIndex + 1].lutID
+                vm.selectNextLUT()
+            } else if currentIndex > 0 {
+                keyboardExpected = vm.library.allLUTs[currentIndex - 1].lutID
+                vm.selectPreviousLUT()
+            }
+        }
+        let keyboardOK = keyboardExpected != nil
+            && vm.activeGridCellIndex == 2
+            && vm.cellLUTIDs[2] == keyboardExpected
+            && vm.cellLUTIDs.enumerated().allSatisfy { offset, id in
+                offset == 2 || id == keyboardBefore[offset]
+            }
+        gridOK = gridOK && keyboardOK
+        print("keyboard LUT cycling replaces active cell only -> \(keyboardOK ? "PASS" : "FAIL")")
+
+        let dropCandidate = vm.library.allLUTs.first {
+            vm.cellLUTIDs.contains(.some($0.lutID)) == false
+        }
+        let dropBefore = vm.cellLUTIDs
+        let dropAccepted = dropCandidate.map {
+            vm.assignDraggedLUT(rawID: $0.lutID.raw, to: 1)
+        } ?? false
+        let dropOK = dropAccepted
+            && vm.activeGridCellIndex == 1
+            && vm.cellLUTIDs[1] == dropCandidate?.lutID
+            && vm.cellLUTIDs.enumerated().allSatisfy { offset, id in
+                offset == 1 || id == dropBefore[offset]
+            }
+        let invalidDropOK = vm.assignDraggedLUT(rawID: "missing://lut", to: 1) == false
+            && vm.assignDraggedLUT(rawID: dropCandidate?.lutID.raw ?? "", to: 99) == false
+        gridOK = gridOK && dropOK && invalidDropOK
+        print("gallery drag replaces drop cell only -> \(dropOK ? "PASS" : "FAIL")")
+        print("grid rejects invalid drag payloads -> \(invalidDropOK ? "PASS" : "FAIL")")
+
+        let cellsBeforeSingle = vm.cellLUTIDs
+        vm.setLayout(.single)
+        if let mainCandidate = vm.library.allLUTs.last {
+            vm.chooseLUTFromGallery(mainCandidate)
+        }
+        let nonGridOK = vm.activeGridCellIndex == nil
+            && vm.cellLUTIDs == cellsBeforeSingle
+            && vm.selectedLUT?.lutID == vm.library.allLUTs.last?.lutID
+        gridOK = gridOK && nonGridOK
+        print("gallery click outside grid keeps main-preview behaviour -> \(nonGridOK ? "PASS" : "FAIL")")
+
+        var restoredGrid = Project.Session()
+        restoredGrid.layout = .grid2x2
+        restoredGrid.cellLUTs = cellsBeforeSingle.map { $0?.raw }
+        restoredGrid.selectedLUT = cellsBeforeSingle[2]?.raw
+        vm.restoreSession(restoredGrid)
+        let matchingRestoreOK = vm.activeGridCellIndex == 2
+
+        restoredGrid.selectedLUT = "missing://outside-grid"
+        vm.restoreSession(restoredGrid)
+        let fallbackRestoreOK = vm.activeGridCellIndex == 0
+        gridOK = gridOK && matchingRestoreOK && fallbackRestoreOK
+        print("grid restore reconnects the selected LUT to its cell -> \(matchingRestoreOK ? "PASS" : "FAIL")")
+        print("grid restore without a matching LUT falls back to Cell 1 -> \(fallbackRestoreOK ? "PASS" : "FAIL")")
     } else {
         gridOK = false
     }

@@ -18,13 +18,17 @@ extension AppViewModel {
 
     /// Switch layout. Grids fill themselves the first time they are shown.
     func setLayout(_ layout: ComparisonLayout) {
-        guard layout != comparisonLayout else { return }
+        guard layout != comparisonLayout else {
+            ensureActiveGridCell()
+            return
+        }
         comparisonLayout = layout
         isSideBySide = layout == .split
         if layout.isGrid || layout.hasChosenBase {
             fitCells(to: layout)
             renderAllCells()
         }
+        ensureActiveGridCell()
     }
 
     /// Resize the cell list to the layout, keeping what was already chosen.
@@ -38,6 +42,7 @@ extension AppViewModel {
         if cellLUTIDs.count > wanted {
             cellLUTIDs = Array(cellLUTIDs.prefix(wanted))
             cellImages = Array(cellImages.prefix(wanted))
+            ensureActiveGridCell()
             return
         }
         guard cellLUTIDs.count < wanted else { return }
@@ -87,11 +92,65 @@ extension AppViewModel {
         renderCell(index)
     }
 
-    /// Promote a cell's LUT to the main selection — the click-through from
-    /// surveying to working on one.
+    /// Make a grid cell the receiver for the next LUT-card click and keep the
+    /// inspector in sync with what that cell contains.
+    func activateGridCell(_ index: Int) {
+        guard comparisonLayout.isGrid, cellLUTIDs.indices.contains(index) else { return }
+        activeGridCellIndex = index
+        selectLUT(cellLUTIDs[index].flatMap { lutForCell($0) }, renderGridCells: false)
+    }
+
+    /// Ensure every visible grid has a usable click target. Restored sessions
+    /// predate this transient focus state, so the first cell is the predictable
+    /// default rather than requiring a preparatory click.
+    func ensureActiveGridCell() {
+        guard comparisonLayout.isGrid, cellLUTIDs.isEmpty == false else {
+            activeGridCellIndex = nil
+            return
+        }
+        if let activeGridCellIndex, cellLUTIDs.indices.contains(activeGridCellIndex) {
+            return
+        }
+        activeGridCellIndex = 0
+    }
+
+    /// Apply a LUT-card click. In a grid the active cell is replaced; in every
+    /// other Viewer layout the card keeps its ordinary main-preview behaviour.
+    func chooseLUTFromGallery(_ lut: CubeLUT) {
+        guard comparisonLayout.isGrid else {
+            selectLUT(lut)
+            return
+        }
+        ensureActiveGridCell()
+        guard let index = activeGridCellIndex else { return }
+        assignGridCell(index, to: lut)
+    }
+
+    /// Assign an explicit drop destination. The raw stable ID is the drag
+    /// payload, keeping the UI transfer small even for a 65-cube LUT.
+    @discardableResult
+    func assignDraggedLUT(rawID: String, to index: Int) -> Bool {
+        guard comparisonLayout.isGrid,
+              cellLUTIDs.indices.contains(index),
+              let lut = library.allLUTs.first(matching: LUTID(raw: rawID))
+        else { return false }
+        assignGridCell(index, to: lut)
+        return true
+    }
+
+    /// Replace one target and select the same look for the inspector without
+    /// disturbing neighbouring cells.
+    func assignGridCell(_ index: Int, to lut: CubeLUT?) {
+        guard comparisonLayout.isGrid, cellLUTIDs.indices.contains(index) else { return }
+        activeGridCellIndex = index
+        setCell(index, to: lut)
+        selectLUT(lut, renderGridCells: false)
+    }
+
+    /// Backwards-compatible name for callers that treat a cell click as
+    /// adopting its LUT.
     func adoptCell(_ index: Int) {
-        guard cellLUTIDs.indices.contains(index) else { return }
-        selectLUT(cellLUTIDs[index].flatMap { lutForCell($0) })
+        activateGridCell(index)
     }
 
     // MARK: - Rendering

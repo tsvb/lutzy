@@ -205,6 +205,17 @@ extension AppViewModel {
         showingFavouritesOnly = session.showingFavouritesOnly
         cellLUTIDs = session.cellLUTs.map { $0.map { LUTID(raw: $0) } }
         cellImages = Array(repeating: nil, count: cellLUTIDs.count)
+        if comparisonLayout.isGrid, cellLUTIDs.isEmpty == false {
+            // Pointer focus is intentionally not project data, but the saved
+            // LUT tells us which cell was last being judged. Reconnect the two
+            // when possible; only fall back to Cell 1 when that LUT is absent.
+            let restoredSelection = session.selectedLUT.map { LUTID(raw: $0) }
+            activeGridCellIndex = restoredSelection.flatMap { selected in
+                cellLUTIDs.firstIndex { $0 == .some(selected) }
+            } ?? 0
+        } else {
+            activeGridCellIndex = nil
+        }
 
         updateDocument { $0.sourceSpace = session.sourceSpace }
 
