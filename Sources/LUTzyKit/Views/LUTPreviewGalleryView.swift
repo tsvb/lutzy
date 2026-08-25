@@ -10,14 +10,17 @@ struct LUTPreviewGalleryView: View {
     @AppStorage("lutzy.viewerLUTCardWidth") private var cardWidth = 220.0
 
     private var visibleLUTs: [CubeLUT] {
-        guard searchText.isEmpty == false else { return viewModel.viewerFolderLUTs }
+        guard searchText.isEmpty == false else { return viewModel.galleryLUTs }
         let query = searchText.localizedLowercase
-        return viewModel.viewerFolderLUTs.filter {
-            $0.name.localizedLowercase.contains(query)
+        return viewModel.galleryLUTs.filter {
+            viewModel.catalog.effectiveName(for: $0).localizedLowercase.contains(query)
         }
     }
 
-    private var folderName: String { viewModel.browsedCategory ?? "All LUTs" }
+    private var folderName: String {
+        viewModel.title(for: viewModel.section == .lutLibrary
+            ? viewModel.libraryLUTSource : viewModel.viewerLUTSource)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -145,7 +148,7 @@ private struct LUTPreviewCard: View {
     @State private var isHovering = false
 
     private var isSelected: Bool { viewModel.selectedLUT?.lutID == lut.lutID }
-    private var isFavourite: Bool { viewModel.tags.isFavourite(lut) }
+    private var isFavourite: Bool { viewModel.isStarred(lut) }
 
     private var renderIdentity: RenderIdentity {
         RenderIdentity(
@@ -176,7 +179,7 @@ private struct LUTPreviewCard: View {
             .clipped()
             .overlay(alignment: .topTrailing) {
                 Button {
-                    viewModel.tags.toggleFavourite(lut)
+                    viewModel.toggleStarred(lut)
                 } label: {
                     Image(systemName: isFavourite ? "star.fill" : "star")
                         .font(.caption.weight(.semibold))
@@ -191,7 +194,7 @@ private struct LUTPreviewCard: View {
             }
 
             HStack(spacing: 6) {
-                Text(lut.name)
+                Text(viewModel.catalog.effectiveName(for: lut))
                     .font(.caption)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -216,9 +219,12 @@ private struct LUTPreviewCard: View {
                 )
         }
         .contentShape(RoundedRectangle(cornerRadius: 6))
-        .onTapGesture { viewModel.chooseLUTFromGallery(lut) }
+        .onTapGesture {
+            if viewModel.section == .lutLibrary { viewModel.selectLibraryLUT(lut) }
+            else { viewModel.chooseLUTFromGallery(lut) }
+        }
         .draggable(lut.lutID.raw) {
-            Label(lut.name, systemImage: "cube.fill")
+                Label(viewModel.catalog.effectiveName(for: lut), systemImage: "cube.fill")
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
@@ -233,16 +239,19 @@ private struct LUTPreviewCard: View {
         )
         .contextMenu {
             Button(isFavourite ? "Unstar" : "Star") {
-                viewModel.tags.toggleFavourite(lut)
+                viewModel.toggleStarred(lut)
             }
             Button("Reveal in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([lut.url])
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(lut.name)
+        .accessibilityLabel(viewModel.catalog.effectiveName(for: lut))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction { viewModel.chooseLUTFromGallery(lut) }
+        .accessibilityAction {
+            if viewModel.section == .lutLibrary { viewModel.selectLibraryLUT(lut) }
+            else { viewModel.chooseLUTFromGallery(lut) }
+        }
         .task(id: renderIdentity) {
             preview = nil
             guard viewModel.sourceImage != nil else { return }

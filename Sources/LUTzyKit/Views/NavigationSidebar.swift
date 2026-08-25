@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// The app's three durable jobs. LUT scope and image browsing are subordinate
-/// controls inside these modes, never competing sidebar selections.
+/// The app's five durable jobs. Browsing, organisation and transform editing
+/// are deliberately separate destinations.
 enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable {
     case viewer
+    case mediaLibrary
+    case lutLibrary
     case manager
     case editor
 
@@ -12,6 +14,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable
     var label: String {
         switch self {
         case .viewer: return "Viewer"
+        case .mediaLibrary: return "Media Library"
+        case .lutLibrary: return "LUT Library"
         case .manager: return "LUT Manager"
         case .editor: return "LUT Editor"
         }
@@ -20,6 +24,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable
     var symbol: String {
         switch self {
         case .viewer: return "photo"
+        case .mediaLibrary: return "photo.on.rectangle.angled"
+        case .lutLibrary: return "square.grid.2x2"
         case .manager: return "square.stack.3d.up"
         case .editor: return "slider.horizontal.3"
         }
@@ -31,7 +37,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let stored = try container.decode(String.self)
-        self = AppSection(rawValue: stored) ?? .viewer
+        if stored == "images" { self = .mediaLibrary }
+        else { self = AppSection(rawValue: stored) ?? .viewer }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -64,7 +71,6 @@ struct NavigationSidebar: View {
             get: { viewModel.section },
             set: { section in
                 guard let section else { return }
-                if section == .viewer { viewModel.viewerSurface = .preview }
                 viewModel.section = section
             }
         )

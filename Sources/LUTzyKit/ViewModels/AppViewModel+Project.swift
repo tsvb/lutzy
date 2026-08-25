@@ -42,11 +42,8 @@ extension AppViewModel {
 
     /// Point the filmstrip and browser at the open project's images.
     func loadProjectImages() {
-        guard let folder = projects.currentImagesFolder else {
-            collection.clear()
-            return
-        }
-        collection.loadFromFolder(folder)
+        media.migrateLegacyProjects(projects)
+        collection.loadMediaRecords(media.records)
     }
 
     // MARK: - Importing images
@@ -57,13 +54,9 @@ extension AppViewModel {
     /// that points at files elsewhere breaks the day those files move, and the
     /// whole point of a project is that it still opens next year.
     func importImages() {
-        guard projects.current != nil else {
-            statusMessage = "Image library unavailable"
-            return
-        }
         let panel = NSOpenPanel()
-        panel.title = "Import Images"
-        panel.message = "Choose images or folders of them."
+        panel.title = "Import Media"
+        panel.message = "Choose images, videos, or folders of them."
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
@@ -72,16 +65,30 @@ extension AppViewModel {
     }
 
     func importImages(from urls: [URL]) {
-        guard let destination = projects.currentImagesFolder else {
-            statusMessage = "Image library unavailable"
+        statusMessage = "Importing media…"
+        Task {
+            let result = await media.importMedia(from: urls)
+            loadProjectImages()
+            statusMessage = Self.mediaImportSummary(result)
+        }
+    }
+
+    func openMedia(_ record: MediaRecord) {
+        media.selectedID = record.id
+        guard record.isAvailable else {
+            statusMessage = "\(record.displayName) is unavailable"
             return
         }
-        statusMessage = "Importing images…"
-        Task {
-            let result = await Task.detached { Self.copyImages(urls, to: destination) }.value
-            loadProjectImages()
-            statusMessage = Self.importSummary(result)
+        guard record.kind == .image else {
+            statusMessage = "Video browsing is available; playback is not included yet"
+            return
         }
+        if let index = collection.items.firstIndex(where: { $0.id == record.id.rawValue }) {
+            collection.selectedIndex = index
+        }
+        openImage(url: record.url)
+        section = .viewer
+        scheduleSessionSave()
     }
 
     /// The copying half. Same duplicate rule as the LUT import — by content, so
@@ -175,6 +182,10 @@ extension AppViewModel {
         session.selectedLUT = document.lut.lutID?.raw
         session.cellLUTs = cellLUTIDs.map { $0?.raw }
         session.imageName = collection.selectedItem?.url?.lastPathComponent
+        if let item = collection.selectedItem,
+           media.records.contains(where: { $0.id.rawValue == item.id }) {
+            session.mediaRecordID = item.id.uuidString.lowercased()
+        }
         session.tagFilter = tagFilter.sorted()
         session.browsedCategory = browsedCategory
         session.showingFavouritesOnly = showingFavouritesOnly
@@ -245,13 +256,15 @@ extension AppViewModel {
             }
         }
 
-        guard let name = session.imageName else { return }
-        restoreDepth += 1
-        Task {
-            defer { restoreDepth -= 1 }
-            await collection.scanCompletion()
-            guard let index = collection.items.firstIndex(where: { $0.url?.lastPathComponent == name }) else { return }
-            selectCollectionImage(at: index)
-        }
+        let directID = session.mediaRecordID.flatMap(UUID.init(uuidString:)).map(MediaRecordID.init)
+        let migratedID: MediaRecordID? = directID ?? {
+            guard let projectID = projects.current?.id, let name = session.imageName else { return nil }
+            return media.legacySessionID(projectID: projectID, basename: name)
+        }()
+        guard let id = migratedID,
+              let record = media.record(id), record.kind == .image,
+              let index = collection.items.firstIndex(where: { $0.id == id.rawValue })
+        else { return }
+        selectCollectionImage(at: index)
     }
 }

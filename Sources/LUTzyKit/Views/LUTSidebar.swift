@@ -113,7 +113,7 @@ struct LUTSidebar: View {
                 scanningState
             } else if viewModel.library.allLUTs.isEmpty {
                 emptyState
-            } else if viewModel.showingFavouritesOnly && viewModel.tags.favouriteCount == 0 {
+            } else if viewModel.showingFavouritesOnly && viewModel.starredCount == 0 {
                 noFavouritesState
             } else {
                 lutList
@@ -246,17 +246,15 @@ struct LUTSidebar: View {
     /// back. Typed ones are the user's, and are the only ones that can go.
     @ViewBuilder
     private func tagMenu(for lut: CubeLUT) -> some View {
-        let measured = viewModel.tags.tags(for: lut).filter {
-            viewModel.tags.typedTags(for: lut).contains($0) == false
-        }
-        let typed = viewModel.tags.typedTags(for: lut)
+        let measured = viewModel.measuredTags(for: lut)
+        let typed = viewModel.typedTags(for: lut)
 
         Button("Add Tag…") {
             newTag = ""
             taggingLUT = lut
         }
-        Button(viewModel.tags.isFavourite(lut) ? "Unstar" : "Star") {
-            viewModel.tags.toggleFavourite(lut)
+        Button(viewModel.isStarred(lut) ? "Unstar" : "Star") {
+            viewModel.toggleStarred(lut)
         }
         if viewModel.library.isManaged {
             Menu("Move to Folder") {
@@ -278,7 +276,7 @@ struct LUTSidebar: View {
         if typed.isEmpty == false {
             Divider()
             ForEach(typed, id: \.self) { tag in
-                Button("Remove “\(tag)”") { viewModel.tags.removeTag(tag, from: lut) }
+                Button("Remove “\(tag)”") { viewModel.removeTag(tag, from: lut) }
             }
         }
         if measured.isEmpty == false {
@@ -367,7 +365,7 @@ struct LUTSidebar: View {
     }
 
     private func commitTag(for lut: CubeLUT) {
-        viewModel.tags.addTag(newTag, to: lut)
+        viewModel.addTag(newTag, to: [lut])
         newTag = ""
         taggingLUT = nil
     }
@@ -384,7 +382,7 @@ struct LUTSidebar: View {
     /// make the user remember which kind each one was.
     @ViewBuilder
     private var tagFilterBar: some View {
-        if viewModel.tags.counts.isEmpty == false {
+        if viewModel.tagCounts.isEmpty == false {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Button {
@@ -423,7 +421,7 @@ struct LUTSidebar: View {
                     // the bottom of the window; it scrolls past that point.
                     ScrollView(.vertical, showsIndicators: false) {
                         FlowLayout(spacing: 5, lineSpacing: 5) {
-                            ForEach(viewModel.tags.counts, id: \.tag) { item in
+                            ForEach(viewModel.tagCounts, id: \.tag) { item in
                                 tagChip(item.tag, count: item.count)
                             }
                         }
@@ -548,8 +546,8 @@ struct LUTSidebar: View {
                         LUTRow(
                             lut: lut,
                             isSelected: viewModel.selectedLUT == lut,
-                            isFavourite: viewModel.tags.isFavourite(lut),
-                            toggleFavourite: { viewModel.tags.toggleFavourite(lut) }
+                            isFavourite: viewModel.isStarred(lut),
+                            toggleFavourite: { viewModel.toggleStarred(lut) }
                         )
                         .tag(lut)
                         .contextMenu { tagMenu(for: lut) }

@@ -74,8 +74,20 @@ final class LUTTagStore: ObservableObject {
         return (entry.measured + entry.typed).sorted()
     }
 
+    func measuredTags(for lut: CubeLUT) -> [String] {
+        entries[lut.contentHash]?.measured ?? []
+    }
+
     func typedTags(for lut: CubeLUT) -> [String] {
         entries[lut.contentHash]?.typed ?? []
+    }
+
+    func legacyTypedTags(forFingerprint fingerprint: String) -> [String] {
+        entries[fingerprint]?.typed ?? []
+    }
+
+    func legacyFavourite(forFingerprint fingerprint: String) -> Bool {
+        entries[fingerprint]?.isFavourite ?? false
     }
 
     func isFavourite(_ lut: CubeLUT) -> Bool {

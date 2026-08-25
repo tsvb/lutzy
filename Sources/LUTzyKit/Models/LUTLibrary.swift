@@ -18,6 +18,11 @@ final class LUTLibrary: ObservableObject {
     @Published var scanError: String?
     /// True while a folder scan is running. Drives the sidebar's progress hint.
     @Published var isScanning: Bool = false
+    let catalog: LUTCatalog
+
+    init(catalog: LUTCatalog? = nil) {
+        self.catalog = catalog ?? LUTCatalog()
+    }
 
     /// Fired after every scan publishes its results, whatever started it.
     ///
@@ -268,6 +273,14 @@ final class LUTLibrary: ObservableObject {
         categories.map(\.name).sorted()
     }
 
+    /// Convert an old path-backed document reference after a scan. Durable and
+    /// derived references pass through unchanged; a missing legacy path stays
+    /// untouched so it can reconnect if the file returns.
+    func migratedRecordID(for id: LUTID) -> LUTID {
+        guard id.isRecord == false, id.isDerived == false else { return id }
+        return allLUTs.first(where: { $0.id == id.raw })?.lutID ?? id
+    }
+
     /// Move a LUT into another folder of the app's own library.
     ///
     /// A folder is the file's own location, so this is a file move — which is
@@ -286,6 +299,10 @@ final class LUTLibrary: ObservableObject {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try FileManager.default.moveItem(at: lut.url, to: destination)
         } catch {
+            return false
+        }
+        guard catalog.updateLocator(for: lut.lutID, to: destination) else {
+            try? FileManager.default.moveItem(at: destination, to: lut.url)
             return false
         }
         scan(managed)
@@ -333,8 +350,9 @@ final class LUTLibrary: ObservableObject {
                 self.allLUTs = []
             case .success(let cats):
                 self.scanError = nil
-                self.categories = cats
-                self.allLUTs = cats.flatMap(\.luts)
+                let reconciled = self.catalog.reconcile(cats, scannedRoot: folder)
+                self.categories = reconciled
+                self.allLUTs = reconciled.flatMap(\.luts)
             }
             // After publishing, and on the failure path too: a scan that found nothing still means
             // the folder changed under whatever the engine has cached.

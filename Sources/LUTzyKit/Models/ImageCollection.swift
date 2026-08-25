@@ -6,7 +6,7 @@ import AppKit
 final class ImageCollection: ObservableObject {
 
     struct Item: Identifiable {
-        let id = UUID()
+        let id: UUID
         let url: URL?               // nil for Photos-imported items
         let displayName: String
         var thumbnail: NSImage?
@@ -14,6 +14,18 @@ final class ImageCollection: ObservableObject {
         /// Relative directory from the source-folder root ("" for top level).
         /// Drives the grouped file browser; empty for Photos imports.
         var subfolder: String = ""
+
+        init(
+            id: UUID = UUID(), url: URL?, displayName: String, thumbnail: NSImage? = nil,
+            imageData: Data?, subfolder: String = ""
+        ) {
+            self.id = id
+            self.url = url
+            self.displayName = displayName
+            self.thumbnail = thumbnail
+            self.imageData = imageData
+            self.subfolder = subfolder
+        }
     }
 
     @Published var items: [Item] = []
@@ -176,6 +188,30 @@ final class ImageCollection: ObservableObject {
         }
         self.items = newItems
         self.isActive = !items.isEmpty
+    }
+
+    /// Present the image subset of the durable global Media Library in the
+    /// existing filmstrip and comparison workflow. Record UUIDs make selection
+    /// stable across refreshes; videos stay in Media Library but are not sent
+    /// to the image decoder.
+    func loadMediaRecords(_ records: [MediaRecord]) {
+        thumbnailTask?.cancel()
+        scanTask?.cancel()
+        let previousID = selectedItem?.id
+        items = records.filter { $0.kind == .image && $0.isAvailable }.map { record in
+            Item(
+                id: record.id.rawValue, url: record.url, displayName: record.displayName,
+                imageData: nil, subfolder: record.logicalFolder
+            )
+        }
+        if let previousID, let index = items.firstIndex(where: { $0.id == previousID }) {
+            selectedIndex = index
+        } else {
+            selectedIndex = 0
+        }
+        isActive = items.isEmpty == false
+        sourceFolderURL = nil
+        generateThumbnails()
     }
 
     // MARK: - Navigation

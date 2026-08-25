@@ -6,11 +6,9 @@ import Foundation
 /// make `EditDocument` non-`Codable` and would copy the whole table into every undo snapshot, so the
 /// document stores an ID and resolves it against the library.
 ///
-/// **The wrapped value is a `String`, and deliberately so.** `CubeLUT.id` is a file path (or
-/// `derived://…` for an in-memory LUT), which makes it deterministic: the same file scanned twice
-/// yields the same ID. A `UUID`-backed ID would mint a fresh value on every `LUTLibrary.scan` — and
-/// `saveDerivedLUT` triggers a rescan — so every persisted and undo document would silently stop
-/// resolving the moment the library was rescanned. See `docs/PHASE2_SPEC.md` §4.3.
+/// Existing path strings remain decodable for migration. New on-disk records
+/// use `record://<uuid>` and resolve through `LUTCatalog`; unsaved LUTs use
+/// `derived://…` until save adopts a durable record.
 struct LUTID: Codable, Sendable, Hashable {
     let raw: String
 
@@ -18,9 +16,13 @@ struct LUTID: Codable, Sendable, Hashable {
         self.raw = raw
     }
 
-    /// The ID of a specific LUT. Deterministic — derived from `CubeLUT.id`, nothing else.
+    init(recordUUID: UUID) {
+        self.raw = "record://\(recordUUID.uuidString.lowercased())"
+    }
+
+    /// The durable record when present, otherwise the legacy path/transient ID.
     init(_ lut: CubeLUT) {
-        self.raw = lut.id
+        self = lut.recordID ?? LUTID(raw: lut.id)
     }
 
     /// True for a LUT that exists only in memory (a freshly derived one, before the user saves it).
@@ -29,6 +31,7 @@ struct LUTID: Codable, Sendable, Hashable {
     /// is not wrong, but the LUT reference in it is expected to dangle; anything that writes
     /// documents to disk should decide deliberately what to do here rather than discover it later.
     var isDerived: Bool { raw.hasPrefix("derived://") }
+    var isRecord: Bool { raw.hasPrefix("record://") }
 
     // Encoded as a bare string rather than `{"raw": "…"}`. This is a newtype over the path, and the
     // JSON should read like one.
@@ -54,7 +57,7 @@ extension Sequence where Element == CubeLUT {
     /// re-scanned often enough that a cache would be the thing to go stale, and the ID is
     /// deterministic precisely so a fresh scan can answer this.
     func first(matching id: LUTID) -> CubeLUT? {
-        first { $0.id == id.raw }
+        first { $0.lutID == id || $0.id == id.raw }
     }
 }
 

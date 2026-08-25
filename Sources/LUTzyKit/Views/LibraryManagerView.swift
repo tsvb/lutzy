@@ -10,7 +10,7 @@ import SwiftUI
 struct LibraryManagerView: View {
     @ObservedObject var viewModel: AppViewModel
 
-    @State private var selection: Set<String> = []
+    @State private var selection: Set<LUTID> = []
     @State private var isTagging = false
     @State private var isMoving = false
     @State private var newTag = ""
@@ -20,7 +20,7 @@ struct LibraryManagerView: View {
 
     /// The selected LUTs, in the order the table shows them.
     private var selected: [CubeLUT] {
-        rows.map(\.lut).filter { selection.contains($0.id) }
+        rows.map(\.lut).filter { selection.contains($0.lutID) }
     }
 
     var body: some View {
@@ -46,17 +46,17 @@ struct LibraryManagerView: View {
             Table(rows, selection: $selection) {
                 TableColumn("") { row in
                     Button {
-                        viewModel.tags.toggleFavourite(row.lut)
+                        viewModel.toggleStarred(row.lut)
                     } label: {
-                        Image(systemName: viewModel.tags.isFavourite(row.lut) ? "star.fill" : "star")
-                            .foregroundStyle(viewModel.tags.isFavourite(row.lut) ? Color.yellow : Color.secondary)
+                        Image(systemName: viewModel.isStarred(row.lut) ? "star.fill" : "star")
+                            .foregroundStyle(viewModel.isStarred(row.lut) ? Color.yellow : Color.secondary)
                     }
                     .buttonStyle(.borderless)
                 }
                 .width(28)
 
                 TableColumn("Name") { row in
-                    Text(row.lut.name).lineLimit(1)
+                    Text(viewModel.catalog.effectiveName(for: row.lut)).lineLimit(1)
                 }
 
                 TableColumn("Folder") { row in
@@ -76,7 +76,7 @@ struct LibraryManagerView: View {
                 TableColumn("Tags") { row in
                     // Measured and typed together: from here they are all just
                     // how the LUT is described.
-                    Text(viewModel.tags.tags(for: row.lut)
+                    Text(viewModel.allTags(for: row.lut)
                         .filter { $0.hasPrefix("input:") == false }
                         .joined(separator: "  "))
                         .font(.caption)

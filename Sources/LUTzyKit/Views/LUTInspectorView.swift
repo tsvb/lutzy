@@ -38,7 +38,7 @@ struct LUTInspectorView: View {
 
     private func header(_ lut: CubeLUT) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(lut.name)
+            Text(viewModel.catalog.effectiveName(for: lut))
                 .font(.headline)
                 .lineLimit(2)
             Text("\(lut.size)³ · \(lut.inputSpace == .vlog ? "V-Log input" : "Display input")"
@@ -139,7 +139,7 @@ struct LUTInspectorView: View {
     }
 
     private func tags(_ lut: CubeLUT) -> some View {
-        let all = viewModel.tags.tags(for: lut).filter { $0.hasPrefix("input:") == false }
+        let all = viewModel.allTags(for: lut).filter { $0.hasPrefix("input:") == false }
         return VStack(alignment: .leading, spacing: 6) {
             if all.isEmpty == false {
                 Text("Tags")

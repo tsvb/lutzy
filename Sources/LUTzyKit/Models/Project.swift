@@ -47,6 +47,9 @@ struct Project: Codable, Identifiable, Equatable, Sendable {
         /// folder can move (a new machine, a restored backup) and the images
         /// move with it.
         var imageName: String?
+        /// New global Media Library identity. `imageName` remains solely for
+        /// one-time migration of old project sessions.
+        var mediaRecordID: String?
         var tagFilter: [String] = []
         var browsedCategory: String?
         var showingFavouritesOnly = false
@@ -61,6 +64,7 @@ struct Project: Codable, Identifiable, Equatable, Sendable {
             selectedLUT = try container.decodeIfPresent(String.self, forKey: .selectedLUT)
             cellLUTs = try container.decodeIfPresent([String?].self, forKey: .cellLUTs) ?? []
             imageName = try container.decodeIfPresent(String.self, forKey: .imageName)
+            mediaRecordID = try container.decodeIfPresent(String.self, forKey: .mediaRecordID)
             tagFilter = try container.decodeIfPresent([String].self, forKey: .tagFilter) ?? []
             browsedCategory = try container.decodeIfPresent(String.self, forKey: .browsedCategory)
             showingFavouritesOnly = try container.decodeIfPresent(Bool.self, forKey: .showingFavouritesOnly) ?? false

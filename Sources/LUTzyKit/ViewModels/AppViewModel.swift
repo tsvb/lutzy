@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 struct LibraryRow: Identifiable, Hashable {
     let lut: CubeLUT
     let category: String
-    var id: String { lut.id }
+    var id: LUTID { lut.lutID }
 }
 
 @MainActor
@@ -282,7 +282,14 @@ final class AppViewModel: ObservableObject {
     /// the workspace belong to a project — see `Project`.
     let projects: ProjectStore
 
+    /// Project-free global media manifest. `ProjectStore` remains only as a
+    /// compatibility source for old images and session files.
+    let media: MediaLibrary
+
     let library = LUTLibrary()
+
+    /// Durable per-file identity and user-authored organisation metadata.
+    var catalog: LUTCatalog { library.catalog }
 
     /// Measured and typed tags for the library, keyed by LUT content.
     let tags: LUTTagStore
@@ -298,8 +305,33 @@ final class AppViewModel: ObservableObject {
     /// Whether the sidebar is showing only starred LUTs.
     @Published var showingFavouritesOnly = false { didSet { scheduleSessionSave() } }
 
+    @Published var viewerLUTSource: LUTSource = .all
+    @Published var libraryLUTSource: LUTSource = .all
+    @Published var managerLUTSource: LUTSource = .all
+    @Published var selectedMediaFolder: String?
+    @Published var selectedLibraryLUTID: LUTRecordID?
+
+    var selectedLibraryLUT: CubeLUT? {
+        selectedLibraryLUTID.flatMap { library.allLUTs.first(matching: $0) }
+    }
+
+    func selectLibraryLUT(_ lut: CubeLUT) {
+        selectedLibraryLUTID = lut.lutID
+    }
+
+    func openLibraryLUTInViewer(_ lut: CubeLUT) {
+        selectLUT(lut)
+        section = .viewer
+    }
+
     /// Which of the three top-level jobs owns the detail column.
-    @Published var section: AppSection = .viewer { didSet { scheduleSessionSave() } }
+    @Published var section: AppSection = .viewer {
+        didSet {
+            if section == .manager && oldValue != .manager { managerLUTSource = .all }
+            if section != .viewer { viewerSurface = .preview }
+            scheduleSessionSave()
+        }
+    }
 
     /// Viewer has a subordinate image-library surface; it is not another app
     /// mode and therefore never competes for the primary sidebar selection.
@@ -338,10 +370,12 @@ final class AppViewModel: ObservableObject {
     /// its own actions wrote back into them.
     init(engine: any RenderEngining = RenderEngine.shared,
          projects projectStore: ProjectStore? = nil,
-         tags tagStore: LUTTagStore? = nil) {
+         tags tagStore: LUTTagStore? = nil,
+         media mediaLibrary: MediaLibrary? = nil) {
         self.engine = engine
         self.projects = projectStore ?? ProjectStore()
         self.tags = tagStore ?? LUTTagStore()
+        self.media = mediaLibrary ?? MediaLibrary()
         self.export = ExportCoordinator(engine: engine)
 
         // Project switching is no longer exposed, but its on-disk layout is a
@@ -354,6 +388,7 @@ final class AppViewModel: ObservableObject {
         // Forward nested ObservableObject changes so SwiftUI views update.
         for child in [
             library.objectWillChange.eraseToAnyPublisher(),
+            library.catalog.objectWillChange.eraseToAnyPublisher(),
             collection.objectWillChange.eraseToAnyPublisher(),
             export.objectWillChange.eraseToAnyPublisher(),
             derive.objectWillChange.eraseToAnyPublisher(),
@@ -363,6 +398,7 @@ final class AppViewModel: ObservableObject {
             // forever.
             tags.objectWillChange.eraseToAnyPublisher(),
             projects.objectWillChange.eraseToAnyPublisher(),
+            media.objectWillChange.eraseToAnyPublisher(),
         ] {
             cancellables.append(child.sink { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -373,6 +409,7 @@ final class AppViewModel: ObservableObject {
 
         wireCoordinators()
         library.restoreFolder()
+        media.migrateLegacyProjects(projects)
 
         // A project owns the images and the workspace, so opening one is what
         // fills the window. Falling back to a loose source folder covers
@@ -380,9 +417,8 @@ final class AppViewModel: ObservableObject {
         if let project = projects.current {
             loadProjectImages()
             restoreSession(project.session)
-        } else if collection.restoreSourceFolder() {
-            isSourceBrowserPresented = true
-            openFirstImageWhenScanned()
+        } else {
+            collection.loadMediaRecords(media.records)
         }
     }
 
@@ -396,6 +432,8 @@ final class AppViewModel: ObservableObject {
         // launch scan is covered too.
         library.onScanned = { [weak self] in
             guard let self else { return }
+            self.catalog.migrateLegacyMetadata(for: self.library.allLUTs, from: self.tags)
+            self.migrateLegacyLUTReferences()
             self.lutGalleryRevision &+= 1
             let engine = self.engine
             Task { await engine.invalidateLUTCache() }
@@ -445,11 +483,29 @@ final class AppViewModel: ObservableObject {
     /// sidebar, and then save the derive from the still-open sheet; that must not steal the selection.
     private func adoptSavedLUT(at destination: URL) {
         guard let saved = try? CubeLUT(url: destination, category: "Derived") else { return }
-        derivedRegistry.register(saved)
+        let bookmark = try? destination.bookmarkData(
+            options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
+        )
+        guard let recordID = catalog.adoptSavedLUT(saved, bookmark: bookmark) else {
+            presentError("The LUT file was saved, but it could not be registered in the library. Try saving again.")
+            return
+        }
+        let durable = saved.withRecordID(recordID)
+        derivedRegistry.register(durable)
 
         guard let current = document.lut.lutID, current == derive.derivedLUT?.lutID else { return }
-        document.lut.lutID = saved.lutID
+        document.lut.lutID = recordID
+        Task { await engine.invalidateLUTCache() }
         schedulePreview()
+    }
+
+    /// Replace exact legacy path references only after the catalog knows the
+    /// file. Missing paths remain non-destructive unresolved references.
+    private func migrateLegacyLUTReferences() {
+        if let id = document.lut.lutID { document.lut.lutID = library.migratedRecordID(for: id) }
+        cellLUTIDs = cellLUTIDs.map { $0.map(library.migratedRecordID(for:)) }
+        if let id = editorBaseID { editorBaseID = library.migratedRecordID(for: id) }
+        if let id = editorStackID { editorStackID = library.migratedRecordID(for: id) }
     }
 
     /// Open the first image of the source folder once its scan completes.
@@ -825,6 +881,90 @@ final class AppViewModel: ObservableObject {
 
     func clearTagFilter() { tagFilter.removeAll() }
 
+    func lutSource(for context: LUTWorkspaceContext) -> LUTSource {
+        switch context {
+        case .viewer: return viewerLUTSource
+        case .library: return libraryLUTSource
+        case .manager: return managerLUTSource
+        }
+    }
+
+    func setLUTSource(_ source: LUTSource, for context: LUTWorkspaceContext) {
+        switch context {
+        case .viewer: viewerLUTSource = source
+        case .library: libraryLUTSource = source
+        case .manager: managerLUTSource = source
+        }
+        scheduleSessionSave()
+    }
+
+    func luts(for source: LUTSource) -> [CubeLUT] {
+        let values: [CubeLUT]
+        switch source {
+        case .all:
+            values = library.allLUTs
+        case .folder(let path):
+            values = library.categories
+                .filter { LUTFolderHierarchy.contains(categoryPath: $0.name, in: path) }
+                .flatMap(\.luts)
+        case .collection(let id):
+            let members = catalog.members(of: id)
+            values = library.allLUTs.filter { members.contains($0.lutID) }
+        case .starred:
+            values = library.allLUTs.filter(isStarred)
+        }
+        return values.sorted {
+            catalog.effectiveName(for: $0).localizedStandardCompare(catalog.effectiveName(for: $1)) == .orderedAscending
+        }
+    }
+
+    func title(for source: LUTSource) -> String {
+        switch source {
+        case .all: return "All LUTs"
+        case .folder(let path): return path
+        case .collection(let id):
+            return catalog.collections.first(where: { $0.id == id })?.name ?? "Collection"
+        case .starred: return "Starred"
+        }
+    }
+
+    func thumbnail(for record: MediaRecord) -> NSImage? {
+        collection.items.first(where: { $0.id == record.id.rawValue })?.thumbnail
+    }
+
+    var galleryLUTs: [CubeLUT] {
+        luts(for: section == .lutLibrary ? libraryLUTSource : viewerLUTSource)
+    }
+
+    // MARK: - Record metadata
+
+    func typedTags(for lut: CubeLUT) -> [String] { catalog.typedTags(for: lut) }
+    func measuredTags(for lut: CubeLUT) -> [String] { tags.measuredTags(for: lut) }
+    func allTags(for lut: CubeLUT) -> [String] {
+        Array(Set(typedTags(for: lut) + measuredTags(for: lut))).sorted()
+    }
+    func isStarred(_ lut: CubeLUT) -> Bool { catalog.isStarred(lut) }
+    var starredCount: Int { library.allLUTs.filter(isStarred).count }
+
+    func toggleStarred(_ lut: CubeLUT) {
+        catalog.toggleStarred(lut.lutID)
+        objectWillChange.send()
+    }
+
+    func removeTag(_ tag: String, from lut: CubeLUT) {
+        catalog.removeTag(tag, from: [lut.lutID])
+        objectWillChange.send()
+    }
+
+    var tagCounts: [(tag: String, count: Int)] {
+        var tally: [String: Int] = [:]
+        for lut in library.allLUTs {
+            for tag in Set(allTags(for: lut)) { tally[tag, default: 0] += 1 }
+        }
+        return tally.map { (tag: $0.key, count: $0.value) }
+            .sorted { $0.count == $1.count ? $0.tag < $1.tag : $0.count > $1.count }
+    }
+
     /// Note that the workspace moved, and write it out shortly.
     func scheduleSessionSave() {
         guard isRestoringSession == false else { return }
@@ -859,13 +999,12 @@ final class AppViewModel: ObservableObject {
     /// this library is big enough to be asked. Categories that end up empty
     /// drop out rather than showing as empty folders.
     var filteredCategories: [LUTLibrary.Category] {
+        let allowed = Set(luts(for: managerLUTSource).map(\.lutID))
         library.categories.compactMap { category in
-            if LUTFolderHierarchy.contains(categoryPath: category.name, in: browsedCategory) == false {
-                return nil
-            }
             let kept = category.luts.filter { lut in
-                if showingFavouritesOnly && tags.isFavourite(lut) == false { return false }
-                return tags.matches(lut, required: tagFilter)
+                guard allowed.contains(lut.lutID) else { return false }
+                if showingFavouritesOnly && isStarred(lut) == false { return false }
+                return tagFilter.isSubset(of: Set(allTags(for: lut)))
             }
             return kept.isEmpty ? nil : LUTLibrary.Category(id: category.id, name: category.name, luts: kept)
         }
@@ -891,10 +1030,7 @@ final class AppViewModel: ObservableObject {
     /// Every LUT below the selected folder, independent of Manager-only tag
     /// filters. Folder selection is the Viewer's primary organisation model.
     var viewerFolderLUTs: [CubeLUT] {
-        library.categories
-            .filter { LUTFolderHierarchy.contains(categoryPath: $0.name, in: browsedCategory) }
-            .flatMap(\.luts)
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        luts(for: viewerLUTSource)
     }
 
     func browse(_ category: String?) {
@@ -940,15 +1076,13 @@ final class AppViewModel: ObservableObject {
     /// LUTs of which four are starred leaves five starred and four not, which
     /// is never what was meant. If any are unstarred, star them all.
     func setFavourite(_ luts: [CubeLUT]) {
-        let shouldStar = luts.contains { tags.isFavourite($0) == false }
-        for lut in luts where tags.isFavourite(lut) != shouldStar {
-            tags.toggleFavourite(lut)
-        }
+        let shouldStar = luts.contains { isStarred($0) == false }
+        catalog.setStarred(shouldStar, for: Set(luts.map(\.lutID)))
         statusMessage = shouldStar ? "Starred \(luts.count)" : "Unstarred \(luts.count)"
     }
 
     func addTag(_ tag: String, to luts: [CubeLUT]) {
-        for lut in luts { tags.addTag(tag, to: lut) }
+        catalog.addTag(tag, to: Set(luts.map(\.lutID)))
         statusMessage = "Tagged \(luts.count) with “\(tag)”"
     }
 
@@ -1348,6 +1482,14 @@ final class AppViewModel: ObservableObject {
     static func importSummary(_ result: LUTLibrary.ImportResult) -> String {
         var parts: [String] = []
         if result.imported > 0 { parts.append("Imported \(result.imported) LUT\(result.imported == 1 ? "" : "s")") }
+        if result.duplicates > 0 { parts.append("\(result.duplicates) already in the library") }
+        if result.failed > 0 { parts.append("\(result.failed) could not be read") }
+        return parts.isEmpty ? "Nothing to import" : parts.joined(separator: " · ")
+    }
+
+    static func mediaImportSummary(_ result: MediaLibrary.ImportResult) -> String {
+        var parts: [String] = []
+        if result.imported > 0 { parts.append("Imported \(result.imported) media item\(result.imported == 1 ? "" : "s")") }
         if result.duplicates > 0 { parts.append("\(result.duplicates) already in the library") }
         if result.failed > 0 { parts.append("\(result.failed) could not be read") }
         return parts.isEmpty ? "Nothing to import" : parts.joined(separator: " · ")

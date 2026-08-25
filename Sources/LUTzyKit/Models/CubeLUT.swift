@@ -30,6 +30,9 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     let size: Int
     let inputSpace: LUTInputSpace   // what this LUT expects to be fed
     let photoStyleTag: String?      // the raw #LUMIXPHOTOSTYLE tag, if any
+    /// Assigned by `LUTCatalog` after a scan. Nil for raw parser results and
+    /// in-memory derived LUTs.
+    let recordID: LUTRecordID?
     private let tableData: Data  // flattened RGBARGBA... float32 for Core Image
 
     // MARK: - Hashable
@@ -60,6 +63,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         // extractor's behaviour unchanged.
         self.inputSpace = inputSpace
         self.photoStyleTag = inputSpace == .vlog ? "VLOG" : nil
+        self.recordID = nil
         self.url = sourceURL ?? URL(fileURLWithPath: "/dev/null")
 
         var floats = [Float]()
@@ -188,6 +192,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         self.size = lutSize
         self.photoStyleTag = photoStyle
         self.inputSpace = Self.resolveInputSpace(photoStyle: photoStyle, name: cleaned)
+        self.recordID = nil
 
         // Build Core Image color cube data: RGBA float32, R varies fastest.
         // .cube format: R fastest, G middle, B slowest — same as Core Image expects.
@@ -215,6 +220,39 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         self.tableData = floats.withUnsafeBufferPointer { buffer in
             Data(buffer: buffer)
         }
+    }
+
+    /// Copy a parsed LUT while attaching the catalog identity. The render
+    /// table is immutable and shared by value through `Data`'s copy-on-write
+    /// storage, so this does not parse the file twice.
+    func withRecordID(_ recordID: LUTRecordID) -> CubeLUT {
+        CubeLUT(
+            id: id, name: name, category: category, url: url, size: size,
+            inputSpace: inputSpace, photoStyleTag: photoStyleTag,
+            recordID: recordID, tableData: tableData
+        )
+    }
+
+    private init(
+        id: String,
+        name: String,
+        category: String,
+        url: URL,
+        size: Int,
+        inputSpace: LUTInputSpace,
+        photoStyleTag: String?,
+        recordID: LUTRecordID?,
+        tableData: Data
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.url = url
+        self.size = size
+        self.inputSpace = inputSpace
+        self.photoStyleTag = photoStyleTag
+        self.recordID = recordID
+        self.tableData = tableData
     }
 
     // MARK: - Sampling

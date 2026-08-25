@@ -72,11 +72,7 @@ public struct ContentView: View {
     }
 
     private var mainContent: some View {
-        // Three columns: what you are doing, which LUTs are in scope, and the
-        // thing itself. The middle column is shared between the viewer and the
-        // manager on purpose — the filters that narrow a library are the same
-        // filters whichever of the two you are in, and duplicating them would
-        // mean two places to keep in step.
+        // Three columns: Workspace, local source navigation, and the active job.
         NavigationSplitView {
             NavigationSidebar(viewModel: viewModel)
         } content: {
@@ -95,9 +91,16 @@ public struct ContentView: View {
     /// direct file-oriented work.
     @ViewBuilder
     private var libraryColumn: some View {
-        if viewModel.section == .viewer {
-            LUTFolderSidebar(viewModel: viewModel)
-        } else {
+        switch viewModel.section {
+        case .viewer:
+            ViewerWorkspaceSidebar(viewModel: viewModel)
+        case .mediaLibrary:
+            MediaLibrarySidebar(viewModel: viewModel)
+        case .lutLibrary:
+            LUTSourceSidebar(viewModel: viewModel, context: .library)
+        case .manager:
+            LUTSourceSidebar(viewModel: viewModel, context: .manager)
+        case .editor:
             LUTSidebar(viewModel: viewModel)
         }
     }
@@ -107,11 +110,11 @@ public struct ContentView: View {
     private var sectionContent: some View {
         switch viewModel.section {
         case .viewer:
-            if viewModel.viewerSurface == .images {
-                ImageManagerView(viewModel: viewModel)
-            } else {
-                viewerContent
-            }
+            viewerContent
+        case .mediaLibrary:
+            MediaLibraryView(viewModel: viewModel)
+        case .lutLibrary:
+            LUTLibraryView(viewModel: viewModel)
         case .manager:
             LibraryManagerView(viewModel: viewModel)
         case .editor:
@@ -147,19 +150,7 @@ public struct ContentView: View {
 
     @ViewBuilder
     private var toolbarContent: some View {
-        Button {
-            viewModel.viewerSurface = viewModel.viewerSurface == .preview ? .images : .preview
-        } label: {
-            Label(
-                viewModel.viewerSurface == .preview ? "Images" : "Back to Viewer",
-                systemImage: viewModel.viewerSurface == .preview ? "square.grid.2x2" : "photo"
-            )
-        }
-        .help(
-            viewModel.viewerSurface == .preview
-                ? "Browse images as a list or gallery" : "Return to image preview")
-
-        if viewModel.viewerSurface == .preview {
+        Group {
             // How the preview is divided. A menu rather than a toggle: there are
             // seven layouts now, and V still cycles the two that get used most.
             Menu {
