@@ -20,8 +20,11 @@ let package = Package(
                 .swiftLanguageMode(.v6),
                 // Lets the `lutcheck` verifier @testable-import the module, so
                 // colour maths can be checked under the CLI toolchain without
-                // XCTest (which needs a full Xcode this machine lacks).
-                .unsafeFlags(["-enable-testing"], .when(configuration: .debug)),
+                // XCTest (which needs a full Xcode this machine lacks). This
+                // applies to release too because `swift build -c release` and
+                // CI build every declared executable product, including
+                // `lutcheck`.
+                .unsafeFlags(["-enable-testing"]),
             ],
             linkerSettings: [
                 .linkedFramework("PhotosUI"),
