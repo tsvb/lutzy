@@ -10,6 +10,28 @@ import simd
 @MainActor
 final class AppViewModelTests: TempDirectoryTestCase {
 
+    func testWorkspaceSourcesStayIndependentAndTransientOriginalClearsOnExit() {
+        let viewModel = AppViewModel()
+        let collectionID = UUID()
+        viewModel.viewerLUTSource = .folder("Fuji/Classic")
+        viewModel.libraryLUTSource = .collection(collectionID)
+        viewModel.managerLUTSource = .starred
+
+        viewModel.section = .lutLibrary
+        viewModel.isShowingLibraryOriginal = true
+        viewModel.section = .manager
+
+        XCTAssertEqual(viewModel.viewerLUTSource, .folder("Fuji/Classic"))
+        XCTAssertEqual(viewModel.libraryLUTSource, .collection(collectionID))
+        XCTAssertEqual(viewModel.managerLUTSource, .all)
+        XCTAssertFalse(viewModel.isShowingLibraryOriginal)
+
+        viewModel.section = .viewer
+        viewModel.isShowingOriginal = true
+        viewModel.section = .mediaLibrary
+        XCTAssertFalse(viewModel.isShowingOriginal)
+    }
+
     func testExportStatusReachesTheStatusBar() {
         let viewModel = AppViewModel()
         viewModel.export.onStatus?("Exported: photo.jpg")
@@ -193,10 +215,12 @@ final class AppViewModelTests: TempDirectoryTestCase {
         try viewModel.derive.performSave(to: destination)
         viewModel.derive.onSaved?(destination)
 
-        XCTAssertEqual(viewModel.document.lut.lutID?.raw, destination.path,
-                       "after the save the document should reference the file, not the scratch identity")
-        XCTAssertNotEqual(viewModel.document.lut.lutID, lut.lutID)
-        XCTAssertEqual(viewModel.selectedLUT?.id, destination.path,
+        let durableID = try XCTUnwrap(viewModel.document.lut.lutID)
+        XCTAssertFalse(durableID.isDerived,
+                       "after the save the document should reference a durable catalog record")
+        XCTAssertNotEqual(durableID, lut.lutID)
+        XCTAssertEqual(viewModel.catalog.record(for: durableID)?.locator, destination.standardizedFileURL.path)
+        XCTAssertEqual(viewModel.selectedLUT?.url.standardizedFileURL, destination.standardizedFileURL,
                        "and it must still resolve — to the saved file")
     }
 
@@ -220,10 +244,38 @@ final class AppViewModelTests: TempDirectoryTestCase {
         viewModel.derive.onSaved?(destination)
         while viewModel.library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
 
-        XCTAssertNil(viewModel.library.allLUTs.first(matching: LUTID(raw: destination.path)),
+        XCTAssertNil(viewModel.library.allLUTs.first(where: {
+            $0.url.standardizedFileURL == destination.standardizedFileURL
+        }),
                      "precondition: the library does not scan this folder")
-        XCTAssertEqual(viewModel.selectedLUT?.id, destination.path,
+        let durableID = try XCTUnwrap(viewModel.document.lut.lutID)
+        XCTAssertEqual(viewModel.catalog.record(for: durableID)?.locator, destination.standardizedFileURL.path)
+        XCTAssertEqual(viewModel.selectedLUT?.url.standardizedFileURL, destination.standardizedFileURL,
                        "the registry has to cover the save the rescan cannot see")
+    }
+
+    /// Catalog persistence is part of adopting a save. If it fails, the file
+    /// may exist, but the document must keep the resolvable in-memory derive
+    /// instead of publishing a durable ID that a relaunch cannot recover.
+    func testCatalogPersistenceFailureDoesNotPublishDanglingDocumentReference() throws {
+        let unwritableManifest = tempDirectory.appendingPathComponent("catalog-is-a-directory")
+        try FileManager.default.createDirectory(at: unwritableManifest, withIntermediateDirectories: true)
+        let catalog = LUTCatalog(fileURL: unwritableManifest)
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(),
+            library: LUTLibrary(catalog: catalog)
+        )
+        let (derived, _) = try deriveAndSelect(on: viewModel)
+        let destination = tempDirectory.appendingPathComponent("Saved-but-unregistered.cube")
+
+        try viewModel.derive.performSave(to: destination)
+        viewModel.derive.onSaved?(destination)
+
+        XCTAssertEqual(viewModel.document.lut.lutID, derived.lutID)
+        XCTAssertTrue(viewModel.document.lut.lutID?.isDerived == true)
+        XCTAssertTrue(catalog.records.isEmpty)
+        XCTAssertNotNil(viewModel.errorMessage)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
     }
 
     /// Re-pointing has to reach the screen.
@@ -252,7 +304,7 @@ final class AppViewModelTests: TempDirectoryTestCase {
         try viewModel.derive.performSave(to: destination)
         viewModel.derive.onSaved?(destination)
 
-        let savedID = LUTID(raw: destination.path)
+        let savedID = try XCTUnwrap(viewModel.document.lut.lutID)
         let deadline = Date().addingTimeInterval(5)
         while await !fake.previewRequests.contains(where: { $0.lutID == savedID }) {
             if Date() > deadline {
@@ -309,11 +361,11 @@ final class AppViewModelTests: TempDirectoryTestCase {
 
     // MARK: - LUT filter cache
 
-    /// A `LUTID` is a file path, so a `.cube` replaced in place keeps its identity and the engine
-    /// keeps serving the filter it built from the old contents.
+    /// A durable LUT record keeps its identity when its `.cube` is replaced in place, so the engine
+    /// can keep serving the filter it built from the old contents.
     ///
     /// Step 9 makes that reachable: save a derive to `X.cube`, derive again, save over `X.cube`. Same
-    /// path, same ID, stale cube on screen. So every library scan now drops the cache.
+    /// record, refreshed content, stale cube on screen unless the cache is dropped.
     ///
     /// Asserted through the fake because the real engine's cache is behind an actor and the question
     /// here is not whether the cache works — `RenderEngineTests` covers that — but whether the app

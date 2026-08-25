@@ -16,6 +16,7 @@ let package = Package(
     targets: [
         .target(
             name: "LUTzyKit",
+            resources: [.process("Resources")],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 // Lets the `lutcheck` verifier @testable-import the module, so

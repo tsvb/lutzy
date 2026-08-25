@@ -92,20 +92,23 @@ final class KeyMonitor {
         // ↑/↓ cycle LUTs; ←/→ step through the source files.
         switch event.keyCode {
         case 49:  // Space — hold to compare original
+            guard vm.section == .viewer || vm.section == .lutLibrary else { return event }
             vm.showOriginal(isDown)
             return nil
         case 126: // Up arrow — previous LUT
+            guard vm.section == .viewer else { return event }
             if isDown { vm.selectPreviousLUT() }
             return nil
         case 125: // Down arrow — next LUT
+            guard vm.section == .viewer else { return event }
             if isDown { vm.selectNextLUT() }
             return nil
         case 123: // Left arrow — previous image
-            guard vm.collection.isActive else { return event }
+            guard vm.section == .viewer, vm.collection.isActive else { return event }
             if isDown { vm.selectPreviousImage() }
             return nil
         case 124: // Right arrow — next image
-            guard vm.collection.isActive else { return event }
+            guard vm.section == .viewer, vm.collection.isActive else { return event }
             if isDown { vm.selectNextImage() }
             return nil
         default:
@@ -118,14 +121,15 @@ final class KeyMonitor {
         }
         switch chars {
         case "v":
+            guard vm.section == .viewer else { return event }
             vm.toggleSideBySide()
             return nil
         case "[":
-            guard vm.collection.isActive else { return event }
+            guard vm.section == .viewer, vm.collection.isActive else { return event }
             vm.selectPreviousImage()
             return nil
         case "]":
-            guard vm.collection.isActive else { return event }
+            guard vm.section == .viewer, vm.collection.isActive else { return event }
             vm.selectNextImage()
             return nil
         default:

@@ -82,6 +82,9 @@ struct LUTSourceList: View {
     @ObservedObject var viewModel: AppViewModel
     let context: LUTWorkspaceContext
 
+    @State private var collectionToRename: UUID?
+    @State private var renameText = ""
+
     private var selected: LUTSource { viewModel.lutSource(for: context) }
 
     var body: some View {
@@ -115,6 +118,10 @@ struct LUTSourceList: View {
                         )
                         .contextMenu {
                             if context == .manager {
+                                Button("Rename Collection…") {
+                                    renameText = collection.name
+                                    collectionToRename = collection.id
+                                }
                                 Button("Delete Collection", role: .destructive) {
                                     if selected == .collection(collection.id) {
                                         viewModel.setLUTSource(.all, for: context)
@@ -131,6 +138,21 @@ struct LUTSourceList: View {
             }
             .padding(8)
         }
+        .alert("Rename Collection", isPresented: Binding(
+            get: { collectionToRename != nil },
+            set: { if $0 == false { collectionToRename = nil } }
+        )) {
+            TextField("Collection name", text: $renameText)
+            Button("Cancel", role: .cancel) { collectionToRename = nil }
+            Button("Rename") { commitCollectionRename() }
+                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private func commitCollectionRename() {
+        guard let id = collectionToRename else { return }
+        viewModel.catalog.renameCollection(id, to: renameText)
+        collectionToRename = nil
     }
 
     private func groupHeader(_ title: String) -> some View {
@@ -168,29 +190,35 @@ private struct LUTSourceFolderBranch: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Button { choose(.folder(node.path)) } label: {
-                HStack(spacing: 5) {
-                    if node.children.isEmpty == false {
-                        Button { expanded.toggle() } label: {
-                            Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 9, weight: .semibold))
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Color.clear.frame(width: 9)
+            HStack(spacing: 5) {
+                if node.children.isEmpty == false {
+                    Button { expanded.toggle() } label: {
+                        Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .frame(width: 12, height: 18)
                     }
-                    Image(systemName: "folder")
-                    Text(node.name).lineLimit(1)
-                    Spacer()
-                    Text("\(node.totalCount)").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(expanded ? "Collapse \(node.name)" : "Expand \(node.name)")
+                } else {
+                    Color.clear.frame(width: 12)
                 }
-                .padding(.leading, CGFloat(depth) * 14 + 6)
-                .padding(.trailing, 9)
-                .padding(.vertical, 5)
-                .background(selected == .folder(node.path) ? Color.accentColor.opacity(0.22) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 6))
+
+                Button { choose(.folder(node.path)) } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "folder")
+                        Text(node.name).lineLimit(1)
+                        Spacer()
+                        Text("\(node.count)").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(.leading, CGFloat(depth) * 14 + 6)
+            .padding(.trailing, 9)
+            .padding(.vertical, 5)
+            .background(selected == .folder(node.path) ? Color.accentColor.opacity(0.22) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 6))
 
             if expanded {
                 ForEach(node.children) { child in

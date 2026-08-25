@@ -286,7 +286,7 @@ final class AppViewModel: ObservableObject {
     /// compatibility source for old images and session files.
     let media: MediaLibrary
 
-    let library = LUTLibrary()
+    let library: LUTLibrary
 
     /// Durable per-file identity and user-authored organisation metadata.
     var catalog: LUTCatalog { library.catalog }
@@ -310,6 +310,15 @@ final class AppViewModel: ObservableObject {
     @Published var managerLUTSource: LUTSource = .all
     @Published var selectedMediaFolder: String?
     @Published var selectedLibraryLUTID: LUTRecordID?
+    @Published var selectedLibrarySampleID: String = LUTLibrarySample.all[0].id {
+        didSet { lutGalleryRevision &+= 1 }
+    }
+    @Published var isShowingLibraryOriginal = false
+
+    var librarySamples: [LUTLibrarySample] { LUTLibrarySample.all }
+    var selectedLibrarySample: LUTLibrarySample {
+        librarySamples.first(where: { $0.id == selectedLibrarySampleID }) ?? librarySamples[0]
+    }
 
     var selectedLibraryLUT: CubeLUT? {
         selectedLibraryLUTID.flatMap { library.allLUTs.first(matching: $0) }
@@ -324,19 +333,19 @@ final class AppViewModel: ObservableObject {
         section = .viewer
     }
 
-    /// Which of the three top-level jobs owns the detail column.
+    /// Which of the five top-level jobs owns the detail column.
     @Published var section: AppSection = .viewer {
         didSet {
             if section == .manager && oldValue != .manager { managerLUTSource = .all }
-            if section != .viewer { viewerSurface = .preview }
+            if oldValue == .viewer && section != .viewer && isShowingOriginal {
+                isShowingOriginal = false
+                schedulePreview(refreshGallery: false)
+            }
+            if oldValue == .lutLibrary && section != .lutLibrary { isShowingLibraryOriginal = false }
             scheduleSessionSave()
         }
     }
 
-    /// Viewer has a subordinate image-library surface; it is not another app
-    /// mode and therefore never competes for the primary sidebar selection.
-    enum ViewerSurface: String, Hashable, Sendable { case preview, images }
-    @Published var viewerSurface: ViewerSurface = .preview
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.
@@ -371,11 +380,13 @@ final class AppViewModel: ObservableObject {
     init(engine: any RenderEngining = RenderEngine.shared,
          projects projectStore: ProjectStore? = nil,
          tags tagStore: LUTTagStore? = nil,
-         media mediaLibrary: MediaLibrary? = nil) {
+         media mediaLibrary: MediaLibrary? = nil,
+         library lutLibrary: LUTLibrary? = nil) {
         self.engine = engine
         self.projects = projectStore ?? ProjectStore()
         self.tags = tagStore ?? LUTTagStore()
         self.media = mediaLibrary ?? MediaLibrary()
+        self.library = lutLibrary ?? LUTLibrary()
         self.export = ExportCoordinator(engine: engine)
 
         // Project switching is no longer exposed, but its on-disk layout is a
@@ -626,9 +637,12 @@ final class AppViewModel: ObservableObject {
     }
 
     func importPhotosData(_ items: [(name: String, data: Data)]) {
-        collection.addFromData(items)
-        if let first = items.first {
-            openImage(data: first.data, name: first.name)
+        let priorIDs = Set(media.records.map(\.id))
+        let result = media.importImageData(items)
+        collection.loadMediaRecords(media.records)
+        statusMessage = Self.mediaImportSummary(result)
+        if let first = media.records.first(where: { priorIDs.contains($0.id) == false }) {
+            openMedia(first)
         }
     }
 
@@ -775,7 +789,12 @@ final class AppViewModel: ObservableObject {
     private func resolvedLUT(_ id: LUTID?) -> CubeLUT? {
         guard let id else { return nil }
         if let registered = derivedRegistry.lut(for: id) { return registered }
-        return library.allLUTs.first(matching: id)
+        if let scanned = library.allLUTs.first(matching: id) { return scanned }
+        if let external = catalog.loadLUT(for: id) {
+            derivedRegistry.register(external)
+            return external
+        }
+        return nil
     }
 
     func selectPreviousLUT() {
@@ -1000,7 +1019,7 @@ final class AppViewModel: ObservableObject {
     /// drop out rather than showing as empty folders.
     var filteredCategories: [LUTLibrary.Category] {
         let allowed = Set(luts(for: managerLUTSource).map(\.lutID))
-        library.categories.compactMap { category in
+        return library.categories.compactMap { category in
             let kept = category.luts.filter { lut in
                 guard allowed.contains(lut.lutID) else { return false }
                 if showingFavouritesOnly && isStarred(lut) == false { return false }
@@ -1042,12 +1061,26 @@ final class AppViewModel: ObservableObject {
     /// SwiftUI tasks call this lazily for visible cards and cancel it when a
     /// card scrolls away.
     func makeLUTGalleryPreview(for lut: CubeLUT, maxSize: CGSize) async -> NSImage? {
-        guard let imageSource else { return nil }
-        var request = document
+        let renderSource: ImageSource
+        var request: EditDocument
+        if section == .lutLibrary {
+            guard let source = selectedLibrarySample.imageSource else { return nil }
+            renderSource = source
+            request = EditDocument(
+                rawDevelop: .neutral, adjustments: [],
+                lut: LUTSettings(lutID: lut.lutID, intensity: 1),
+                sourceSpace: selectedLibrarySample.sourceSpace
+            )
+        } else {
+            guard let imageSource else { return nil }
+            renderSource = imageSource
+            request = document
+        }
         request.lut.lutID = lut.lutID
+        request.lut.intensity = section == .lutLibrary ? 1 : request.lut.intensity
 
         let cgImage = await engine.makeCGImage(
-            source: imageSource,
+            source: renderSource,
             document: request,
             lut: lut,
             scale: .preview(maxSize: maxSize),
@@ -1057,6 +1090,32 @@ final class AppViewModel: ObservableObject {
         return NSImage(
             cgImage: cgImage,
             size: NSSize(width: cgImage.width, height: cgImage.height)
+        )
+    }
+
+    func makeLUTLibraryDetailImages(
+        for lut: CubeLUT, sample: LUTLibrarySample, maxSize: CGSize
+    ) async -> LUTLibraryRenderPair? {
+        guard let source = sample.imageSource else { return nil }
+        let originalDocument = EditDocument(
+            rawDevelop: .neutral, adjustments: [], lut: .none, sourceSpace: sample.sourceSpace
+        )
+        let gradedDocument = EditDocument(
+            rawDevelop: .neutral, adjustments: [],
+            lut: LUTSettings(lutID: lut.lutID, intensity: 1), sourceSpace: sample.sourceSpace
+        )
+        async let originalCG = engine.makeCGImage(
+            source: source, document: originalDocument, lut: nil,
+            scale: .preview(maxSize: maxSize), space: .current
+        )
+        async let gradedCG = engine.makeCGImage(
+            source: source, document: gradedDocument, lut: lut,
+            scale: .preview(maxSize: maxSize), space: .current
+        )
+        guard let original = await originalCG, let graded = await gradedCG, !Task.isCancelled else { return nil }
+        return LUTLibraryRenderPair(
+            original: NSImage(cgImage: original, size: NSSize(width: original.width, height: original.height)),
+            graded: NSImage(cgImage: graded, size: NSSize(width: graded.width, height: graded.height))
         )
     }
 
@@ -1240,6 +1299,11 @@ final class AppViewModel: ObservableObject {
 
     /// Toggle between original and LUT preview (for Space-hold comparison).
     func showOriginal(_ show: Bool) {
+        if section == .lutLibrary {
+            isShowingLibraryOriginal = show
+            return
+        }
+        guard section == .viewer else { return }
         guard show != isShowingOriginal else { return }
         isShowingOriginal = show
         schedulePreview(refreshGallery: false)

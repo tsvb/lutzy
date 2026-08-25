@@ -99,4 +99,126 @@ final class LUTCatalogTests: TempDirectoryTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: lut.url.path))
         }
     }
+
+    func testOneMissingAndOneUnmatchedReconnectsTheSameRecord() async throws {
+        let original = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Original.cube", in: tempDirectory
+        )
+        let library = makeLibrary()
+        library.scan(tempDirectory)
+        try await waitForScan(library)
+        let originalID = try XCTUnwrap(library.allLUTs.first?.lutID)
+        library.catalog.addTag("reconnect", to: [originalID])
+
+        let movedFolder = tempDirectory.appendingPathComponent("Moved", isDirectory: true)
+        try FileManager.default.createDirectory(at: movedFolder, withIntermediateDirectories: true)
+        let moved = movedFolder.appendingPathComponent("Renamed.cube")
+        try FileManager.default.moveItem(at: original, to: moved)
+        library.scan(tempDirectory)
+        try await waitForScan(library)
+
+        let reconnected = try XCTUnwrap(library.allLUTs.first)
+        XCTAssertEqual(reconnected.lutID, originalID)
+        XCTAssertEqual(library.catalog.typedTags(for: reconnected), ["reconnect"])
+        XCTAssertEqual(library.catalog.record(for: originalID)?.locator, moved.resolvingSymlinksInPath().path)
+    }
+
+    func testCatalogLocatorUpdateAndCollectionMembershipSurviveRelaunch() throws {
+        let file = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Look.cube", in: tempDirectory
+        )
+        let catalogURL = tempDirectory.appendingPathComponent("catalog-relaunch.json")
+        let catalog = LUTCatalog(fileURL: catalogURL)
+        let parsed = try CubeLUT(url: file)
+        let id = try XCTUnwrap(catalog.adoptSavedLUT(parsed))
+        let collection = try XCTUnwrap(catalog.createCollection(named: "低飽和"))
+        catalog.setMembership(true, collectionID: collection.id, recordIDs: [id])
+        catalog.setDisplayName("Soft Look", for: [id])
+        catalog.setOrigin(.custom, for: [id])
+
+        let moved = tempDirectory.appendingPathComponent("Renamed.cube")
+        try FileManager.default.moveItem(at: file, to: moved)
+        XCTAssertTrue(catalog.updateLocator(for: id, to: moved))
+
+        let relaunched = LUTCatalog(fileURL: catalogURL)
+        let loaded = try XCTUnwrap(relaunched.loadLUT(for: id))
+        XCTAssertEqual(loaded.lutID, id)
+        XCTAssertEqual(relaunched.members(of: collection.id), Set([id]))
+        XCTAssertEqual(relaunched.effectiveName(for: loaded), "Soft Look")
+        XCTAssertEqual(relaunched.origin(for: loaded), .custom)
+    }
+
+    func testKnownLocatorOverwriteKeepsMetadataAndRefreshesFingerprint() throws {
+        let file = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Derived.cube", in: tempDirectory
+        )
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("overwrite.json"))
+        let first = try CubeLUT(url: file)
+        let id = try XCTUnwrap(catalog.adoptSavedLUT(first))
+        catalog.addTag("keeper", to: [id])
+        catalog.setStarred(true, for: [id])
+
+        try Fixtures.writeCube(Fixtures.identityCubeText(size: 3), named: "Derived.cube", in: tempDirectory)
+        let replacement = try CubeLUT(url: file)
+        let adoptedID = try XCTUnwrap(catalog.adoptSavedLUT(replacement))
+
+        XCTAssertEqual(adoptedID, id)
+        XCTAssertNotEqual(replacement.contentHash, first.contentHash)
+        XCTAssertEqual(catalog.record(for: id)?.fingerprint, replacement.contentHash)
+        XCTAssertEqual(catalog.record(for: id)?.typedTags, ["keeper"])
+        XCTAssertEqual(catalog.record(for: id)?.isStarred, true)
+    }
+
+    func testPersistenceFailureDoesNotPublishNewRecord() throws {
+        let file = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Derived.cube", in: tempDirectory
+        )
+        let blocker = tempDirectory.appendingPathComponent("not-a-directory")
+        try Data("blocker".utf8).write(to: blocker)
+        let catalog = LUTCatalog(fileURL: blocker.appendingPathComponent("catalog.json"))
+
+        let result = catalog.adoptSavedLUT(try CubeLUT(url: file))
+
+        XCTAssertNil(result)
+        XCTAssertTrue(catalog.records.isEmpty)
+    }
+
+    func testExactLegacyPathReferenceMigratesButUnknownPathDoesNot() async throws {
+        let file = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Legacy.cube", in: tempDirectory
+        )
+        let library = makeLibrary()
+        library.scan(tempDirectory)
+        try await waitForScan(library)
+        let durableID = try XCTUnwrap(library.allLUTs.first?.lutID)
+
+        XCTAssertEqual(library.migratedRecordID(for: LUTID(url: file)), durableID)
+        let missing = LUTID(url: tempDirectory.appendingPathComponent("Missing.cube"))
+        XCTAssertEqual(library.migratedRecordID(for: missing), missing)
+    }
+
+    func testLegacyContentMetadataCopiesToEveryIdenticalRecord() async throws {
+        let a = tempDirectory.appendingPathComponent("A", isDirectory: true)
+        let b = tempDirectory.appendingPathComponent("B", isDirectory: true)
+        try FileManager.default.createDirectory(at: a, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: b, withIntermediateDirectories: true)
+        let text = Fixtures.identityCubeText(size: 2)
+        try Fixtures.writeCube(text, named: "Copy.cube", in: a)
+        try Fixtures.writeCube(text, named: "Copy.cube", in: b)
+        let library = makeLibrary()
+        library.scan(tempDirectory)
+        try await waitForScan(library)
+
+        let legacy = LUTTagStore(fileURL: tempDirectory.appendingPathComponent("legacy-tags.json"))
+        let representative = try XCTUnwrap(library.allLUTs.first)
+        legacy.addTag("legacy-tag", to: representative)
+        legacy.toggleFavourite(representative)
+        library.catalog.migrateLegacyMetadata(for: library.allLUTs, from: legacy)
+
+        XCTAssertEqual(library.allLUTs.count, 2)
+        for lut in library.allLUTs {
+            XCTAssertEqual(library.catalog.typedTags(for: lut), ["legacy-tag"])
+            XCTAssertTrue(library.catalog.isStarred(lut))
+        }
+    }
 }

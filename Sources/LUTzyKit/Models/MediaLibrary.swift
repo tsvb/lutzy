@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import CryptoKit
+import ImageIO
 import UniformTypeIdentifiers
 
 struct MediaRecordID: Codable, Sendable, Hashable {
@@ -183,6 +184,51 @@ final class MediaLibrary: ObservableObject {
         return result.tally
     }
 
+    /// PhotosPicker provides bytes rather than stable file URLs. Persist those
+    /// bytes into the same global manifest so importing from Photos cannot
+    /// recreate the old project-only image silo.
+    func importImageData(_ items: [(name: String, data: Data)]) -> ImportResult {
+        let destinationFolder = managedRoot.appendingPathComponent("Photos", isDirectory: true)
+        var known = Set(records.map(\.fingerprint))
+        var result = ImportResult()
+
+        for item in items {
+            let fingerprint = Self.digest(item.data)
+            guard known.insert(fingerprint).inserted else {
+                result.duplicates += 1
+                continue
+            }
+
+            let proposed = Self.imageFilename(name: item.name, data: item.data)
+            do {
+                try FileManager.default.createDirectory(
+                    at: destinationFolder, withIntermediateDirectories: true
+                )
+                let destination = Self.uniqueURL(in: destinationFolder, named: proposed)
+                try item.data.write(to: destination, options: .atomic)
+                records.append(MediaRecord(
+                    id: MediaRecordID(),
+                    displayName: destination.deletingPathExtension().lastPathComponent,
+                    kind: .image,
+                    logicalPath: "Photos/\(destination.lastPathComponent)",
+                    locator: Self.normalized(destination),
+                    fingerprint: fingerprint,
+                    byteCount: Int64(item.data.count),
+                    legacyOriginKey: nil,
+                    legacySourceName: nil,
+                    isAvailable: true
+                ))
+                result.imported += 1
+            } catch {
+                known.remove(fingerprint)
+                result.failed += 1
+            }
+        }
+
+        sortAndPersist()
+        return result
+    }
+
     private struct CopyOutcome: Sendable {
         var tally: ImportResult
         var records: [MediaRecord]
@@ -304,6 +350,17 @@ final class MediaLibrary: ObservableObject {
 
     private nonisolated static func normalized(_ url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private nonisolated static func imageFilename(name: String, data: Data) -> String {
+        let raw = URL(fileURLWithPath: name).lastPathComponent
+        if raw.contains("."), kind(for: URL(fileURLWithPath: raw)) == .image { return raw }
+        let source = CGImageSourceCreateWithData(data as CFData, nil)
+        let type: String? = source.flatMap { imageSource in
+            CGImageSourceGetType(imageSource).map { $0 as String }
+        }
+        let ext = type.flatMap { UTType($0)?.preferredFilenameExtension } ?? "jpg"
+        return raw + "." + ext
     }
 
     private nonisolated static func uniqueURL(in folder: URL, named name: String) -> URL {

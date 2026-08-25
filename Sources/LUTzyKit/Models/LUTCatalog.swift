@@ -86,6 +86,57 @@ final class LUTCatalog: ObservableObject {
         return records.values.first { $0.locator == path }?.id
     }
 
+    /// Resolve and parse a catalogued LUT that is not part of the active scan
+    /// root. This is what makes an explicitly saved outside-root LUT survive a
+    /// relaunch instead of leaving a durable ID that cannot produce pixels.
+    func loadLUT(for id: LUTRecordID) -> CubeLUT? {
+        guard var record = records[id] else { return nil }
+        var url = record.url
+        var didAccessSecurityScope = false
+
+        if let bookmark = record.bookmark {
+            var isStale = false
+            if let resolved = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: [.withSecurityScope],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ) {
+                url = resolved
+                didAccessSecurityScope = resolved.startAccessingSecurityScopedResource()
+                if isStale,
+                   let refreshed = try? resolved.bookmarkData(
+                    options: [.withSecurityScope],
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                   ) {
+                    record.bookmark = refreshed
+                }
+            }
+        }
+        defer {
+            if didAccessSecurityScope { url.stopAccessingSecurityScopedResource() }
+        }
+
+        guard FileManager.default.fileExists(atPath: url.path),
+              let parsed = try? CubeLUT(url: url, category: "External")
+        else {
+            if record.isAvailable {
+                record.isAvailable = false
+                records[id] = record
+                persist()
+            }
+            return nil
+        }
+
+        record.locator = Self.normalized(url)
+        record.fingerprint = parsed.contentHash
+        record.isAvailable = true
+        records[id] = record
+        persist()
+        return parsed.withRecordID(id)
+    }
+
     func effectiveName(for lut: CubeLUT) -> String {
         guard let override = record(for: lut)?.displayNameOverride?
             .trimmingCharacters(in: .whitespacesAndNewlines), override.isEmpty == false

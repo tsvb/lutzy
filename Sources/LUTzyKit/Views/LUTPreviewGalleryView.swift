@@ -33,6 +33,7 @@ struct LUTPreviewGalleryView: View {
                 gallery
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -147,13 +148,28 @@ private struct LUTPreviewCard: View {
     @State private var preview: NSImage?
     @State private var isHovering = false
 
-    private var isSelected: Bool { viewModel.selectedLUT?.lutID == lut.lutID }
+    private var isSelected: Bool {
+        viewModel.section == .lutLibrary
+            ? viewModel.selectedLibraryLUTID == lut.lutID
+            : viewModel.selectedLUT?.lutID == lut.lutID
+    }
     private var isFavourite: Bool { viewModel.isStarred(lut) }
+
+    /// Typed tags communicate the owner's intent, so they are shown before
+    /// measured tags. Cards deliberately stop at three; the detail view keeps
+    /// the complete set.
+    private var visibleTags: [String] {
+        LUTGalleryMetadata.visibleTags(
+            typed: viewModel.typedTags(for: lut),
+            measured: viewModel.measuredTags(for: lut)
+        )
+    }
 
     private var renderIdentity: RenderIdentity {
         RenderIdentity(
             lutID: lut.lutID,
-            revision: viewModel.lutGalleryRevision
+            revision: viewModel.lutGalleryRevision,
+            sampleID: viewModel.section == .lutLibrary ? viewModel.selectedLibrarySampleID : nil
         )
     }
 
@@ -166,7 +182,7 @@ private struct LUTPreviewCard: View {
                     Image(nsImage: preview)
                         .resizable()
                         .scaledToFill()
-                } else if viewModel.sourceImage != nil {
+                } else if viewModel.sourceImage != nil || viewModel.section == .lutLibrary {
                     ProgressView()
                         .controlSize(.small)
                 } else {
@@ -193,16 +209,36 @@ private struct LUTPreviewCard: View {
                 .help(isFavourite ? "Unstar \(lut.name)" : "Star \(lut.name)")
             }
 
-            HStack(spacing: 6) {
-                Text(viewModel.catalog.effectiveName(for: lut))
-                    .font(.caption)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(viewModel.catalog.effectiveName(for: lut))
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    if lut.inputSpace == .vlog {
+                        Text("V-LOG")
+                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text(viewModel.catalog.origin(for: lut).label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                if lut.inputSpace == .vlog {
-                    Text("V-LOG")
-                        .font(.system(size: 8, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+
+                if visibleTags.isEmpty == false {
+                    FlowLayout(spacing: 4, lineSpacing: 4) {
+                        ForEach(visibleTags, id: \.self) { tag in
+                            Text(tag)
+                                .font(.system(size: 9))
+                                .lineLimit(1)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.primary.opacity(0.08), in: Capsule())
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 8)
@@ -254,7 +290,7 @@ private struct LUTPreviewCard: View {
         }
         .task(id: renderIdentity) {
             preview = nil
-            guard viewModel.sourceImage != nil else { return }
+            guard viewModel.sourceImage != nil || viewModel.section == .lutLibrary else { return }
             preview = await viewModel.makeLUTGalleryPreview(
                 for: lut,
                 maxSize: CGSize(width: 640, height: 400)
@@ -265,5 +301,6 @@ private struct LUTPreviewCard: View {
     private struct RenderIdentity: Hashable {
         let lutID: LUTID
         let revision: Int
+        let sampleID: String?
     }
 }
