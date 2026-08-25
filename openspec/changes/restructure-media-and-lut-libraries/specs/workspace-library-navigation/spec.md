@@ -1,0 +1,49 @@
+## ADDED Requirements
+
+### Requirement: Five provisional Workspace destinations
+The application SHALL expose Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor as top-level Workspace destinations, and local content selections SHALL NOT change the highlighted Workspace destination. The LUT Library label and placement remain a product-decision gate documented in the design.
+
+#### Scenario: Workspace labels
+- **WHEN** the primary sidebar is displayed
+- **THEN** it labels the five destinations Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor
+
+#### Scenario: Select a local source
+- **WHEN** the user selects media, a LUT folder, a collection, or Starred within a Workspace destination
+- **THEN** the active Workspace row remains selected
+
+### Requirement: Viewer secondary-column composition
+Viewer SHALL place a Media chooser at the top of its secondary column and SHALL place LUT sources grouped as Folders, Collections, and Starred below it.
+
+#### Scenario: Inspect Viewer navigation
+- **WHEN** Viewer is active
+- **THEN** media and LUT sources are simultaneously reachable from the secondary column without opening another Viewer surface
+
+#### Scenario: Select media
+- **WHEN** the user selects an image in the Viewer Media section
+- **THEN** the selected image becomes the active Viewer source while the LUT-source selection remains unchanged
+
+#### Scenario: Select a LUT source
+- **WHEN** the user selects a Folder, Collection, or Starred source
+- **THEN** the lower LUT gallery updates while the active media item remains unchanged
+
+### Requirement: Stable Viewer workbench
+Viewer SHALL keep its existing comparison or preview region above its LUT gallery and SHALL NOT replace the workbench with a whole-surface image List or Gallery.
+
+#### Scenario: Change active media
+- **WHEN** the user changes the active image from Viewer's secondary column
+- **THEN** the comparison region and LUT gallery remain in their existing spatial regions and update their content in place
+
+#### Scenario: Removed image-browser toggle
+- **WHEN** Viewer is active
+- **THEN** no Images or Back to Viewer control offers to replace the workbench with an image-management surface
+
+### Requirement: Independent workspace state
+Viewer LUT scope, LUT Library navigation, and LUT Manager navigation SHALL be independent, and entering LUT Manager from another Workspace destination SHALL open the Manager overview at All LUTs rather than a visual detail or Viewer's active source.
+
+#### Scenario: Enter Manager after Viewer browsing
+- **WHEN** the user selects a nested LUT folder in Viewer and then enters LUT Manager
+- **THEN** LUT Manager opens its All LUTs overview and Viewer retains its own folder selection for a later return
+
+#### Scenario: Return from LUT Library detail
+- **WHEN** the user opens a LUT detail and navigates back without leaving LUT Library
+- **THEN** the prior LUT Library source, selection, and Gallery scroll context are restored
