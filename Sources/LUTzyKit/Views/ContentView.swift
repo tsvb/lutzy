@@ -80,13 +80,25 @@ public struct ContentView: View {
         NavigationSplitView {
             NavigationSidebar(viewModel: viewModel)
         } content: {
-            LUTSidebar(viewModel: viewModel)
+            libraryColumn
         } detail: {
             sectionContent
         }
         .inspector(isPresented: $viewModel.isInspectorPresented) {
             InfoInspectorView(viewModel: viewModel)
                 .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
+        }
+    }
+
+    /// Viewer navigates LUTs by folder and auditions the files as pictures.
+    /// Manager and Editor retain the denser LUT list needed for metadata and
+    /// direct file-oriented work.
+    @ViewBuilder
+    private var libraryColumn: some View {
+        if viewModel.section == .viewer {
+            LUTFolderSidebar(viewModel: viewModel)
+        } else {
+            LUTSidebar(viewModel: viewModel)
         }
     }
 
@@ -109,15 +121,23 @@ public struct ContentView: View {
 
     private var viewerContent: some View {
         VStack(spacing: 0) {
-            PreviewView(viewModel: viewModel)
+            VSplitView {
+                VStack(spacing: 0) {
+                    PreviewView(viewModel: viewModel)
 
-            if viewModel.collection.isActive {
-                Divider()
-                FilmstripView(collection: viewModel.collection) { index in
-                    viewModel.selectCollectionImage(at: index)
+                    if viewModel.collection.isActive {
+                        Divider()
+                        FilmstripView(collection: viewModel.collection) { index in
+                            viewModel.selectCollectionImage(at: index)
+                        }
+                        .frame(height: 86)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
-                .frame(height: 100)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .frame(minHeight: 260, idealHeight: 440)
+
+                LUTPreviewGalleryView(viewModel: viewModel)
+                    .frame(minHeight: 210, idealHeight: 320)
             }
 
             StatusBar(viewModel: viewModel)

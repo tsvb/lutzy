@@ -761,6 +761,19 @@ let navigationOwnershipOK = AppSection.allCases == [.viewer, .manager, .editor]
     && formerImagesSection == .viewer
 print("sidebar has three stable modes and migrates former Images to Viewer -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
 
+let folderTree = LUTFolderHierarchy.tree(from: [
+    "Sony": 2,
+    "Sony/VENICE": 3,
+    "Sony/VENICE/Creative": 4,
+    "Sony Pictures": 5,
+])
+let sonyFolder = folderTree.first { $0.path == "Sony" }
+let folderHierarchyOK = sonyFolder?.count == 9
+    && sonyFolder?.children.first?.count == 7
+    && LUTFolderHierarchy.contains(categoryPath: "Sony/VENICE/Creative", in: "Sony")
+    && LUTFolderHierarchy.contains(categoryPath: "Sony Pictures", in: "Sony") == false
+print("viewer folder hierarchy rolls up descendants without prefix collisions -> \(folderHierarchyOK ? "PASS" : "FAIL")")
+
 let implicitRoot = scratch.appendingPathComponent("lutcheck-implicit-images-\(UUID().uuidString)")
 defer { try? FileManager.default.removeItem(at: implicitRoot) }
 let implicitProjects = ProjectStore(root: implicitRoot.appendingPathComponent("Projects"))

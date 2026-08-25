@@ -184,6 +184,10 @@ final class AppViewModel: ObservableObject {
     @Published var cellLUTIDs: [LUTID?] = []
     /// The rasterized cells, index-parallel to `cellLUTIDs`.
     @Published var cellImages: [NSImage?] = []
+    /// Invalidates the lazily-rendered LUT contact sheet without tying it to
+    /// the currently selected LUT. Picking a card changes the main preview,
+    /// but should not make every other card render again.
+    @Published private(set) var lutGalleryRevision = 0
     /// The amplified difference between the base cell and the current look.
     /// Only built while the difference layout is on screen.
     @Published var diffNSImage: NSImage?
@@ -388,6 +392,7 @@ final class AppViewModel: ObservableObject {
         // launch scan is covered too.
         library.onScanned = { [weak self] in
             guard let self else { return }
+            self.lutGalleryRevision &+= 1
             let engine = self.engine
             Task { await engine.invalidateLUTCache() }
             // Measure whatever the scan found that has not been measured
@@ -733,7 +738,7 @@ final class AppViewModel: ObservableObject {
     // MARK: - LUT application
 
     private func applyLUT() {
-        schedulePreview()
+        schedulePreview(refreshGallery: false)
     }
 
     /// What space the open image is treated as, for a V-Log LUT.
@@ -839,6 +844,7 @@ final class AppViewModel: ObservableObject {
         originalPreviewNSImage = nil
         diffNSImage = nil
         cellImages = Array(repeating: nil, count: cellLUTIDs.count)
+        lutGalleryRevision &+= 1
         statusMessage = "Open an image to get started"
     }
 
@@ -850,7 +856,9 @@ final class AppViewModel: ObservableObject {
     /// drop out rather than showing as empty folders.
     var filteredCategories: [LUTLibrary.Category] {
         library.categories.compactMap { category in
-            if let browsed = browsedCategory, category.name != browsed { return nil }
+            if LUTFolderHierarchy.contains(categoryPath: category.name, in: browsedCategory) == false {
+                return nil
+            }
             let kept = category.luts.filter { lut in
                 if showingFavouritesOnly && tags.isFavourite(lut) == false { return false }
                 return tags.matches(lut, required: tagFilter)
@@ -866,8 +874,50 @@ final class AppViewModel: ObservableObject {
             .sorted { $0.name < $1.name }
     }
 
+    /// The folder column shown in Viewer. Counts include descendant folders,
+    /// matching the set of LUT cards that selecting the row will reveal.
+    var lutFolderTree: [LUTFolderNode] {
+        let counts = Dictionary(
+            library.categories.map { ($0.name, $0.luts.count) },
+            uniquingKeysWith: +
+        )
+        return LUTFolderHierarchy.tree(from: counts)
+    }
+
+    /// Every LUT below the selected folder, independent of Manager-only tag
+    /// filters. Folder selection is the Viewer's primary organisation model.
+    var viewerFolderLUTs: [CubeLUT] {
+        library.categories
+            .filter { LUTFolderHierarchy.contains(categoryPath: $0.name, in: browsedCategory) }
+            .flatMap(\.luts)
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
     func browse(_ category: String?) {
         browsedCategory = category
+    }
+
+    /// Render one contact-sheet card through the same engine and document as
+    /// the main Viewer. The only substitution is the LUT being auditioned.
+    /// SwiftUI tasks call this lazily for visible cards and cancel it when a
+    /// card scrolls away.
+    func makeLUTGalleryPreview(for lut: CubeLUT, maxSize: CGSize) async -> NSImage? {
+        guard let imageSource else { return nil }
+        var request = document
+        request.lut.lutID = lut.lutID
+
+        let cgImage = await engine.makeCGImage(
+            source: imageSource,
+            document: request,
+            lut: lut,
+            scale: .preview(maxSize: maxSize),
+            space: .current
+        )
+        guard Task.isCancelled == false, let cgImage else { return nil }
+        return NSImage(
+            cgImage: cgImage,
+            size: NSSize(width: cgImage.width, height: cgImage.height)
+        )
     }
 
     /// Every LUT the current filters leave, with the folder it is in.
@@ -980,8 +1030,10 @@ final class AppViewModel: ObservableObject {
     ///
     /// Any in-flight render is cancelled first, so a slider drag drops stale work rather than
     /// queueing it.
-    private func schedulePreview() {
+    private func schedulePreview(refreshGallery: Bool = true) {
         previewTask?.cancel()
+
+        if refreshGallery { lutGalleryRevision &+= 1 }
 
         guard let imageSource else {
             previewNSImage = nil
@@ -1052,7 +1104,7 @@ final class AppViewModel: ObservableObject {
     func showOriginal(_ show: Bool) {
         guard show != isShowingOriginal else { return }
         isShowingOriginal = show
-        schedulePreview()
+        schedulePreview(refreshGallery: false)
     }
 
     /// The V shortcut. With seven layouts a boolean toggle is no longer the

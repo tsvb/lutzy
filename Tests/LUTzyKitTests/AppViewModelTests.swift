@@ -102,6 +102,44 @@ final class AppViewModelTests: TempDirectoryTestCase {
                        "Save should open in the user's LUT folder")
     }
 
+    func testGalleryPreviewUsesTheCurrentDocumentWithItsCandidateLUT() async throws {
+        let fake = FakeRenderEngine()
+        let viewModel = AppViewModel(engine: fake)
+        let imageURL = try Fixtures.writeGradientPNG(
+            width: 32,
+            height: 24,
+            named: "gallery-source.png",
+            in: tempDirectory
+        )
+        let lutURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2),
+            named: "Gallery Candidate.cube",
+            in: tempDirectory
+        )
+        let candidate = try CubeLUT(url: lutURL, category: "Test")
+
+        viewModel.openImage(url: imageURL)
+        let deadline = Date().addingTimeInterval(5)
+        while viewModel.sourceImage == nil {
+            if Date() > deadline { return XCTFail("the source image never opened") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.setLUTIntensity(0.42)
+        let current = viewModel.document
+        let size = CGSize(width: 480, height: 300)
+        _ = await viewModel.makeLUTGalleryPreview(for: candidate, maxSize: size)
+
+        let requests = await fake.previewRequests
+        let request = try XCTUnwrap(requests.last { $0.lutID == candidate.lutID })
+        XCTAssertEqual(request.document.rawDevelop, current.rawDevelop)
+        XCTAssertEqual(request.document.adjustments, current.adjustments)
+        XCTAssertEqual(request.document.sourceSpace, current.sourceSpace)
+        XCTAssertEqual(request.document.lut.intensity, current.lut.intensity)
+        XCTAssertEqual(request.document.lut.lutID, candidate.lutID)
+        XCTAssertEqual(request.scale, .preview(maxSize: size))
+    }
+
     /// Saving a derived LUT into the library folder has to trigger a re-scan,
     /// or the new file won't appear in the sidebar until relaunch.
     func testSavingADerivedLUTRescansTheLibrary() async throws {
