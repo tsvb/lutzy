@@ -138,7 +138,6 @@ func pipelineGrey(lutPath: String, sourceSpace: SourceSpace, input: Float) -> Fl
     // `workingColorSpace: NSNull()` measures a different pipeline than the one
     // that ships, and hid the very conversion this is about.
     let ctx = CIContext()
-    let linear = CGColorSpace(name: CGColorSpace.linearSRGB)!
     var pixel: [Float] = [input, input, input, 1.0]
     let img = pixel.withUnsafeMutableBytes { p in
         CIImage(bitmapData: Data(bytes: p.baseAddress!, count: 16), bytesPerRow: 16,
@@ -306,24 +305,36 @@ if FileManager.default.fileExists(atPath: vlogLUT) {
 }
 
 // Expected values are lutcraft's, computed through the same corrected chain
-// (undo the render, V-Gamut, V-Log, then provia). They agree to 0.0008, which
-// is Core Image sampling the cube trilinearly where lutcraft samples it
-// tetrahedrally — not slack in the conversion.
+// (undo the render, V-Gamut, V-Log, then the named cube) with trilinear
+// sampling and sRGB output. The remaining sub-millipoint error is float/kernel
+// evaluation, not an interpolation-mode mismatch.
 var colourOK = true
+let neutralLUT = "/Users/world4jason/code_ground/claude lut/out/lumix-s9-vlog/tools/utility-vlog-neutral.cube"
+let colourCases: [(rgb: (Float, Float, Float), neutral: [Float], provia: [Float])] = [
+    ((0.80, 0.20, 0.20), [0.7986, 0.2656, 0.2630], [0.9191, 0.2138, 0.1981]),
+    ((0.20, 0.70, 0.30), [0.2598, 0.6973, 0.3041], [0.2761, 0.7067, 0.1453]),
+    ((0.15, 0.30, 0.85), [0.2807, 0.3412, 0.8487], [0.2117, 0.3095, 0.9440]),
+]
+if FileManager.default.fileExists(atPath: neutralLUT) {
+    for probe in colourCases {
+        guard let out = pipelineColour(lutPath: neutralLUT, sourceSpace: .display, rgb: probe.rgb) else { continue }
+        let error = zip(out, probe.neutral).map { abs($0 - $1) }.max() ?? 1
+        let ok = error < 0.002
+        colourOK = colourOK && ok
+        print(String(format: "neutral in (%.2f %.2f %.2f) -> out (%.4f %.4f %.4f), want (%.4f %.4f %.4f), err %.4f  %@",
+                     probe.rgb.0, probe.rgb.1, probe.rgb.2, out[0], out[1], out[2],
+                     probe.neutral[0], probe.neutral[1], probe.neutral[2], error, ok ? "ok" : "WRONG"))
+    }
+}
 if FileManager.default.fileExists(atPath: vlogLUT) {
-    let colourCases: [(rgb: (Float, Float, Float), expected: [Float])] = [
-        ((0.80, 0.20, 0.20), [0.9191, 0.2138, 0.1981]),
-        ((0.20, 0.70, 0.30), [0.2761, 0.7067, 0.1453]),
-        ((0.15, 0.30, 0.85), [0.2117, 0.3095, 0.9440]),
-    ]
     for probe in colourCases {
         guard let out = pipelineColour(lutPath: vlogLUT, sourceSpace: .display, rgb: probe.rgb) else { continue }
-        let error = zip(out, probe.expected).map { abs($0 - $1) }.max() ?? 1
+        let error = zip(out, probe.provia).map { abs($0 - $1) }.max() ?? 1
         let ok = error < 0.002
         colourOK = colourOK && ok
         print(String(format: "colour in (%.2f %.2f %.2f) -> out (%.4f %.4f %.4f), want (%.4f %.4f %.4f), err %.4f  %@",
                      probe.rgb.0, probe.rgb.1, probe.rgb.2, out[0], out[1], out[2],
-                     probe.expected[0], probe.expected[1], probe.expected[2], error, ok ? "ok" : "WRONG"))
+                     probe.provia[0], probe.provia[1], probe.provia[2], error, ok ? "ok" : "WRONG"))
     }
     print("colour through the V-Log path -> \(colourOK ? "PASS" : "FAIL")")
 }
@@ -741,6 +752,34 @@ do {
     projectOK = createdOK && insideOK && importOnceOK && junkOK && sessionOK && legacyOK && deleteOK
 }
 print("projects -> \(projectOK ? "PASS" : "FAIL")")
+
+
+// --- image manager selection ----------------------------------------------
+// `swift test` needs the full Xcode toolchain on macOS. Keep the focused
+// selection contract in XCTest, and replay it here as part of the CLI gate so
+// Command/Shift behaviour is still exercised on a CommandLineTools machine.
+let imageIDs = ["a", "b", "c", "d"]
+let plainImageSelection = ImageManagerSelection.selecting(
+    "c", orderedIDs: imageIDs, current: ["a", "b"], anchor: "a",
+    toggling: false, extending: false)
+let toggledImageSelection = ImageManagerSelection.selecting(
+    "c", orderedIDs: imageIDs, current: ["a"], anchor: "a",
+    toggling: true, extending: false)
+let rangedImageSelection = ImageManagerSelection.selecting(
+    "d", orderedIDs: imageIDs, current: ["b"], anchor: "b",
+    toggling: false, extending: true)
+let unionImageSelection = ImageManagerSelection.selecting(
+    "d", orderedIDs: imageIDs, current: ["a"], anchor: "c",
+    toggling: true, extending: true)
+let missingAnchorSelection = ImageManagerSelection.selecting(
+    "b", orderedIDs: imageIDs, current: ["a"], anchor: "missing",
+    toggling: false, extending: true)
+let imageSelectionOK = plainImageSelection.selection == ["c"]
+    && toggledImageSelection.selection == ["a", "c"]
+    && rangedImageSelection.selection == ["b", "c", "d"]
+    && unionImageSelection.selection == ["a", "c", "d"]
+    && missingAnchorSelection.selection == ["b"]
+print("image manager plain, Command, Shift, and missing-anchor selection -> \(imageSelectionOK ? "PASS" : "FAIL")")
 
 
 // --- the editor -------------------------------------------------------------

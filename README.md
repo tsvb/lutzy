@@ -232,6 +232,22 @@ what is still outstanding.
 - **Work stays off the main actor.** Decoding, preview rasterization, folder scans, LUT parsing, export, and recipe derivation all run detached and publish results back to `@MainActor`; the intensity slider is debounced and each render cancels the one before it. Previews are capped at 1600×1200; exports are always full resolution.
 - **No third-party code.** Everything ships with the system: SwiftUI, Core Image, AppKit, PhotosUI, Swift Charts, ImageIO, Metal, simd.
 
+### Colour parity with `lut-viewer`
+
+Compare the same named stage in both applications; their default comparison views are deliberately
+different:
+
+- LUTzy's **Original** is the decoded source image. `lut-viewer`'s left-hand **neutral base** is the
+  source converted to V-Log and rendered through `utility-vlog-neutral.cube`. That neutral render is
+  a reconstructed baseline, not the untouched source, so saturated and clipped colours can differ.
+- LUTzy applies cubes through Core Image's trilinear path. For like-for-like graded output, switch
+  `lut-viewer`'s **interpolation** control from its tetrahedral default to **trilinear** and compare
+  explicit sRGB output.
+- Standard-image parity is pinned by shared stage-labelled golden vectors. RAW output remains
+  decoder-dependent: LUTzy uses `CIRAWFilter`, while `lut-viewer` uses `rawpy` plus embedded-preview
+  exposure matching. Preview and export must agree within each app, but RAW pixels are not expected
+  to be identical across the two decoders.
+
 ---
 
 ## 📦 Preparing for the App Store
