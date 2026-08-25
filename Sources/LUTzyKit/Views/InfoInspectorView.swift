@@ -18,6 +18,8 @@ struct InfoInspectorView: View {
                 Divider()
 
                 switch viewModel.inspectorTab {
+                case .lut:
+                    LUTInspectorView(viewModel: viewModel)
                 case .info:
                     infoContent
                 case .develop:
