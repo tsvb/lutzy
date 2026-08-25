@@ -48,6 +48,7 @@ This file preserves the user's original intent and the evolution of decisions be
 7. LUT display is strictly for the local LUT Library: LUTs already imported into or created by the app. Marketplace, creator network, remote catalogue, and download features are explicitly excluded.
 8. LUT Library may Star, add a LUT to an existing Collection, and open it in Viewer. LUT Manager owns Collection creation/rename/deletion, complete membership editing, names, origin, tags, folder movement, and deletion.
 9. Current LUT Manager metadata editing is inconvenient, especially tags. The add-only Tag sheet does not provide enough visibility or correction control.
+10. “Edit LUT” in Manager means metadata and organisation only. Any operation that changes colour values or the LUT transform belongs exclusively to LUT Editor.
 
 ### Colour consistency
 
@@ -131,6 +132,10 @@ The visual LUT space operates on the same local LUT set as LUT Manager. It is no
 ### 2026-08-26 — Display and management write boundary
 
 LUT Library is allowed to Star, add to an existing Collection, and open a LUT in Viewer. LUT Manager owns Collection structure, full membership editing, LUT metadata, folder moves, and deletion. Manager must improve metadata editing beyond the current add-only Tag sheet; the exact editing interaction remains open.
+
+### 2026-08-26 — Manager edits metadata, Editor edits transforms
+
+LUT Manager may edit display name, Vendor/Custom/Unknown origin, tags, Collection membership, physical folder, and Starred state. It must not change LUT colour values, curves, interpolation, or transform data; those operations remain in LUT Editor.
 
 ## Reference-image index
 

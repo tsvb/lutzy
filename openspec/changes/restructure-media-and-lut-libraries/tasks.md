@@ -36,6 +36,7 @@
 - [ ] 5.2 Keep LUT Manager's table focused on organisation and expose Gallery through the confirmed separate visual-LUT destination
 - [ ] 5.3 Build lazy Gallery cards with preview, name, origin, a maximum of three tags, and loading state
 - [ ] 5.4 Replace the add-only Tag sheet with a confirmed single- and multi-selection metadata editing workflow that exposes existing tags and supports removal
+- [ ] 5.5 Keep Manager mutations metadata-only and route every transform-changing action to LUT Editor
 
 ## 6. LUT detail and samples
 
