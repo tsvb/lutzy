@@ -43,3 +43,14 @@ Gallery SHALL provide the same Open, Export Selected, Remove, and context-menu a
 #### Scenario: Batch action from gallery
 - **WHEN** multiple gallery images are selected and Export Selected or Remove is invoked
 - **THEN** the action receives exactly the shared selected set
+
+### Requirement: Separate navigation ownership
+The application SHALL expose project Images independently from an explicitly named LUT Manager, and LUT Manager SHALL contain only LUT-library management features.
+
+#### Scenario: Open project images
+- **WHEN** the user selects All Images in the sidebar
+- **THEN** the independent Images section opens with its List or Gallery presentation
+
+#### Scenario: Open LUT Manager
+- **WHEN** the user selects LUT Manager in the Workspace section
+- **THEN** the global LUT table and LUT actions are shown without an Images tab or image-management controls

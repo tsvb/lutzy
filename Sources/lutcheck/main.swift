@@ -718,7 +718,7 @@ do {
 
     // The workspace survives a round trip through disk.
     var session = Project.Session()
-    session.section = .manager
+    session.section = .images
     session.layout = .grid3x3
     session.selectedLUT = "/some/lut.cube"
     session.cellLUTs = ["/a.cube", nil, "/b.cube"]
@@ -752,6 +752,11 @@ do {
     projectOK = createdOK && insideOK && importOnceOK && junkOK && sessionOK && legacyOK && deleteOK
 }
 print("projects -> \(projectOK ? "PASS" : "FAIL")")
+
+let navigationOwnershipOK = AppSection.manager.label == "LUT Manager"
+    && AppSection.images.label == "Images"
+    && AppSection.workspaceSections == [.viewer, .manager, .editor]
+print("sidebar keeps Images separate from LUT Manager -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
 
 
 // --- image manager selection ----------------------------------------------

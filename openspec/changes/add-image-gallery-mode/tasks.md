@@ -14,3 +14,9 @@
 - [x] 3.1 Verify switching presentations preserves selection and action targets
 - [x] 3.2 Run focused CLI checks, debug/release builds, and `lutcheck`; keep XCTest coverage for a full Xcode toolchain
 - [x] 3.3 Validate the OpenSpec change
+
+## 4. Navigation ownership
+
+- [x] 4.1 Rename the sidebar destination to LUT Manager and give Images an independent section
+- [x] 4.2 Remove the Images tab and image-management controls from LUT Manager
+- [x] 4.3 Verify saved-section compatibility, navigation behaviour, build, and OpenSpec validation

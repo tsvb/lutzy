@@ -2,22 +2,25 @@ import SwiftUI
 
 /// What the app is being used for right now.
 ///
-/// The app grew three jobs that were sharing one screen: keeping a library
-/// (importing, tagging, filing), looking at pictures through it, and — later —
-/// building a LUT. They want different room. A viewer wants the whole window
-/// for the picture; a manager wants a table it can survey and act on in bulk.
-/// Splitting them means neither has to apologise to the other.
+/// Each section owns one job. In particular, project images and the global LUT
+/// library have separate destinations even though both support bulk actions.
 enum AppSection: String, CaseIterable, Identifiable, Codable, Sendable {
     case viewer
+    case images
     case manager
     case editor
+
+    /// Images has its own project-scoped navigation group below, so it does not
+    /// also appear in Workspace and create two equivalent sidebar rows.
+    static let workspaceSections: [AppSection] = [.viewer, .manager, .editor]
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .viewer: return "Viewer"
-        case .manager: return "Manager"
+        case .images: return "Images"
+        case .manager: return "LUT Manager"
         case .editor: return "Editor"
         }
     }
@@ -25,15 +28,11 @@ enum AppSection: String, CaseIterable, Identifiable, Codable, Sendable {
     var symbol: String {
         switch self {
         case .viewer: return "photo"
-        case .manager: return "square.grid.2x2"
+        case .images: return "photo.on.rectangle"
+        case .manager: return "square.stack.3d.up"
         case .editor: return "slider.horizontal.3"
         }
     }
-
-    /// The editor is listed before it exists on purpose: it says where the app
-    /// is going, and an empty section that explains itself is better than a
-    /// feature appearing one day with no warning.
-    var isAvailable: Bool { true }
 }
 
 /// The app's navigation column: what you are doing, and what you are looking at.
@@ -53,7 +52,7 @@ struct NavigationSidebar: View {
         List(selection: navigationSelection) {
             projectSection
             Section("Workspace") {
-                ForEach(AppSection.allCases) { section in
+                ForEach(AppSection.workspaceSections) { section in
                     Label(section.label, systemImage: section.symbol)
                         .tag(NavigationTarget.section(section))
                 }
@@ -197,7 +196,7 @@ struct NavigationSidebar: View {
     private var navigationSelection: Binding<NavigationTarget?> {
         Binding(
             get: {
-                if viewModel.section == .manager && viewModel.managerTab == .images { return .images }
+                if viewModel.section == .images { return .images }
                 if viewModel.showingFavouritesOnly { return .starred }
                 if let folder = viewModel.browsedCategory { return .folder(folder) }
                 return .section(viewModel.section)
@@ -215,8 +214,7 @@ struct NavigationSidebar: View {
                     viewModel.showingFavouritesOnly = false
                     viewModel.browse(nil)
                 case .images:
-                    viewModel.managerTab = .images
-                    viewModel.section = .manager
+                    viewModel.section = .images
                 case .starred:
                     viewModel.showingFavouritesOnly = true
                     viewModel.browse(nil)

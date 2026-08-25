@@ -92,6 +92,8 @@ public struct ContentView: View {
         switch viewModel.section {
         case .viewer:
             viewerContent
+        case .images:
+            ImageManagerView(viewModel: viewModel)
         case .manager:
             LibraryManagerView(viewModel: viewModel)
         case .editor:

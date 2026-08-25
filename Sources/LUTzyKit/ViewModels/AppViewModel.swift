@@ -290,15 +290,9 @@ final class AppViewModel: ObservableObject {
     /// Whether the sidebar is showing only starred LUTs.
     @Published var showingFavouritesOnly = false { didSet { scheduleSessionSave() } }
 
-    /// What the app is being used for: looking, managing, or editing.
+    /// What the app is being used for: viewing, managing project images,
+    /// managing the global LUT library, or editing a LUT.
     @Published var section: AppSection = .viewer { didSet { scheduleSessionSave() } }
-
-    /// Which of the two things the manager is managing. Held here rather than
-    /// in the view so navigation can point straight at one — "All Images"
-    /// means show me the images, not put me in the viewer.
-    @Published var managerTab: ManagerTab = .luts
-
-    enum ManagerTab: String, Hashable, Codable, Sendable { case luts, images }
     let collection = ImageCollection()
     /// Writing images to disk — the single export, the batch run, and naming.
     /// Shares this view model's engine, so an export renders through the same funnel the preview does.

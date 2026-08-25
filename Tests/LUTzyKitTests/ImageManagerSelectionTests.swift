@@ -58,4 +58,10 @@ final class ImageManagerSelectionTests: XCTestCase {
         XCTAssertEqual(result.selection, ["b"])
         XCTAssertEqual(result.anchor, "b")
     }
+
+    func testImagesAndLUTManagerHaveSeparateNavigationOwnership() {
+        XCTAssertEqual(AppSection.images.label, "Images")
+        XCTAssertEqual(AppSection.manager.label, "LUT Manager")
+        XCTAssertEqual(AppSection.workspaceSections, [.viewer, .manager, .editor])
+    }
 }

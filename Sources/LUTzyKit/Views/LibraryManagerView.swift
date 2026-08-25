@@ -25,27 +25,19 @@ struct LibraryManagerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Two things get managed here, and they are managed differently:
-            // LUTs are a library shared across projects, images belong to one.
-            // A picker rather than two sections, because it is one question —
-            // what am I tidying — and the answer changes often.
-            Picker("", selection: $viewModel.managerTab) {
-                Text("LUTs").tag(AppViewModel.ManagerTab.luts)
-                Text("Images").tag(AppViewModel.ManagerTab.images)
+            HStack {
+                Text("LUT Manager")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("Global library")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 9)
 
             Divider()
-
-            if viewModel.managerTab == .images {
-                ImageManagerView(viewModel: viewModel)
-            } else {
-                lutTable
-            }
+            lutTable
         }
     }
 

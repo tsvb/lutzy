@@ -13,6 +13,7 @@ The visual direction stays native and utilitarian: filenames and folder context 
 - Make Gallery responsive to window width and useful with missing thumbnails.
 - Remember the chosen presentation.
 - Keep mouse, keyboard, and accessibility semantics understandable.
+- Keep project images out of the global LUT-management destination.
 
 **Non-Goals:**
 
@@ -33,6 +34,12 @@ Alternative: give each mode independent selection. Rejected because switching wo
 
 A compact segmented picker labelled for accessibility sits above the presentation, using `list.bullet` and `square.grid.2x2` symbols. The value is stored with `@AppStorage`, defaulting to List so existing users see no surprise on first launch.
 
+### Separate navigation ownership
+
+The sidebar names the library destination **LUT Manager** and routes **All Images** to a separate Images section. `LibraryManagerView` contains only global LUT-library controls; the old LUTs/Images segmented switch is removed. The `manager` raw section value remains unchanged so existing saved projects still restore safely, while a new `images` value can remember the independent image destination.
+
+Alternative: keep Images as a tab inside Manager and only rename the sidebar row. Rejected because the page would still mix project-scoped images with a global LUT library under one destination.
+
 ### Adaptive contact-sheet gallery
 
 Gallery uses `ScrollView` and an adaptive `LazyVGrid`. Cards show a large aspect-fill thumbnail, filename, and optional subfolder. Selected cards use a clear accent outline and selection tint; missing thumbnails use a stable placeholder of the same size so layout does not jump.
@@ -52,7 +59,7 @@ The selection calculation is a small pure helper so modifier and range behaviour
 
 ## Migration Plan
 
-No data migration is required. The persisted preference is new and defaults to List. Removing the feature leaves project files untouched.
+No explicit data migration is required. The persisted presentation preference is new and defaults to List. Existing `manager` sessions continue to decode as LUT Manager; newly saved image-manager sessions use the new `images` section value.
 
 ## Open Questions
 
