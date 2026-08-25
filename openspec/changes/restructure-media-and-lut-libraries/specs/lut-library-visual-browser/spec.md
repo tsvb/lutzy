@@ -63,6 +63,17 @@ Every visible LUT Library Gallery card SHALL render its LUT against the same cur
 - **WHEN** the user chooses another Gallery sample
 - **THEN** every visible card updates to that same sample while preserving source, search, selection, and scroll context
 
+### Requirement: Fixed built-in sample set
+LUT Library SHALL use a fixed set of licensed sample images bundled with the application and SHALL NOT import, add, remove, reorder, or replace samples through Media Library.
+
+#### Scenario: Open on a fresh installation
+- **WHEN** the user opens LUT Library before importing personal media
+- **THEN** the complete built-in sample set is available for Gallery and LUT detail
+
+#### Scenario: Look for custom sample management
+- **WHEN** the user browses LUT Library or Media Library
+- **THEN** no Add Sample, Remove Sample, or Replace Sample action is offered for the LUT Library sample set
+
 ### Requirement: LUT detail with multiple samples
 Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fixed sample images, full metadata, and an original-versus-LUT comparison for the selected sample.
 

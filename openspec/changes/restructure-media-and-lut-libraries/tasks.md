@@ -3,7 +3,7 @@
 - [x] 0.1 Confirm visual LUT browsing is local-only and excludes online download, creator, and marketplace scope
 - [x] 0.2 Confirm LUT Library and LUT Manager are separate top-level Workspace destinations
 - [x] 0.3 Confirm every Gallery card uses the same currently selected sample image
-- [ ] 0.4 Confirm whether the sample set is fixed app content or accepts Media Library additions
+- [x] 0.4 Confirm the sample set is fixed built-in app content and does not accept Media Library additions
 
 ## 1. Navigation and state boundaries
 
@@ -43,7 +43,7 @@
 
 ## 6. LUT detail and samples
 
-- [ ] 6.1 Add a small licensed sample-image set with explicit colour/source-space metadata
+- [ ] 6.1 Add a small fixed licensed sample-image set with explicit colour/source-space metadata and no custom-sample management
 - [ ] 6.2 Build visual Library LUT detail with sample selection, complete metadata, and original-versus-LUT comparison
 - [ ] 6.3 Reuse `EditDocument`, `RenderEngine`, source-space resolution, and render-context cache keys from Viewer
 - [ ] 6.4 Restore visual Library Gallery scope, selection, and scroll context on Back

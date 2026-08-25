@@ -72,7 +72,7 @@ Folder names may be offered as an editing suggestion, but are not authoritative 
 
 ### Visual Library sample set
 
-LUT Manager ships with a small, fixed set of representative, licensed sample images. The set contains multiple scene types and has one selected sample shared across Gallery and LUT detail. Sample assets declare the source-space assumptions needed for deterministic rendering.
+LUT Library ships with a small, fixed set of representative, licensed sample images. The set contains multiple scene types and has one selected sample shared across Gallery and LUT detail. Sample assets declare the source-space assumptions needed for deterministic rendering. Users cannot add, remove, reorder, or replace samples from Media Library; personal-media auditioning remains a Viewer responsibility.
 
 ## Decisions
 
@@ -163,8 +163,6 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 ## Open Questions
 
-The primary information architecture and shared Gallery comparison sample are resolved. One sample-scope question remains before implementation:
-
-1. Is the sample set fixed app content only, or may users add samples from Media Library?
+The primary information architecture, shared Gallery comparison sample, and fixed built-in sample scope are resolved. Remaining grilling questions concern sample composition and interaction details.
 
 Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; video playback is future work.

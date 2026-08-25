@@ -51,6 +51,7 @@ This file preserves the user's original intent and the evolution of decisions be
 10. “Edit LUT” in Manager means metadata and organisation only. Any operation that changes colour values or the LUT transform belongs exclusively to LUT Editor.
 11. Use a persistent right-side Manager Inspector as the first design to test. It supports full single-selection metadata, direct Tag chips, and common/mixed multi-selection editing. The interaction may be refined after inspecting the implemented app.
 12. Every LUT Library Gallery card uses the same currently selected sample image. Different sample images are available in LUT detail, not assigned as individual LUT cover images.
+13. LUT Library samples are fixed built-in app assets. Users do not add or manage Library samples through Media Library; personal-image testing remains in Viewer.
 
 ### Colour consistency
 
@@ -152,6 +153,10 @@ Workspace contains Viewer, Media Library, LUT Library, LUT Manager, and LUT Edit
 ### 2026-08-26 — One shared Gallery sample
 
 All LUT Library Gallery cards render the same currently selected sample image so users compare LUT effects against constant source pixels. Per-LUT cover images are excluded; additional samples are switched in LUT detail.
+
+### 2026-08-26 — Fixed built-in samples
+
+LUT Library uses only a fixed set of licensed sample images bundled with the app. There is no Add Sample, custom sample collection, or Media Library sample membership in this scope. Viewer remains the place to test LUTs on personal media.
 
 ## Reference-image index
 
