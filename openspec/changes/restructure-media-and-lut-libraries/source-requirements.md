@@ -49,6 +49,7 @@ This file preserves the user's original intent and the evolution of decisions be
 8. LUT Library may Star, add a LUT to an existing Collection, and open it in Viewer. LUT Manager owns Collection creation/rename/deletion, complete membership editing, names, origin, tags, folder movement, and deletion.
 9. Current LUT Manager metadata editing is inconvenient, especially tags. The add-only Tag sheet does not provide enough visibility or correction control.
 10. “Edit LUT” in Manager means metadata and organisation only. Any operation that changes colour values or the LUT transform belongs exclusively to LUT Editor.
+11. Use a persistent right-side Manager Inspector as the first design to test. It supports full single-selection metadata, direct Tag chips, and common/mixed multi-selection editing. The interaction may be refined after inspecting the implemented app.
 
 ### Colour consistency
 
@@ -114,6 +115,8 @@ These excerpts preserve the user's wording. Line breaks were normalised only for
 > 可以啊 Manager那邊要不要能編輯collection?  
 > 另外就是manager那邊好像 lut編輯也不太方便？ 尤其是tag
 
+> 先試試看inspector吧 沒意見
+
 ## Requirement evolution and supersession
 
 | Earlier direction | Current direction | Status |
@@ -136,6 +139,10 @@ LUT Library is allowed to Star, add to an existing Collection, and open a LUT in
 ### 2026-08-26 — Manager edits metadata, Editor edits transforms
 
 LUT Manager may edit display name, Vendor/Custom/Unknown origin, tags, Collection membership, physical folder, and Starred state. It must not change LUT colour values, curves, interpolation, or transform data; those operations remain in LUT Editor.
+
+### 2026-08-26 — Test a persistent Manager Inspector
+
+The first Manager metadata interaction will use a persistent right-side Inspector. Single selection exposes full metadata; Tags are directly addable/removable chips; multi-selection exposes common and mixed states with explicit safe batch actions. This is the first design to validate in the running app, not a permanent pixel-level constraint.
 
 ## Reference-image index
 

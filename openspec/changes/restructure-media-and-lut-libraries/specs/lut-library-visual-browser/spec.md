@@ -82,17 +82,6 @@ LUT Manager SHALL let users classify a LUT origin as Vendor with a name, Custom,
 - **WHEN** the user assigns a non-empty vendor name in LUT Manager
 - **THEN** LUT Library Gallery and detail display that vendor consistently
 
-### Requirement: Metadata-only Manager editing
-LUT Manager SHALL edit descriptive metadata and organisation without exposing controls that change LUT colour values or transforms; LUT Editor SHALL remain the exclusive destination for transform editing.
-
-#### Scenario: Edit LUT metadata
-- **WHEN** the user changes a LUT name, origin, tags, Collection membership, folder, or Starred state in Manager
-- **THEN** the LUT's rendered transform remains byte-for-byte or value-for-value unchanged
-
-#### Scenario: Request transform editing
-- **WHEN** the user chooses to alter LUT colour values, curves, interpolation, or the transform itself
-- **THEN** the application routes the action to LUT Editor rather than performing it in Manager
-
 ### Requirement: Cross-surface render parity
 LUT Library Gallery and detail previews SHALL use the same production render pipeline, colour management, source-space resolution, LUT intensity semantics, and LUT transform as Viewer.
 

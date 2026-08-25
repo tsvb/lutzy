@@ -15,6 +15,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - Keep LUT Manager focused on physical organisation, metadata, collections, and bulk actions.
 - Put visual LUT browsing in a separate LUT Library surface rather than presenting it as a Manager table mode.
 - Let LUT Library perform only lightweight curation—Star, add to an existing Collection, and open in Viewer—while LUT Manager owns Collection structure and metadata editing.
+- Add a persistent LUT Manager metadata Inspector as the first interaction to test, replacing the add-only Tag sheet for normal editing.
 - Keep LUT Library local-only: it displays LUTs already imported into or created by the app and has no marketplace, download catalogue, or creator-network scope.
 - Show a LUT preview, name, vendor or Custom origin, and no more than three tags on each LUT Library gallery card.
 - Open a LUT detail from the visual Library with multiple sample images and an original-versus-graded comparison rendered through the same colour pipeline as Viewer.
@@ -28,6 +29,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - `media-library`: Defines image/video import, Finder-like List/Columns browsing, and handoff of images to Viewer.
 - `lut-virtual-collections`: Defines physical folders, manual metadata collections, and Starred as distinct LUT source types.
 - `lut-library-visual-browser`: Defines the separation between visual LUT discovery and management, gallery card metadata, LUT details, and sample-image rendering.
+- `lut-manager-metadata-inspector`: Defines single- and multi-selection metadata editing through a persistent Manager Inspector.
 
 ### Modified Capabilities
 

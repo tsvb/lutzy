@@ -127,7 +127,9 @@ LUT Manager remains the place for folder moves, Collection creation/rename/delet
 
 Manager edits descriptive metadata and organisation only: display name, Vendor/Custom/Unknown origin, tags, Collection membership, physical folder, and Starred state. Controls that change LUT colour values, curves, interpolation, or the transform itself remain exclusively in LUT Editor.
 
-The current Manager `Tag…` action only adds one value through a sheet. It does not make existing tags directly inspectable or removable and is insufficient as the primary metadata-editing workflow. The final editing component—persistent inspector, inline table editing, or another model—remains a grilling decision, but it must support both single-LUT and multi-LUT correction without hiding current values.
+The current Manager `Tag…` action only adds one value through a sheet. It does not make existing tags directly inspectable or removable and is insufficient as the primary metadata-editing workflow.
+
+The first implementation will test a persistent right-side metadata Inspector. A single selection exposes editable name, origin, tags, Collection membership, folder, and Starred state. Tags are visible chips with direct add/remove actions. Multiple selections expose common and mixed values plus explicit batch add/remove actions; fields without a safe batch meaning, such as display name, are disabled. This is a testable first interaction rather than a permanent visual constraint and may be refined after running-app review.
 
 Card activation opens a LUT Library detail rather than switching to Viewer or Manager. Back returns to the same Gallery context.
 
@@ -164,6 +166,5 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 The requested grilling session must resolve one product-level decision before implementation:
 
 1. Should the local **LUT Library** surface be its own Workspace destination, or a distinct Browse child under a broader LUT destination?
-2. Which Manager interaction should replace the add-only Tag sheet: a persistent inspector, inline table editing, or another explicit model?
 
 All other assumptions are explicit: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.

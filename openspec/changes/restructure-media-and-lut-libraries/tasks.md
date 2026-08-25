@@ -35,8 +35,9 @@
 - [ ] 5.1 Add Vendor, Custom, and Unknown origin metadata with stable persistence and editing
 - [ ] 5.2 Keep LUT Manager's table focused on organisation and expose Gallery through the confirmed separate visual-LUT destination
 - [ ] 5.3 Build lazy Gallery cards with preview, name, origin, a maximum of three tags, and loading state
-- [ ] 5.4 Replace the add-only Tag sheet with a confirmed single- and multi-selection metadata editing workflow that exposes existing tags and supports removal
-- [ ] 5.5 Keep Manager mutations metadata-only and route every transform-changing action to LUT Editor
+- [ ] 5.4 Build a persistent right-side Manager Inspector for single and multi-selection metadata editing
+- [ ] 5.5 Replace the add-only Tag sheet with visible tag chips, direct add/remove, and common/mixed multi-selection states
+- [ ] 5.6 Keep Manager mutations metadata-only and route every transform-changing action to LUT Editor
 
 ## 6. LUT detail and samples
 
@@ -49,6 +50,6 @@
 
 - [ ] 7.1 Verify existing media, folder hierarchy, tags, favourites, and LUT files are not moved or deleted
 - [ ] 7.2 Add focused tests for navigation isolation, media presentation parity, collection safety, origin persistence, and Gallery card limits
-- [ ] 7.3 Add pixel/RGB parity checks between Viewer and Manager for display-space and V-Log preview inputs
+- [ ] 7.3 Add pixel/RGB parity checks between Viewer and LUT Library for display-space and V-Log preview inputs
 - [ ] 7.4 Verify lazy rendering cancellation, stable placeholders, keyboard navigation, VoiceOver labels, and narrow-window behaviour
 - [ ] 7.5 Run debug/release builds, `lutcheck`, strict OpenSpec validation, and running-app interface inspection
