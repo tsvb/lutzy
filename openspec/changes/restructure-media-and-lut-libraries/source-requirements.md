@@ -44,7 +44,7 @@ This file preserves the user's original intent and the evolution of decisions be
 3. A visual LUT gallery shows many LUTs with a rendered preview, name, vendor or self-made status, and at most three visible tags per card.
 4. Activating a visual LUT opens a detail with several sample images so the user can inspect its effect. The supplied draggable before/after reference is not a mandate to copy that exact control.
 5. Gallery/detail previews must share Viewer's real render and colour pipeline so the same source and LUT do not produce a different RGB result in different parts of the app.
-6. The latest direction leans toward separating LUT display/discovery from LUT management. The behavioural separation is recorded; its final top-level placement and label remain subject to the requested grilling session.
+6. LUT display/discovery and LUT management are separate top-level Workspace destinations named LUT Library and LUT Manager.
 7. LUT display is strictly for the local LUT Library: LUTs already imported into or created by the app. Marketplace, creator network, remote catalogue, and download features are explicitly excluded.
 8. LUT Library may Star, add a LUT to an existing Collection, and open it in Viewer. LUT Manager owns Collection creation/rename/deletion, complete membership editing, names, origin, tags, folder movement, and deletion.
 9. Current LUT Manager metadata editing is inconvenient, especially tags. The add-only Tag sheet does not provide enough visibility or correction control.
@@ -121,9 +121,9 @@ These excerpts preserve the user's wording. Line breaks were normalised only for
 
 | Earlier direction | Current direction | Status |
 | --- | --- | --- |
-| Exactly Viewer, LUT Manager, LUT Editor at Workspace level | Add Media Library; visual LUT Library placement is being evaluated | Superseded / open decision |
+| Exactly Viewer, LUT Manager, LUT Editor at Workspace level | Viewer, Media Library, LUT Library, LUT Manager, LUT Editor | Superseded / confirmed |
 | Viewer owns an Images List/Gallery surface | Remove the whole-surface Viewer browser; put media in the secondary column | Superseded |
-| LUT Manager may gain Gallery as another presentation | Separate visual discovery responsibility from management; decide final navigation placement | Provisional split |
+| LUT Manager may gain Gallery as another presentation | Separate top-level LUT Library for discovery and LUT Manager for organisation | Confirmed split |
 | Collections may resemble the reference's Smart Collections | Manual metadata Collections only | Confirmed |
 
 ## Confirmed follow-up decisions
@@ -143,6 +143,10 @@ LUT Manager may edit display name, Vendor/Custom/Unknown origin, tags, Collectio
 ### 2026-08-26 — Test a persistent Manager Inspector
 
 The first Manager metadata interaction will use a persistent right-side Inspector. Single selection exposes full metadata; Tags are directly addable/removable chips; multi-selection exposes common and mixed states with explicit safe batch actions. This is the first design to validate in the running app, not a permanent pixel-level constraint.
+
+### 2026-08-26 — Five separate Workspace destinations
+
+Workspace contains Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor. LUT Library and LUT Manager are separate top-level destinations rather than Gallery/Table modes or children of a shared LUT destination.
 
 ## Reference-image index
 

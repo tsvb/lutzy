@@ -34,7 +34,7 @@ The requested screenshots demonstrate useful relationships—media beside the wo
 | --- | --- | --- |
 | Viewer | Media chooser at the top; LUT Folders, Collections, and Starred below | Existing comparison/preview above; existing LUT gallery below |
 | Media Library | Media locations and folder hierarchy | Finder-like List or Columns browser and media actions |
-| LUT Library *(working label)* | LUT Folders, Collections, and Starred | Visual Gallery and sample-based LUT detail |
+| LUT Library | LUT Folders, Collections, and Starred | Visual Gallery and sample-based LUT detail |
 | LUT Manager | LUT Folders, Collections, and Starred | Existing table and bulk organisation/metadata actions |
 | LUT Editor | Existing LUT-oriented navigation | Existing editor |
 
@@ -76,15 +76,15 @@ LUT Manager ships with a small, fixed set of representative, licensed sample ima
 
 ## Decisions
 
-### Add Media Library and provisionally split LUT Library from LUT Manager
+### Add Media Library and split LUT Library from LUT Manager
 
-Media management is a durable job, not a temporary Viewer mode. Visual LUT discovery is also becoming materially different from management: it uses large renders, samples, and explanatory detail, while Manager uses dense rows and batch actions. The provisional architecture therefore has five Workspace destinations: Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor.
+Media management is a durable job, not a temporary Viewer mode. Visual LUT discovery is also materially different from management: it uses large renders, samples, and explanatory detail, while Manager uses dense rows and batch actions. The architecture therefore has five Workspace destinations: Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor.
 
-“LUT Library” is a working label for the visual discovery surface. It only browses LUTs already imported into or created by the app. The remaining product-grilling decision is whether this deserves its own Workspace row or should remain a distinct child surface under a broader LUT destination.
+LUT Library is the visual discovery surface and has its own Workspace row. It only browses LUTs already imported into or created by the app. LUT Manager remains a separate Workspace row for metadata, physical organisation, Collections, and bulk work.
 
 Alternative: keep media management behind the current Viewer toolbar button. Rejected because it is the layout-changing interaction the redesign is intended to remove and leaves no coherent home for future video assets.
 
-Alternative: make Table and Gallery two presentations inside LUT Manager. Provisionally rejected because a sample-based LUT detail and browse-oriented gallery are a different task, not merely another encoding of the same management rows. This decision remains subject to the requested grilling session.
+Alternative: make Table and Gallery two presentations inside LUT Manager. Rejected because a sample-based LUT detail and browse-oriented gallery are a different task, not merely another encoding of the same management rows.
 
 ### Compose Viewer instead of swapping its detail surface
 
@@ -143,7 +143,7 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 ## State and Migration
 
-1. Add decodable Media Library and provisional LUT Library `AppSection` cases while continuing to decode all existing section values.
+1. Add decodable Media Library and LUT Library `AppSection` cases while continuing to decode all existing section values.
 2. Reuse existing project-backed image files as initial Media Library contents; do not move, merge, or delete them.
 3. Retire the persisted Viewer image-presentation preference. An old `imageManager.presentation` value is ignored rather than mapped to Media Library because Gallery and Columns have different meanings.
 4. Keep LUT Manager at All LUTs on entry and keep visual Gallery state owned by LUT Library.
@@ -163,8 +163,6 @@ Alternative: pre-bake decorative thumbnails. Rejected because they would not pro
 
 ## Open Questions
 
-The requested grilling session must resolve one product-level decision before implementation:
+The primary information architecture is resolved. Remaining grilling questions concern visual-Library sample behaviour and implementation details, not Workspace ownership.
 
-1. Should the local **LUT Library** surface be its own Workspace destination, or a distinct Browse child under a broader LUT destination?
-
-All other assumptions are explicit: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.
+Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; sample images are fixed app assets; video playback is future work.

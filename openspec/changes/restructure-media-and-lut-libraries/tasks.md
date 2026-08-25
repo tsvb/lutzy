@@ -1,11 +1,11 @@
 ## 0. Product decision gate
 
 - [x] 0.1 Confirm visual LUT browsing is local-only and excludes online download, creator, and marketplace scope
-- [ ] 0.2 Confirm whether LUT Library is its own Workspace destination or a distinct Browse child under a broader LUT destination, then update the provisional navigation spec before implementation
+- [x] 0.2 Confirm LUT Library and LUT Manager are separate top-level Workspace destinations
 
 ## 1. Navigation and state boundaries
 
-- [ ] 1.1 Add Media Library and the confirmed visual-LUT destination to `AppSection` and keep tolerant decoding for all existing saved section values
+- [ ] 1.1 Add Media Library and LUT Library to `AppSection` and keep tolerant decoding for all existing saved section values
 - [ ] 1.2 Give Viewer, Media Library, visual LUT browsing, LUT Manager, and LUT Editor independent local navigation state
 - [ ] 1.3 Make LUT Manager enter at All LUTs and restore Gallery context only inside the visual LUT surface
 

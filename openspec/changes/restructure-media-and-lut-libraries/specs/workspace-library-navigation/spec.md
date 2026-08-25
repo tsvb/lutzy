@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Five provisional Workspace destinations
-The application SHALL expose Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor as top-level Workspace destinations, and local content selections SHALL NOT change the highlighted Workspace destination. The LUT Library label and placement remain a product-decision gate documented in the design.
+### Requirement: Five stable Workspace destinations
+The application SHALL expose Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor as the five top-level Workspace destinations, and local content selections SHALL NOT change the highlighted Workspace destination.
 
 #### Scenario: Workspace labels
 - **WHEN** the primary sidebar is displayed
