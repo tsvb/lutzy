@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 @testable import LUTzyKit
 
@@ -88,6 +89,91 @@ func runDurableLibraryChecks() async -> Bool {
             && ProjectStore(root: recoveryProjectRoot).current?.session.selectedLUT == recoveredID?.raw
         print("derived session adoption -> \(recoveredSessionOK ? "PASS" : "FAIL")")
 
+        let brandShelves = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
+        let tagShelves = recoveryViewModel.libraryDiscoveryShelves(for: .tag)
+        let collectionShelves = recoveryViewModel.libraryDiscoveryShelves(for: .collection)
+        let brandOK = brandShelves.first(where: { $0.title == "Custom" })?.luts.map(\.lutID).contains(firstID) == true
+            && brandShelves.first(where: { $0.title == "Unknown" })?.luts.map(\.lutID).contains(secondID) == true
+        let tagOK = tagShelves.first(where: { $0.title == "soft" })?.luts.map(\.lutID) == [firstID]
+            && tagShelves.contains(where: { $0.title.hasPrefix("input:") }) == false
+        let collectionOK = Set(
+            collectionShelves.first(where: { $0.title == "低飽和" })?.luts.map(\.lutID) ?? []
+        ) == Set([firstID, secondID])
+        recoveryViewModel.setLUTSource(.collection(collection.id), for: .library)
+        let scopedCount = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
+            .reduce(0) { $0 + $1.luts.count }
+        let discoveryOK = brandOK && tagOK && collectionOK && scopedCount == 2
+        recoveryViewModel.setLUTSource(.all, for: .library)
+        print("LUT discovery Brand/Tag/Collection shelves and source scope -> \(discoveryOK ? "PASS" : "FAIL")")
+
+        let survivingShelf = LUTLibraryShelf(
+            id: "tag:soft", title: "soft", luts: [first]
+        )
+        let focusRecoveryOK = LUTLibraryFocusTarget.homeCard(
+            shelfID: survivingShelf.id, lutID: secondID
+        ).resolved(in: [survivingShelf]) == .shelfHeading(survivingShelf.id)
+            && LUTLibraryFocusTarget.gridCard(
+                shelfID: survivingShelf.id, lutID: secondID
+            ).resolved(in: [survivingShelf]) == .gridBack(survivingShelf.id)
+            && LUTLibraryFocusTarget.gridCard(
+                shelfID: survivingShelf.id, lutID: secondID
+            ).resolved(in: []) == .groupingControl
+        print("LUT discovery focus fallback after card/shelf removal -> \(focusRecoveryOK ? "PASS" : "FAIL")")
+
+        let previewCache = LUTGalleryPreviewCache(countLimit: 4)
+        let previewKey = LUTGalleryPreviewCacheKey(
+            lutID: firstID, revision: 1, sampleID: "outdoor",
+            context: "library", width: 640, height: 400
+        )
+        var previewRenderCount = 0
+        let firstPreview = Task { @MainActor in
+            let image = await previewCache.image(for: previewKey) {
+                previewRenderCount += 1
+                try? await Task.sleep(for: .milliseconds(40))
+                return NSImage(size: NSSize(width: 8, height: 8))
+            }
+            return image != nil
+        }
+        let duplicatePreview = Task { @MainActor in
+            let image = await previewCache.image(for: previewKey) {
+                previewRenderCount += 1
+                return NSImage(size: NSSize(width: 8, height: 8))
+            }
+            return image != nil
+        }
+        let previewsRendered = await (firstPreview.value, duplicatePreview.value)
+        let cachedPreview = await previewCache.image(for: previewKey) {
+            previewRenderCount += 1
+            return NSImage(size: NSSize(width: 8, height: 8))
+        }
+
+        let cancelledKey = LUTGalleryPreviewCacheKey(
+            lutID: secondID, revision: 1, sampleID: "outdoor",
+            context: "library", width: 640, height: 400
+        )
+        var cancellationObserved = false
+        let cancelledPreview = Task { @MainActor in
+            let image = await previewCache.image(for: cancelledKey) {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                    return NSImage(size: NSSize(width: 8, height: 8))
+                } catch {
+                    cancellationObserved = true
+                    return nil
+                }
+            }
+            return image != nil
+        }
+        await Task.yield()
+        cancelledPreview.cancel()
+        _ = await cancelledPreview.value
+        let previewCacheOK = previewsRendered.0
+            && previewsRendered.1
+            && cachedPreview != nil
+            && previewRenderCount == 1
+            && cancellationObserved
+        print("shared LUT preview cache coalescing and cancellation -> \(previewCacheOK ? "PASS" : "FAIL")")
+
         let legacyProjectRoot = root.appendingPathComponent("Legacy Projects", isDirectory: true)
         let legacyProjects = ProjectStore(root: legacyProjectRoot)
         let legacyProject = legacyProjects.create(named: "Legacy")
@@ -151,7 +237,8 @@ func runDurableLibraryChecks() async -> Bool {
             && Set(relaunchedMedia.records.map(\.id)) == mediaIDs
             && relaunchedMedia.records.contains { $0.logicalPath == "Shoot/Day 1/frame.png" }
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
-        return catalogOK && recoveryOK && recoveredSessionOK && legacyMigrationOK && mediaOK
+        return catalogOK && recoveryOK && recoveredSessionOK && discoveryOK && focusRecoveryOK
+            && previewCacheOK && legacyMigrationOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")
         return false

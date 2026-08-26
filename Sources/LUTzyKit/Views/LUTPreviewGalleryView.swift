@@ -5,20 +5,56 @@ import SwiftUI
 /// photograph that is currently open.
 struct LUTPreviewGalleryView: View {
     @ObservedObject var viewModel: AppViewModel
+    let suppliedLUTs: [CubeLUT]?
+    let suppliedTitle: String?
+    let renderingActive: Bool
+    let libraryShelfID: String?
+    let libraryKeyboardFocus: FocusState<LUTLibraryFocusTarget?>.Binding?
+    let libraryAccessibilityFocus: AccessibilityFocusState<LUTLibraryFocusTarget?>.Binding?
+    let selectedLibraryCardTarget: LUTLibraryFocusTarget?
+    let onLibraryActivate: ((CubeLUT, LUTLibraryFocusTarget) -> Void)?
+    let onLibraryContentMutation: ((LUTLibraryFocusTarget) -> Void)?
 
     @State private var searchText = ""
     @AppStorage("lutzy.viewerLUTCardWidth") private var cardWidth = 220.0
 
+    init(
+        viewModel: AppViewModel,
+        luts: [CubeLUT]? = nil,
+        title: String? = nil,
+        renderingActive: Bool = true,
+        libraryShelfID: String? = nil,
+        libraryKeyboardFocus: FocusState<LUTLibraryFocusTarget?>.Binding? = nil,
+        libraryAccessibilityFocus: AccessibilityFocusState<LUTLibraryFocusTarget?>.Binding? = nil,
+        selectedLibraryCardTarget: LUTLibraryFocusTarget? = nil,
+        onLibraryActivate: ((CubeLUT, LUTLibraryFocusTarget) -> Void)? = nil,
+        onLibraryContentMutation: ((LUTLibraryFocusTarget) -> Void)? = nil
+    ) {
+        self.viewModel = viewModel
+        self.suppliedLUTs = luts
+        self.suppliedTitle = title
+        self.renderingActive = renderingActive
+        self.libraryShelfID = libraryShelfID
+        self.libraryKeyboardFocus = libraryKeyboardFocus
+        self.libraryAccessibilityFocus = libraryAccessibilityFocus
+        self.selectedLibraryCardTarget = selectedLibraryCardTarget
+        self.onLibraryActivate = onLibraryActivate
+        self.onLibraryContentMutation = onLibraryContentMutation
+    }
+
+    private var baseLUTs: [CubeLUT] { suppliedLUTs ?? viewModel.galleryLUTs }
+
     private var visibleLUTs: [CubeLUT] {
-        guard searchText.isEmpty == false else { return viewModel.galleryLUTs }
+        guard searchText.isEmpty == false else { return baseLUTs }
         let query = searchText.localizedLowercase
-        return viewModel.galleryLUTs.filter {
+        return baseLUTs.filter {
             viewModel.catalog.effectiveName(for: $0).localizedLowercase.contains(query)
         }
     }
 
     private var folderName: String {
-        viewModel.title(for: viewModel.section == .lutLibrary
+        if let suppliedTitle { return suppliedTitle }
+        return viewModel.title(for: viewModel.section == .lutLibrary
             ? viewModel.libraryLUTSource : viewModel.viewerLUTSource)
     }
 
@@ -39,7 +75,7 @@ struct LUTPreviewGalleryView: View {
 
     private var galleryHeader: some View {
         HStack(spacing: 10) {
-            Image(systemName: "folder.fill")
+            Image(systemName: suppliedLUTs == nil ? "folder.fill" : "rectangle.grid.2x2.fill")
                 .foregroundStyle(Color.accentColor)
             Text(folderName)
                 .font(.subheadline.weight(.semibold))
@@ -48,7 +84,7 @@ struct LUTPreviewGalleryView: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-            if viewModel.comparisonLayout.isGrid {
+            if viewModel.section != .lutLibrary && viewModel.comparisonLayout.isGrid {
                 Rectangle()
                     .fill(Color.primary.opacity(0.16))
                     .frame(width: 1, height: 16)
@@ -70,7 +106,7 @@ struct LUTPreviewGalleryView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("Search this folder", text: $searchText)
+                TextField(suppliedLUTs == nil ? "Search this folder" : "Search this shelf", text: $searchText)
                     .textFieldStyle(.plain)
                     .frame(width: 150)
                 if searchText.isEmpty == false {
@@ -112,9 +148,19 @@ struct LUTPreviewGalleryView: View {
         return ScrollView {
             LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
                 ForEach(visibleLUTs) { lut in
+                    let focusTarget = libraryShelfID.map {
+                        LUTLibraryFocusTarget.gridCard(shelfID: $0, lutID: lut.lutID)
+                    }
                     LUTPreviewCard(
                         lut: lut,
-                        viewModel: viewModel
+                        viewModel: viewModel,
+                        renderingActive: renderingActive,
+                        libraryKeyboardFocus: libraryKeyboardFocus,
+                        libraryAccessibilityFocus: libraryAccessibilityFocus,
+                        libraryFocusTarget: focusTarget,
+                        librarySelected: focusTarget == selectedLibraryCardTarget,
+                        onActivate: activation(for: lut, target: focusTarget),
+                        onLibraryContentMutation: onLibraryContentMutation
                     )
                 }
             }
@@ -139,17 +185,33 @@ struct LUTPreviewGalleryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    private func activation(
+        for lut: CubeLUT,
+        target: LUTLibraryFocusTarget?
+    ) -> (() -> Void)? {
+        guard let target, let onLibraryActivate else { return nil }
+        return { onLibraryActivate(lut, target) }
+    }
 }
 
-private struct LUTPreviewCard: View {
+struct LUTPreviewCard: View {
     let lut: CubeLUT
     @ObservedObject var viewModel: AppViewModel
+    var renderingActive = true
+    var libraryKeyboardFocus: FocusState<LUTLibraryFocusTarget?>.Binding? = nil
+    var libraryAccessibilityFocus: AccessibilityFocusState<LUTLibraryFocusTarget?>.Binding? = nil
+    var libraryFocusTarget: LUTLibraryFocusTarget? = nil
+    var librarySelected: Bool? = nil
+    var onActivate: (() -> Void)? = nil
+    var onLibraryContentMutation: ((LUTLibraryFocusTarget) -> Void)? = nil
 
     @State private var preview: NSImage?
     @State private var isHovering = false
 
     private var isSelected: Bool {
-        viewModel.section == .lutLibrary
+        if let librarySelected { return librarySelected }
+        return viewModel.section == .lutLibrary
             ? viewModel.selectedLibraryLUTID == lut.lutID
             : viewModel.selectedLUT?.lutID == lut.lutID
     }
@@ -169,7 +231,8 @@ private struct LUTPreviewCard: View {
         RenderIdentity(
             lutID: lut.lutID,
             revision: viewModel.lutGalleryRevision,
-            sampleID: viewModel.section == .lutLibrary ? viewModel.selectedLibrarySampleID : nil
+            sampleID: viewModel.section == .lutLibrary ? viewModel.selectedLibrarySampleID : nil,
+            active: renderingActive
         )
     }
 
@@ -195,7 +258,7 @@ private struct LUTPreviewCard: View {
             .clipped()
             .overlay(alignment: .topTrailing) {
                 Button {
-                    viewModel.toggleStarred(lut)
+                    toggleStarred()
                 } label: {
                     Image(systemName: isFavourite ? "star.fill" : "star")
                         .font(.caption.weight(.semibold))
@@ -256,8 +319,22 @@ private struct LUTPreviewCard: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 6))
         .onTapGesture {
-            if viewModel.section == .lutLibrary { viewModel.selectLibraryLUT(lut) }
-            else { viewModel.chooseLUTFromGallery(lut) }
+            activate()
+        }
+        .modifier(LUTLibraryCardFocusModifier(
+            keyboardFocus: libraryKeyboardFocus,
+            accessibilityFocus: libraryAccessibilityFocus,
+            target: libraryFocusTarget
+        ))
+        .onKeyPress(.return) {
+            guard libraryFocusTarget != nil else { return .ignored }
+            activate()
+            return .handled
+        }
+        .onKeyPress(.space) {
+            guard libraryFocusTarget != nil else { return .ignored }
+            activate()
+            return .handled
         }
         .draggable(lut.lutID.raw) {
                 Label(viewModel.catalog.effectiveName(for: lut), systemImage: "cube.fill")
@@ -269,13 +346,15 @@ private struct LUTPreviewCard: View {
         }
         .onHover { isHovering = $0 }
         .help(
-            viewModel.comparisonLayout.isGrid
+            viewModel.section == .lutLibrary
+                ? "Inspect \(lut.name)"
+                : viewModel.comparisonLayout.isGrid
                 ? "Click to assign to Cell \((viewModel.activeGridCellIndex ?? 0) + 1), or drag onto another cell"
                 : "Apply \(lut.name)"
         )
         .contextMenu {
             Button(isFavourite ? "Unstar" : "Star") {
-                viewModel.toggleStarred(lut)
+                toggleStarred()
             }
             Button("Reveal in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([lut.url])
@@ -285,11 +364,11 @@ private struct LUTPreviewCard: View {
         .accessibilityLabel(viewModel.catalog.effectiveName(for: lut))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction {
-            if viewModel.section == .lutLibrary { viewModel.selectLibraryLUT(lut) }
-            else { viewModel.chooseLUTFromGallery(lut) }
+            activate()
         }
         .task(id: renderIdentity) {
             preview = nil
+            guard renderingActive else { return }
             guard viewModel.sourceImage != nil || viewModel.section == .lutLibrary else { return }
             preview = await viewModel.makeLUTGalleryPreview(
                 for: lut,
@@ -302,5 +381,41 @@ private struct LUTPreviewCard: View {
         let lutID: LUTID
         let revision: Int
         let sampleID: String?
+        let active: Bool
+    }
+
+    private func activate() {
+        if let onActivate {
+            onActivate()
+        } else if viewModel.section == .lutLibrary {
+            viewModel.selectLibraryLUT(lut)
+        } else {
+            viewModel.chooseLUTFromGallery(lut)
+        }
+    }
+
+    private func toggleStarred() {
+        viewModel.toggleStarred(lut)
+        if let libraryFocusTarget {
+            onLibraryContentMutation?(libraryFocusTarget)
+        }
+    }
+}
+
+private struct LUTLibraryCardFocusModifier: ViewModifier {
+    let keyboardFocus: FocusState<LUTLibraryFocusTarget?>.Binding?
+    let accessibilityFocus: AccessibilityFocusState<LUTLibraryFocusTarget?>.Binding?
+    let target: LUTLibraryFocusTarget?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let keyboardFocus, let accessibilityFocus, let target {
+            content
+                .focusable()
+                .focused(keyboardFocus, equals: target)
+                .accessibilityFocused(accessibilityFocus, equals: target)
+        } else {
+            content
+        }
     }
 }

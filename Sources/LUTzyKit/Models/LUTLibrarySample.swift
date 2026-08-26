@@ -58,13 +58,20 @@ struct LUTLibrarySample: Identifiable, Hashable, Sendable {
 }
 
 enum LUTGalleryMetadata {
-    static func visibleTags(typed: [String], measured: [String], limit: Int = 3) -> [String] {
-        guard limit > 0 else { return [] }
+    /// Tags intended for people to browse. `input:*` is render-pipeline
+    /// metadata and has its own dedicated Input field, so surfacing it as a
+    /// discovery category would crowd out descriptive style tags.
+    static func browsableTags(typed: [String], measured: [String]) -> [String] {
         let typed = typed.filter { $0.hasPrefix("input:") == false }.sorted()
         let measured = measured
             .filter { $0.hasPrefix("input:") == false && typed.contains($0) == false }
             .sorted()
-        return Array((typed + measured).prefix(limit))
+        return typed + measured
+    }
+
+    static func visibleTags(typed: [String], measured: [String], limit: Int = 3) -> [String] {
+        guard limit > 0 else { return [] }
+        return Array(browsableTags(typed: typed, measured: measured).prefix(limit))
     }
 }
 

@@ -18,6 +18,14 @@ enum LUTOrigin: Codable, Sendable, Equatable, Hashable {
         case .unknown: return "Unknown"
         }
     }
+
+    var discoveryID: String {
+        switch self {
+        case .vendor(let name): return "vendor:\(name.localizedLowercase)"
+        case .custom: return "custom"
+        case .unknown: return "unknown"
+        }
+    }
 }
 
 struct LUTRecord: Identifiable, Codable, Sendable, Equatable {

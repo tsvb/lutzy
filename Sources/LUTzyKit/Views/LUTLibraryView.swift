@@ -4,27 +4,273 @@ import SwiftUI
 /// silently mutate the Viewer document.
 struct LUTLibraryView: View {
     @ObservedObject var viewModel: AppViewModel
+    @State private var grouping: LUTLibraryGrouping = .tag
+    @State private var selectedShelfID: String?
+    @State private var shelfReturnFocus: LUTLibraryFocusTarget?
+    @State private var selectedCardTarget: LUTLibraryFocusTarget?
+    @FocusState private var keyboardFocus: LUTLibraryFocusTarget?
+    @AccessibilityFocusState private var accessibilityFocus: LUTLibraryFocusTarget?
 
-    var body: some View {
-        VSplitView {
-            detail
-                .frame(maxWidth: .infinity, minHeight: 250, idealHeight: 390)
-            LUTPreviewGalleryView(viewModel: viewModel)
-                .frame(maxWidth: .infinity, minHeight: 250, idealHeight: 360)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private var shelves: [LUTLibraryShelf] {
+        viewModel.libraryDiscoveryShelves(for: grouping)
     }
 
-    @ViewBuilder
-    private var detail: some View {
-        if let lut = viewModel.selectedLibraryLUT {
-            LUTLibraryDetailView(lut: lut, viewModel: viewModel)
-        } else {
-            ContentUnavailableView {
-                Label("Choose a LUT", systemImage: "cube.transparent")
-            } description: {
-                Text("Select a card below to inspect it on the fixed sample set.")
+    private var selectedShelf: LUTLibraryShelf? {
+        selectedShelfID.flatMap { id in shelves.first(where: { $0.id == id }) }
+    }
+
+    var body: some View {
+        ZStack {
+            discoveryHome
+                .allowsHitTesting(selectedShelf == nil && viewModel.selectedLibraryLUT == nil)
+                .accessibilityHidden(selectedShelf != nil || viewModel.selectedLibraryLUT != nil)
+
+            if let selectedShelf {
+                shelfGrid(selectedShelf)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .allowsHitTesting(viewModel.selectedLibraryLUT == nil)
+                    .accessibilityHidden(viewModel.selectedLibraryLUT != nil)
             }
+
+            if let lut = viewModel.selectedLibraryLUT {
+                LUTLibraryDetailView(
+                    lut: lut,
+                    viewModel: viewModel,
+                    backLabel: selectedShelf.map { "Back to \($0.title)" } ?? "Back to Discover",
+                    accessibilityFocus: $accessibilityFocus
+                ) {
+                    let returnTarget = selectedCardTarget
+                    viewModel.setLUTDetailFocused(false)
+                    viewModel.selectedLibraryLUTID = nil
+                    restoreFocus(returnTarget)
+                }
+                .background(Color(nsColor: .windowBackgroundColor))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: viewModel.libraryLUTSource) { _, _ in
+            selectedShelfID = nil
+            viewModel.selectedLibraryLUTID = nil
+            shelfReturnFocus = nil
+            selectedCardTarget = nil
+        }
+        .onChange(of: grouping) { _, _ in
+            selectedShelfID = nil
+            viewModel.selectedLibraryLUTID = nil
+            shelfReturnFocus = nil
+            selectedCardTarget = nil
+        }
+    }
+
+    private var discoveryHome: some View {
+        VStack(spacing: 0) {
+            discoveryHeader
+            Divider()
+
+            if shelves.isEmpty {
+                ContentUnavailableView {
+                    Label(emptyTitle, systemImage: grouping.symbol)
+                } description: {
+                    Text(emptyDescription)
+                }
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        ForEach(shelves) { shelf in
+                            discoveryShelf(shelf)
+                                .id(shelf.id)
+                        }
+                    }
+                    .padding(.vertical, 18)
+                }
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var discoveryHeader: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Discover LUTs")
+                    .font(.title2.weight(.semibold))
+                Text("\(viewModel.title(for: viewModel.libraryLUTSource)) · \(viewModel.luts(for: viewModel.libraryLUTSource).count) local LUTs")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Picker("Group LUTs", selection: $grouping) {
+                ForEach(LUTLibraryGrouping.allCases) { grouping in
+                    Label(grouping.label, systemImage: grouping.symbol)
+                        .tag(grouping)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 330)
+            .accessibilityLabel("Group LUTs")
+            .focused($keyboardFocus, equals: .groupingControl)
+            .accessibilityFocused($accessibilityFocus, equals: .groupingControl)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
+
+    private func discoveryShelf(_ shelf: LUTLibraryShelf) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Button {
+                    openShelf(shelf, from: .shelfHeading(shelf.id))
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(shelf.title)
+                            .font(.headline)
+                        Text("\(shelf.luts.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .focused($keyboardFocus, equals: .shelfHeading(shelf.id))
+                .accessibilityFocused($accessibilityFocus, equals: .shelfHeading(shelf.id))
+
+                Spacer()
+
+                Button("View All") {
+                    openShelf(shelf, from: .viewAll(shelf.id))
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("View all \(shelf.title) LUTs")
+                .focused($keyboardFocus, equals: .viewAll(shelf.id))
+                .accessibilityFocused($accessibilityFocus, equals: .viewAll(shelf.id))
+            }
+            .padding(.horizontal, 18)
+
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(shelf.luts) { lut in
+                        let focusTarget = LUTLibraryFocusTarget.homeCard(
+                            shelfID: shelf.id, lutID: lut.lutID
+                        )
+                        LUTPreviewCard(
+                            lut: lut,
+                            viewModel: viewModel,
+                            renderingActive: selectedShelf == nil && viewModel.selectedLibraryLUT == nil,
+                            libraryKeyboardFocus: $keyboardFocus,
+                            libraryAccessibilityFocus: $accessibilityFocus,
+                            libraryFocusTarget: focusTarget,
+                            librarySelected: selectedCardTarget == focusTarget,
+                            onActivate: { openDetail(lut, from: focusTarget) },
+                            onLibraryContentMutation: handleContentMutation
+                        )
+                            .frame(width: 220, alignment: .top)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 4)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func shelfGrid(_ shelf: LUTLibraryShelf) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button {
+                    let returnTarget = shelfReturnFocus
+                    selectedShelfID = nil
+                    if selectedCardTarget?.isGridCard == true { selectedCardTarget = nil }
+                    restoreFocus(returnTarget)
+                } label: {
+                    Label("Back to Discover", systemImage: "chevron.left")
+                }
+                .buttonStyle(.borderless)
+                .focused($keyboardFocus, equals: .gridBack(shelf.id))
+                .accessibilityFocused($accessibilityFocus, equals: .gridBack(shelf.id))
+
+                Text(grouping.label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            LUTPreviewGalleryView(
+                viewModel: viewModel,
+                luts: shelf.luts,
+                title: shelf.title,
+                renderingActive: viewModel.selectedLibraryLUT == nil,
+                libraryShelfID: shelf.id,
+                libraryKeyboardFocus: $keyboardFocus,
+                libraryAccessibilityFocus: $accessibilityFocus,
+                selectedLibraryCardTarget: selectedCardTarget,
+                onLibraryActivate: openDetail,
+                onLibraryContentMutation: handleContentMutation
+            )
+        }
+    }
+
+    private func openShelf(_ shelf: LUTLibraryShelf, from origin: LUTLibraryFocusTarget) {
+        shelfReturnFocus = origin
+        selectedShelfID = shelf.id
+        selectedCardTarget = nil
+        moveFocus(to: .gridBack(shelf.id))
+    }
+
+    private func openDetail(_ lut: CubeLUT, from origin: LUTLibraryFocusTarget) {
+        selectedCardTarget = origin
+        viewModel.selectLibraryLUT(lut)
+        Task { @MainActor in
+            await Task.yield()
+            accessibilityFocus = .detailBack
+        }
+    }
+
+    private func restoreFocus(_ target: LUTLibraryFocusTarget?) {
+        guard let target else { return }
+        let resolved = target.resolved(in: shelves)
+        if target.isCard && resolved != target { selectedCardTarget = nil }
+        if selectedShelfID != nil && selectedShelf == nil { selectedShelfID = nil }
+        moveFocus(to: resolved)
+    }
+
+    private func handleContentMutation(from target: LUTLibraryFocusTarget) {
+        Task { @MainActor in
+            await Task.yield()
+            let resolved = target.resolved(in: shelves)
+            guard resolved != target else { return }
+            if target.isCard { selectedCardTarget = nil }
+            if selectedShelfID != nil && selectedShelf == nil { selectedShelfID = nil }
+            moveFocus(to: resolved)
+        }
+    }
+
+    private func moveFocus(to target: LUTLibraryFocusTarget) {
+        Task { @MainActor in
+            await Task.yield()
+            keyboardFocus = target
+            accessibilityFocus = target
+        }
+    }
+
+    private var emptyTitle: String {
+        switch grouping {
+        case .brand: return "No Brands in This Source"
+        case .tag: return "No Tags in This Source"
+        case .collection: return "No Collections in This Source"
+        }
+    }
+
+    private var emptyDescription: String {
+        switch grouping {
+        case .brand: return "Set Origin metadata in LUT Manager to organise confirmed brands."
+        case .tag: return "Add Tags in LUT Manager or let local measurement finish."
+        case .collection: return "Create and edit local Collections in LUT Manager."
         }
     }
 }
@@ -32,6 +278,9 @@ struct LUTLibraryView: View {
 private struct LUTLibraryDetailView: View {
     let lut: CubeLUT
     @ObservedObject var viewModel: AppViewModel
+    let backLabel: String
+    let accessibilityFocus: AccessibilityFocusState<LUTLibraryFocusTarget?>.Binding
+    let onBack: () -> Void
 
     @State private var rendered: LUTLibraryRenderPair?
     @State private var split = 0.5
@@ -70,12 +319,12 @@ private struct LUTLibraryDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Button {
-                        viewModel.setLUTDetailFocused(false)
-                        viewModel.selectedLibraryLUTID = nil
+                        onBack()
                     } label: {
-                        Label("Back to Gallery", systemImage: "chevron.left")
+                        Label(backLabel, systemImage: "chevron.left")
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityFocused(accessibilityFocus, equals: .detailBack)
 
                     Text(viewModel.catalog.effectiveName(for: lut))
                         .font(.title2.weight(.semibold))

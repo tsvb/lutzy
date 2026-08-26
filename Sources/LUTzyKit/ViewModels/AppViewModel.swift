@@ -394,6 +394,7 @@ final class AppViewModel: ObservableObject {
     private var previewTask: Task<Void, Never>?
     private var originalPreviewTask: Task<Void, Never>?
     private var intensityTask: Task<Void, Never>?
+    private let lutGalleryPreviewCache = LUTGalleryPreviewCache()
     private var cancellables: [AnyCancellable] = []
 
     // MARK: - Init
@@ -1051,6 +1052,69 @@ final class AppViewModel: ObservableObject {
         luts(for: section == .lutLibrary ? libraryLUTSource : viewerLUTSource)
     }
 
+    /// Build the visual Library's discovery shelves from the active local
+    /// source. No inference happens here: an Unknown origin stays Unknown, and
+    /// every row is backed by metadata that Manager already owns.
+    func libraryDiscoveryShelves(for grouping: LUTLibraryGrouping) -> [LUTLibraryShelf] {
+        let scoped = luts(for: libraryLUTSource)
+
+        switch grouping {
+        case .brand:
+            var groups: [String: (title: String, luts: [CubeLUT])] = [:]
+            for lut in scoped {
+                let origin = catalog.origin(for: lut)
+                let key = origin.discoveryID
+                if groups[key] == nil { groups[key] = (origin.label, []) }
+                groups[key]?.luts.append(lut)
+            }
+            return groups.map { id, group in
+                LUTLibraryShelf(
+                    id: "brand:\(id)",
+                    title: group.title,
+                    luts: group.luts
+                )
+            }
+            .sorted { lhs, rhs in
+                let leftRank = lhs.title == "Unknown" ? 1 : 0
+                let rightRank = rhs.title == "Unknown" ? 1 : 0
+                if leftRank != rightRank { return leftRank < rightRank }
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
+
+        case .tag:
+            var groups: [String: [CubeLUT]] = [:]
+            for lut in scoped {
+                let tags = LUTGalleryMetadata.browsableTags(
+                    typed: typedTags(for: lut),
+                    measured: measuredTags(for: lut)
+                )
+                for tag in Set(tags).filter({ $0.isEmpty == false }) {
+                    groups[tag, default: []].append(lut)
+                }
+            }
+            return groups.map { tag, values in
+                LUTLibraryShelf(id: "tag:\(tag)", title: tag, luts: values)
+            }
+            .sorted {
+                if $0.luts.count != $1.luts.count { return $0.luts.count > $1.luts.count }
+                return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+            }
+
+        case .collection:
+            let scopedIDs = Set(scoped.map(\.lutID))
+            return catalog.collections.compactMap { collection in
+                let members = catalog.members(of: collection.id).intersection(scopedIDs)
+                let values = scoped.filter { members.contains($0.lutID) }
+                guard values.isEmpty == false else { return nil }
+                return LUTLibraryShelf(
+                    id: "collection:\(collection.id.uuidString)",
+                    title: collection.name,
+                    luts: values
+                )
+            }
+        }
+    }
+
     // MARK: - Record metadata
 
     func typedTags(for lut: CubeLUT) -> [String] { catalog.typedTags(for: lut) }
@@ -1183,9 +1247,13 @@ final class AppViewModel: ObservableObject {
     func makeLUTGalleryPreview(for lut: CubeLUT, maxSize: CGSize) async -> NSImage? {
         let renderSource: ImageSource
         var request: EditDocument
+        let context: String
+        let sampleID: String?
         if section == .lutLibrary {
             guard let source = selectedLibrarySample.imageSource else { return nil }
             renderSource = source
+            context = "library"
+            sampleID = selectedLibrarySampleID
             request = EditDocument(
                 rawDevelop: .neutral, adjustments: [],
                 lut: LUTSettings(lutID: lut.lutID, intensity: 1),
@@ -1194,23 +1262,36 @@ final class AppViewModel: ObservableObject {
         } else {
             guard let imageSource else { return nil }
             renderSource = imageSource
+            context = "viewer"
+            sampleID = nil
             request = document
         }
         request.lut.lutID = lut.lutID
         request.lut.intensity = section == .lutLibrary ? 1 : request.lut.intensity
 
-        let cgImage = await engine.makeCGImage(
-            source: renderSource,
-            document: request,
-            lut: lut,
-            scale: .preview(maxSize: maxSize),
-            space: .current
+        let key = LUTGalleryPreviewCacheKey(
+            lutID: lut.lutID,
+            revision: lutGalleryRevision,
+            sampleID: sampleID,
+            context: context,
+            width: Int(maxSize.width.rounded()),
+            height: Int(maxSize.height.rounded())
         )
-        guard Task.isCancelled == false, let cgImage else { return nil }
-        return NSImage(
-            cgImage: cgImage,
-            size: NSSize(width: cgImage.width, height: cgImage.height)
-        )
+        let engine = self.engine
+        return await lutGalleryPreviewCache.image(for: key) {
+            let cgImage = await engine.makeCGImage(
+                source: renderSource,
+                document: request,
+                lut: lut,
+                scale: .preview(maxSize: maxSize),
+                space: .current
+            )
+            guard Task.isCancelled == false, let cgImage else { return nil }
+            return NSImage(
+                cgImage: cgImage,
+                size: NSSize(width: cgImage.width, height: cgImage.height)
+            )
+        }
     }
 
     func makeLUTLibraryDetailImages(

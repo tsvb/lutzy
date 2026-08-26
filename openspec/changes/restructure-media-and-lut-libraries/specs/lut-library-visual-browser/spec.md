@@ -37,6 +37,41 @@ The application SHALL provide a visual LUT Library for discovery and sample-base
 - **WHEN** the user enters LUT Manager
 - **THEN** the existing table and organisation actions are available without sample-based detail replacing the management surface
 
+### Requirement: Three-level local discovery navigation
+LUT Library SHALL provide a local discovery home made of multiple horizontally scrollable shelves, a complete Grid for one selected shelf, and a LUT detail as three distinct navigation levels.
+
+#### Scenario: Browse the discovery home
+- **WHEN** the user enters LUT Library without an open shelf or LUT detail
+- **THEN** the surface shows a Brand, Tag, and Collection grouping control and multiple vertically stacked horizontal LUT shelves, with Tag as the initial grouping so a measured local library immediately exposes several discovery rows
+
+#### Scenario: Scope discovery from the source sidebar
+- **WHEN** the user chooses a Folder, Collection, or Starred source in the existing secondary sidebar
+- **THEN** every discovery shelf and count is derived only from LUTs inside that source without replacing or duplicating the sidebar
+
+#### Scenario: Group by Brand
+- **WHEN** Brand grouping is active
+- **THEN** LUTs are grouped by confirmed Origin metadata, Custom remains explicit, and absent origin is shown as Unknown rather than inferred from a filename or folder
+
+#### Scenario: Group by Tag
+- **WHEN** Tag grouping is active
+- **THEN** each non-empty user-authored or measured Tag becomes a shelf containing the scoped LUTs carrying that Tag, except internal `input:*` pipeline metadata which remains represented by the dedicated Input field
+
+#### Scenario: Group by Collection
+- **WHEN** Collection grouping is active
+- **THEN** each non-empty local virtual Collection becomes a shelf containing its scoped members and no marketplace or remote grouping appears
+
+#### Scenario: Open a complete shelf
+- **WHEN** the user activates a shelf heading or View All action
+- **THEN** LUT Library replaces the discovery home with a complete searchable Grid for that shelf
+
+#### Scenario: Open LUT detail from either browsing level
+- **WHEN** the user activates a LUT card from a discovery shelf or its complete Grid
+- **THEN** LUT Library opens the same sample-based LUT detail and Back restores the exact originating home or Grid level
+
+#### Scenario: Originating card leaves the active source
+- **WHEN** the user removes the current LUT from Starred while its card or detail is focused and that mutation removes the card or whole shelf
+- **THEN** selection clears safely and Back or the mutation itself moves keyboard and assistive-technology focus to the surviving shelf control, Grid Back control, or grouping control instead of targeting a destroyed element
+
 ### Requirement: Lightweight LUT Library actions
 LUT Library SHALL allow Star, Add to Existing Collection, and Open in Viewer, and SHALL route structural or metadata editing to LUT Manager.
 
@@ -86,6 +121,14 @@ Every visible LUT Library Gallery card SHALL render its LUT against the same cur
 - **WHEN** the user chooses another Gallery sample
 - **THEN** every visible card updates to that same sample while preserving source, search, selection, and scroll context
 
+#### Scenario: Reuse a preview across discovery rows
+- **WHEN** one LUT is visible in more than one Tag or Collection shelf for the same sample and render context
+- **THEN** the card instances share one identity-keyed preview request or completed result instead of submitting duplicate renders
+
+#### Scenario: Cover one navigation level with another
+- **WHEN** a complete Grid or LUT detail covers an already-mounted discovery level
+- **THEN** hidden card tasks release their image state and cancel their interest in unfinished renders while the visible level remains responsive
+
 ### Requirement: Isolated neutral Library baseline
 LUT Library SHALL render every sample from its own immutable baseline with neutral develop and adjustments, the candidate LUT at 100% intensity, the sample's declared display source space, and the application's current working/output space.
 
@@ -129,7 +172,7 @@ Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fi
 
 #### Scenario: Navigate back
 - **WHEN** the user leaves LUT detail with Back
-- **THEN** LUT Library restores the originating Gallery source, selection, and scroll context
+- **THEN** LUT Library restores the originating discovery home or complete Grid, active grouping/source, card selection, scroll context, and keyboard/assistive-technology focus target
 
 ### Requirement: Draggable Before/After comparison
 LUT detail SHALL compare the original and LUT-rendered result in one aligned large preview using a vertically divided image with a horizontally draggable split position. Before SHALL remain on the left and After SHALL remain on the right, matching Viewer comparison orientation.

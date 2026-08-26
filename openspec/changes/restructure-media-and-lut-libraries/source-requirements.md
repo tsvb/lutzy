@@ -56,6 +56,11 @@ This file preserves the user's original intent and the evolution of decisions be
 15. LUT detail uses a vertically divided Before/After image with a horizontally draggable split. Holding Space temporarily shows the complete original and release restores the comparison.
 16. Across Viewer and LUT Library comparisons, Before stays on the left and After stays on the right.
 17. Gallery cards show at most three Tags. User-authored Tags take priority, then measured Tags fill remaining positions; each group uses stable alphabetical order and users do not manage a separate card-display order.
+18. LUT Library starts with a Netflix-like local discovery home made of multiple horizontal carousel rows rather than immediately showing one complete Grid.
+19. The discovery home can group shelves by confirmed Brand/Origin, visible Tag, or existing virtual Collection. The user's word `tab` is interpreted as `tag` in this context; this can be renamed without changing the navigation model. Tag is the initial grouping so an already-measured library opens with several meaningful rows even before Brand and Collection metadata are curated. Internal `input:*` pipeline metadata is not a discovery shelf.
+20. The existing left Folder/Collection/Starred source remains a scope over the discovery home; it is not replaced by the grouping subtabs.
+21. Activating a shelf opens a complete Grid like the second reference. Activating a LUT from either level opens the existing fixed-sample Before/After detail like the third reference.
+22. Back navigation restores the originating level: detail to its Grid or discovery home, and Grid to discovery home. It also restores the originating selection and keyboard/assistive-technology focus target.
 
 ### Colour consistency
 
@@ -253,6 +258,9 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5411ffd7-3444-4663-a8b9-ec10b4e680ac.png` | Reference for the now-resolved split between visual display and management |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-d7b694ea-8224-471d-a234-1e01f4c58459.png` | Finder Icon View reference clarifying Media Library Grid density and thumbnail treatment |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-4756ca78-8bce-4996-8f1e-4d8723189751.png` | Clarifies the global comparison convention: After is always on the right |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8a2d8975-742e-46d1-900f-522f393eee53.png` | Multi-row local LUT discovery home with horizontal carousel rhythm |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-78ae362e-550f-4164-bcd7-fdb8d88ea733.png` | Complete Grid reached after opening one discovery shelf |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-40b37c6f-a2d9-4b28-b150-6f70fae57b69.png` | Fixed-sample LUT detail reached after activating one LUT; styling remains non-normative |
 
 ## OpenSpec record map
 

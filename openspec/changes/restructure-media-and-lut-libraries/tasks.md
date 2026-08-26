@@ -62,6 +62,10 @@
 - [x] 7.4 Build LUT detail with sample thumbnails, a draggable vertical Before/After split, hold-Space original, and complete metadata
 - [x] 7.5 Restore LUT Library source, selection, sample, and Gallery scroll context on Back
 - [x] 7.6 Keep Before on the left and After on the right across Viewer and LUT Library comparisons
+- [x] 7.7 Add Brand/Tag/Collection discovery grouping over the active local LUT source
+- [x] 7.8 Build a vertically scrolling discovery home of horizontal LUT shelves with accessible View All actions
+- [x] 7.9 Add complete shelf Grid navigation and restore the originating home/Grid when leaving LUT detail
+- [x] 7.10 Restore originating shelf/card selection plus keyboard and assistive-technology focus across Back navigation, with safe fallback when Starred removal destroys that origin
 
 ## 8. Verification
 
@@ -76,3 +80,4 @@
 - [x] 8.9 Add complete visible measured-tag buckets, versioned remeasurement, and preservation checks for user-authored Tags
 - [x] 8.10 Add same-input-space post-import similarity review with confidence floor, explanations, exact-duplicate exclusion, and no metadata side effects
 - [x] 8.11 Serialize process-wide Library writes and each window's complete import-to-review pipeline, with concurrent same-name coverage
+- [x] 8.12 Coalesce duplicate card renders in a bounded preview cache and cancel hidden-level render interest
