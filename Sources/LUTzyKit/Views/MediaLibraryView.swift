@@ -101,9 +101,14 @@ struct MediaLibraryView: View {
         .contextMenu(forSelectionType: MediaRecordID.self) { ids in
             if let id = ids.first, let record = viewModel.media.record(id) {
                 Button("Open in Viewer") { viewModel.openMedia(record) }
+                    .disabled(record.kind == .video)
             }
         } primaryAction: { ids in
-            if let id = ids.first, let record = viewModel.media.record(id) { viewModel.openMedia(record) }
+            if let id = ids.first,
+               let record = viewModel.media.record(id),
+               record.kind == .image {
+                viewModel.openMedia(record)
+            }
         }
     }
 
@@ -127,46 +132,52 @@ struct MediaLibraryView: View {
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.28))
     }
 
+    @ViewBuilder
     private func mediaCard(_ record: MediaRecord) -> some View {
         let isSelected = viewModel.media.selectedID == record.id
-        return VStack(spacing: 7) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(Color.black.opacity(0.22))
+        let disambiguator = viewModel.media.disambiguator(for: record)
+        let card = Button {
+            viewModel.media.selectedID = record.id
+        } label: {
+            VStack(spacing: 7) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(Color.black.opacity(0.22))
 
-                if let image = viewModel.thumbnail(for: record) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(8)
-                } else {
-                    Image(systemName: record.kind == .video ? "film" : "photo")
-                        .font(.system(size: 36, weight: .light))
-                        .foregroundStyle(.tertiary)
+                    if let image = viewModel.thumbnail(for: record) {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(8)
+                    } else {
+                        Image(systemName: record.kind == .video ? "film" : "photo")
+                            .font(.system(size: 36, weight: .light))
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    if record.kind == .video {
+                        Image(systemName: "play.circle.fill")
+                            .font(.title2)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .black.opacity(0.58))
+                            .padding(8)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    }
                 }
+                .frame(height: 132)
 
-                if record.kind == .video {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title2)
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .black.opacity(0.58))
-                        .padding(8)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                Text(record.displayName)
+                    .font(.caption)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 30, alignment: .top)
+
+                if let disambiguator {
+                    Text(disambiguator)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-            }
-            .frame(height: 132)
-
-            Text(record.displayName)
-                .font(.caption)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: 30, alignment: .top)
-
-            if let detail = viewModel.media.disambiguator(for: record) {
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
         }
         .padding(7)
@@ -179,20 +190,32 @@ struct MediaLibraryView: View {
                 .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
         }
         .contentShape(RoundedRectangle(cornerRadius: 9))
-        .onTapGesture(count: 2) {
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
             viewModel.media.selectedID = record.id
             if record.kind == .image { viewModel.openMedia(record) }
-        }
-        .onTapGesture {
-            viewModel.media.selectedID = record.id
-        }
+        })
         .contextMenu {
             Button("Open in Viewer") { viewModel.openMedia(record) }
                 .disabled(record.kind == .video)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(record.displayName), \(record.kind == .image ? "Image" : "Video")")
+        .accessibilityLabel([
+            record.displayName,
+            disambiguator,
+            record.kind == .image ? "Image" : "Video",
+        ].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityHint(record.kind == .image
+            ? "Press to select. Use Open in Viewer to edit."
+            : "Press to select. Video playback is not available.")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+
+        if record.kind == .image {
+            card.accessibilityAction(named: Text("Open in Viewer")) {
+                viewModel.openMedia(record)
+            }
+        } else {
+            card
+        }
     }
 
     private func mediaName(_ record: MediaRecord) -> some View {
