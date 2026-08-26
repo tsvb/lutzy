@@ -5,7 +5,11 @@ The application SHALL expose Viewer, Media Library, LUT Library, LUT Manager, an
 
 #### Scenario: Workspace labels
 - **WHEN** the primary sidebar is displayed
-- **THEN** it labels the five destinations Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor
+- **THEN** it presents large icons for Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor in a compact outer rail; each icon exposes its full name on hover and to assistive technology, and the active destination is visually distinct
+
+#### Scenario: Navigate the compact Workspace rail without a pointer
+- **WHEN** a keyboard or assistive-technology user moves through the Workspace destinations
+- **THEN** every icon is an operable control with its full destination name and selected state
 
 #### Scenario: Select a local source
 - **WHEN** the user selects media, a LUT folder, a collection, or Starred within a Workspace destination

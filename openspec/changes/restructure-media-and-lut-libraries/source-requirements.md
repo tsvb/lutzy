@@ -165,6 +165,10 @@ The first Manager metadata interaction will use a persistent right-side Inspecto
 
 Workspace contains Viewer, Media Library, LUT Library, LUT Manager, and LUT Editor. LUT Library and LUT Manager are separate top-level destinations rather than Gallery/Table modes or children of a shared LUT destination.
 
+### 2026-08-26 — Compact icon Workspace rail
+
+The outermost Workspace navigation uses large icons instead of permanently visible text rows. Hover exposes each destination name, the active destination remains visually clear, and keyboard or assistive-technology users retain an explicit accessible name.
+
 ### 2026-08-26 — One shared Gallery sample
 
 All LUT Library Gallery cards render the same currently selected sample image so users compare LUT effects against constant source pixels. Per-LUT cover images are excluded; additional samples are switched in LUT detail.

@@ -48,30 +48,80 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable
 }
 
 /// Primary navigation intentionally has one kind of selection: app mode.
-/// Scope controls live beside the content they filter, so choosing a LUT
-/// folder can no longer steal the LUT Manager highlight.
+/// It stays compact as an icon rail; destination names remain available from
+/// hover labels and accessibility labels. Scope controls live beside the
+/// content they filter, so choosing a LUT folder can no longer steal the LUT
+/// Manager highlight.
 struct NavigationSidebar: View {
     @ObservedObject var viewModel: AppViewModel
+    @State private var hoveredSection: AppSection?
 
     var body: some View {
-        List(selection: selection) {
-            Section("Workspace") {
-                ForEach(AppSection.allCases) { section in
-                    Label(section.label, systemImage: section.symbol)
-                        .tag(section)
+        VStack(spacing: 10) {
+            ForEach(AppSection.allCases) { section in
+                let isSelected = viewModel.section == section
+                let isHovered = hoveredSection == section
+
+                Button {
+                    viewModel.section = section
+                } label: {
+                    Image(systemName: section.symbol)
+                        .font(.system(size: 23, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(
+                            isSelected
+                                ? Color.white
+                                : Color.primary.opacity(isHovered ? 0.95 : 0.70)
+                        )
+                        .frame(width: 48, height: 48)
+                        .background {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(
+                                    isSelected
+                                        ? Color.accentColor
+                                        : Color.primary.opacity(isHovered ? 0.10 : 0)
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .popover(
+                    isPresented: hoverPresentation(for: section),
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .leading
+                ) {
+                    Text(section.label)
+                        .font(.callout.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .fixedSize()
+                }
+                .accessibilityLabel(Text(section.label))
+                .accessibilityValue(Text(isSelected ? "Selected" : ""))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .onHover { hovering in
+                    hoveredSection = hovering ? section : nil
                 }
             }
+
+            Spacer(minLength: 0)
         }
-        .listStyle(.sidebar)
-        .frame(minWidth: 170, idealWidth: 190, maxWidth: 240)
+        .padding(.vertical, 12)
+        .frame(minWidth: 70, idealWidth: 76, maxWidth: 84, maxHeight: .infinity)
+        .navigationSplitViewColumnWidth(min: 70, ideal: 76, max: 84)
+        .animation(.easeOut(duration: 0.12), value: hoveredSection)
+        .animation(.easeOut(duration: 0.12), value: viewModel.section)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Workspace")
     }
 
-    private var selection: Binding<AppSection?> {
+    private func hoverPresentation(for section: AppSection) -> Binding<Bool> {
         Binding(
-            get: { viewModel.section },
-            set: { section in
-                guard let section else { return }
-                viewModel.section = section
+            get: { hoveredSection == section },
+            set: { presented in
+                if presented == false, hoveredSection == section {
+                    hoveredSection = nil
+                }
             }
         )
     }

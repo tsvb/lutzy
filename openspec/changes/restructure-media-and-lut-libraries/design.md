@@ -38,7 +38,7 @@ The requested screenshots demonstrate useful relationships—media beside the wo
 | LUT Manager | LUT Folders, Collections, and Starred | Existing table and bulk organisation/metadata actions |
 | LUT Editor | Existing LUT-oriented navigation | Existing editor |
 
-Workspace is global navigation. Media selection, LUT source selection, and Manager detail navigation are local navigation and never replace or re-highlight a Workspace destination.
+Workspace is global navigation. Its outermost column is a compact large-icon rail: the active destination remains visually distinct, while hover labels and accessibility labels expose the full destination names without permanently consuming horizontal space. Media selection, LUT source selection, and Manager detail navigation are local navigation and never replace or re-highlight a Workspace destination.
 
 ## Content Model
 
