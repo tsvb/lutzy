@@ -101,12 +101,12 @@ struct MediaLibraryView: View {
         .contextMenu(forSelectionType: MediaRecordID.self) { ids in
             if let id = ids.first, let record = viewModel.media.record(id) {
                 Button("Open in Viewer") { viewModel.openMedia(record) }
-                    .disabled(record.kind == .video)
+                    .disabled(record.canOpenInViewer == false)
             }
         } primaryAction: { ids in
             if let id = ids.first,
                let record = viewModel.media.record(id),
-               record.kind == .image {
+               record.canOpenInViewer {
                 viewModel.openMedia(record)
             }
         }
@@ -193,23 +193,23 @@ struct MediaLibraryView: View {
         .buttonStyle(.plain)
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             viewModel.media.selectedID = record.id
-            if record.kind == .image { viewModel.openMedia(record) }
+            if record.canOpenInViewer { viewModel.openMedia(record) }
         })
         .contextMenu {
             Button("Open in Viewer") { viewModel.openMedia(record) }
-                .disabled(record.kind == .video)
+                .disabled(record.canOpenInViewer == false)
         }
         .accessibilityLabel([
             record.displayName,
             disambiguator,
             record.kind == .image ? "Image" : "Video",
         ].compactMap { $0 }.joined(separator: ", "))
-        .accessibilityHint(record.kind == .image
+        .accessibilityHint(record.canOpenInViewer
             ? "Press to select. Use Open in Viewer to edit."
             : "Press to select. Video playback is not available.")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
 
-        if record.kind == .image {
+        if record.canOpenInViewer {
             card.accessibilityAction(named: Text("Open in Viewer")) {
                 viewModel.openMedia(record)
             }
@@ -245,7 +245,7 @@ struct MediaLibraryView: View {
             Text(record.displayName).font(.headline)
             Text(record.logicalPath).font(.caption).foregroundStyle(.secondary)
             Button("Open in Viewer") { viewModel.openMedia(record) }
-                .buttonStyle(.borderedProminent).disabled(record.kind == .video)
+                .buttonStyle(.borderedProminent).disabled(record.canOpenInViewer == false)
             Spacer()
         }
         .padding(18)
@@ -464,7 +464,7 @@ private struct MediaColumnsBrowser: View {
             Text(record.logicalPath).font(.caption).foregroundStyle(.secondary)
             Button("Open in Viewer") { viewModel.openMedia(record) }
                 .buttonStyle(.borderedProminent)
-                .disabled(record.kind == .video)
+                .disabled(record.canOpenInViewer == false)
             Spacer()
         }
         .padding(18)

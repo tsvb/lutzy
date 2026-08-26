@@ -307,6 +307,8 @@ func runDurableLibraryChecks() async -> Bool {
         let mediaOK = importResult.imported == 2
             && media.records.contains { $0.kind == .image }
             && media.records.contains { $0.kind == .video }
+            && media.records.first(where: { $0.kind == .image })?.canOpenInViewer == true
+            && media.records.first(where: { $0.kind == .video })?.canOpenInViewer == false
             && Set(relaunchedMedia.records.map(\.id)) == mediaIDs
             && relaunchedMedia.records.contains { $0.logicalPath == "Shoot/Day 1/frame.png" }
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")

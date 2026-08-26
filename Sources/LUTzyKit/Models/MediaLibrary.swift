@@ -43,6 +43,9 @@ struct MediaRecord: Identifiable, Codable, Sendable, Equatable {
     var isAvailable: Bool
 
     var url: URL { URL(fileURLWithPath: locator) }
+    /// Media Library owns both images and videos. The current Viewer is an
+    /// image workbench, so video remains browseable without claiming playback.
+    var canOpenInViewer: Bool { kind == .image }
     var logicalFolder: String {
         let value = (logicalPath as NSString).deletingLastPathComponent
         return value == "." ? "" : value

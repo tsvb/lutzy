@@ -79,7 +79,7 @@ extension AppViewModel {
             statusMessage = "\(record.displayName) is unavailable"
             return
         }
-        guard record.kind == .image else {
+        guard record.canOpenInViewer else {
             statusMessage = "Video browsing is available; playback is not included yet"
             return
         }

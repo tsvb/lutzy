@@ -26,9 +26,17 @@ Viewer SHALL place a Media chooser at the top of its secondary column and SHALL 
 - **WHEN** Viewer is active
 - **THEN** media and LUT sources are simultaneously reachable from the secondary column without opening another Viewer surface
 
+#### Scenario: Resize Viewer navigation sections
+- **WHEN** the user drags the divider between Media and LUT sources
+- **THEN** the Media and LUT regions resize continuously while both retain a usable minimum height
+
 #### Scenario: Select media
 - **WHEN** the user selects an image in the Viewer Media section
 - **THEN** the selected image becomes the active Viewer source while the LUT-source selection remains unchanged
+
+#### Scenario: Select a video record
+- **WHEN** the user selects an imported video in the Viewer Media section
+- **THEN** the record remains visibly selectable and is labelled as Video, while the current image workbench is not replaced and the application states that playback is not available yet
 
 #### Scenario: Select a LUT source
 - **WHEN** the user selects a Folder, Collection, or Starred source

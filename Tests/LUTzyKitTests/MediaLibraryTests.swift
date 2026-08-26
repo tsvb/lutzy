@@ -11,6 +11,20 @@ final class MediaLibraryTests: TempDirectoryTestCase {
         tempDirectory.appendingPathComponent("Managed", isDirectory: true)
     }
 
+    func testViewerCapabilityKeepsVideosBrowseableWithoutClaimingPlayback() {
+        func record(_ kind: MediaKind) -> MediaRecord {
+            MediaRecord(
+                id: MediaRecordID(), displayName: "Fixture", kind: kind,
+                logicalPath: kind == .image ? "frame.png" : "clip.mov",
+                locator: "/tmp/fixture", fingerprint: "fixture", byteCount: 1,
+                legacyOriginKey: nil, legacySourceName: nil, isAvailable: true
+            )
+        }
+
+        XCTAssertTrue(record(.image).canOpenInViewer)
+        XCTAssertFalse(record(.video).canOpenInViewer)
+    }
+
     func testMigratesEveryLegacyProjectWithCollidingNestedNamesIdempotently() throws {
         let projects = ProjectStore(root: tempDirectory.appendingPathComponent("Projects"))
         let alpha = projects.create(named: "Alpha")

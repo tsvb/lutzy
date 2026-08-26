@@ -39,6 +39,7 @@
 - [x] 4.2 Add Folders, Collections, and Starred source sections without listing individual LUTs in the folder tree
 - [x] 4.3 Remove the Viewer Images/Back toggle, `viewerSurface == .images` route, and obsolete List/Gallery preference
 - [x] 4.4 Keep the existing comparison region and LUT gallery mounted while media or LUT source changes
+- [x] 4.5 Make the Viewer Media/LUT divider draggable with usable minimum pane heights and keep video records visibly browseable without claiming playback
 
 ## 5. LUT sources and Collections
 

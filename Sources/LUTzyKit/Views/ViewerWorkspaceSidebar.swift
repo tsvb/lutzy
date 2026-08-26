@@ -6,23 +6,27 @@ struct ViewerWorkspaceSidebar: View {
     @ObservedObject var viewModel: AppViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
+        VSplitView {
             mediaSection
-                .frame(minHeight: 150, idealHeight: 230, maxHeight: 330)
-            Divider()
-            VStack(spacing: 0) {
-                HStack {
-                    Text("LUTs").font(.headline)
-                    Spacer()
-                    Text("\(viewModel.galleryLUTs.count)")
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                LUTSourceList(viewModel: viewModel, context: .viewer)
-            }
+                .frame(minHeight: 140, idealHeight: 270)
+            lutSection
+                .frame(minHeight: 220, idealHeight: 430)
         }
         .frame(minWidth: 220, idealWidth: 270, maxWidth: 390)
+    }
+
+    private var lutSection: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("LUTs").font(.headline)
+                Spacer()
+                Text("\(viewModel.galleryLUTs.count)")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            LUTSourceList(viewModel: viewModel, context: .viewer)
+        }
     }
 
     private var mediaSection: some View {
@@ -52,7 +56,9 @@ struct ViewerWorkspaceSidebar: View {
                                     mediaThumbnail(record)
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(record.displayName).lineLimit(1)
-                                        Text(record.kind == .video ? "Video" : (record.logicalFolder.isEmpty ? "Media Library" : record.logicalFolder))
+                                        Text(record.canOpenInViewer
+                                             ? (record.logicalFolder.isEmpty ? "Media Library" : record.logicalFolder)
+                                             : "Video · Browse only")
                                             .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                                     }
                                     Spacer()
@@ -64,6 +70,12 @@ struct ViewerWorkspaceSidebar: View {
                                             in: RoundedRectangle(cornerRadius: 5))
                             }
                             .buttonStyle(.plain)
+                            .help(record.canOpenInViewer
+                                  ? "Open \(record.displayName) in Viewer"
+                                  : "Video is saved in Media Library; playback is not available yet")
+                            .accessibilityHint(record.canOpenInViewer
+                                               ? "Opens this image in Viewer"
+                                               : "Selects this video. Playback is not available yet")
                         }
                     }
                     .padding(.horizontal, 7)

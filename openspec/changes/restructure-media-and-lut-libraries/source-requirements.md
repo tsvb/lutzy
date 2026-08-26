@@ -224,6 +224,13 @@ The Manager Inspector lists every visible Tag beside the selected LUT and provid
 >
 > 還有底下那行star, tag,move, remove 是不是跟右手邊重疊 那就免了吧？
 
+### 2026-08-27 — Resizable Viewer sidebar and video-ready Media
+
+The divider between Viewer's upper Media chooser and lower LUT source browser is draggable, with usable minimum heights on both sides. Media already accepts durable image and video records; Viewer keeps videos selectable and clearly labelled as browse-only while playback, scrubbing, LUT rendering, and video export remain deferred.
+
+> 這邊中間上下lut跟media的bar可不可以調整區間
+> 另外media可能未來會需要支援...video?
+
 ## Implementation contracts added after independent gate review
 
 These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.
@@ -279,6 +286,7 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-78ae362e-550f-4164-bcd7-fdb8d88ea733.png` | Complete Grid reached after opening one discovery shelf |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-40b37c6f-a2d9-4b28-b150-6f70fae57b69.png` | Fixed-sample LUT detail reached after activating one LUT; styling remains non-normative |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-de81a0d6-d025-4db0-8d9c-0208a953c3c2.png` | Manager Inspector terminology, visible Tag editing, and removal of the duplicated bottom action row |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-566f9aef-cb80-44df-aec3-6b84b70738ec.png` | Viewer secondary-column Media/LUT divider that should become vertically resizable |
 
 ## OpenSpec record map
 
