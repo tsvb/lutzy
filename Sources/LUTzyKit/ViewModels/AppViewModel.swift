@@ -178,7 +178,12 @@ final class AppViewModel: ObservableObject {
 
     /// How the preview area is divided. Stored here rather than in the
     /// extension because Swift extensions cannot hold stored properties.
-    @Published var comparisonLayout: ComparisonLayout = .split { didSet { scheduleSessionSave() } }
+    @Published var comparisonLayout: ComparisonLayout = .split {
+        didSet {
+            if comparisonLayout != .wipe { setViewerWipeFocused(false) }
+            scheduleSessionSave()
+        }
+    }
     /// One LUT reference per cell, in cell order. `nil` is a deliberate choice —
     /// the ungraded picture — not an empty slot.
     @Published var cellLUTIDs: [LUTID?] = []
@@ -328,6 +333,7 @@ final class AppViewModel: ObservableObject {
     }
     @Published var isShowingLibraryOriginal = false
     @Published private(set) var isLUTDetailFocused = false
+    @Published private(set) var isViewerWipeFocused = false
 
     var librarySamples: [LUTLibrarySample] { LUTLibrarySample.all }
     var selectedLibrarySample: LUTLibrarySample {
@@ -354,6 +360,9 @@ final class AppViewModel: ObservableObject {
             if oldValue == .viewer && section != .viewer && isShowingOriginal {
                 isShowingOriginal = false
                 schedulePreview(refreshGallery: false)
+            }
+            if oldValue == .viewer && section != .viewer {
+                setViewerWipeFocused(false)
             }
             if oldValue == .lutLibrary && section != .lutLibrary {
                 setLUTDetailFocused(false)
@@ -1427,6 +1436,10 @@ final class AppViewModel: ObservableObject {
     func setLUTDetailFocused(_ focused: Bool) {
         isLUTDetailFocused = focused
         if focused == false { isShowingLibraryOriginal = false }
+    }
+
+    func setViewerWipeFocused(_ focused: Bool) {
+        isViewerWipeFocused = focused && section == .viewer && comparisonLayout == .wipe
     }
 
     /// The V shortcut. With seven layouts a boolean toggle is no longer the

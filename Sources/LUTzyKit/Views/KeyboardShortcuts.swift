@@ -107,10 +107,12 @@ final class KeyMonitor {
             return nil
         case 123: // Left arrow — previous image
             guard vm.section == .viewer, vm.collection.isActive else { return event }
+            if vm.isViewerWipeFocused { return event }
             if isDown { vm.selectPreviousImage() }
             return nil
         case 124: // Right arrow — next image
             guard vm.section == .viewer, vm.collection.isActive else { return event }
+            if vm.isViewerWipeFocused { return event }
             if isDown { vm.selectNextImage() }
             return nil
         default:

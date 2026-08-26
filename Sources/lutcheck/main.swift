@@ -1429,6 +1429,21 @@ let baseSet = ComparisonLayout.allCases.filter(\.hasChosenBase)
 let baseOK = baseSet == [.compare, .wipe, .diff]
 layoutOK = layoutOK && baseOK
 print("layout chosen-base family -> \(baseOK ? "PASS" : "FAIL")")
+
+let focusVM = AppViewModel()
+focusVM.section = .viewer
+focusVM.setLayout(.wipe)
+focusVM.setViewerWipeFocused(true)
+let focusedWipeOK = focusVM.isViewerWipeFocused
+focusVM.setLayout(.split)
+let layoutClearsFocusOK = focusVM.isViewerWipeFocused == false
+focusVM.setLayout(.wipe)
+focusVM.setViewerWipeFocused(true)
+focusVM.section = .mediaLibrary
+let workspaceClearsFocusOK = focusVM.isViewerWipeFocused == false
+let wipeFocusOK = focusedWipeOK && layoutClearsFocusOK && workspaceClearsFocusOK
+layoutOK = layoutOK && wipeFocusOK
+print("layout wipe focus owns arrows only while visible -> \(wipeFocusOK ? "PASS" : "FAIL")")
 print("layouts -> \(layoutOK ? "PASS" : "FAIL")")
 
 

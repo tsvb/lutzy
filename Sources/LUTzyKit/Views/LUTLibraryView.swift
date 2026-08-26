@@ -50,6 +50,13 @@ private struct LUTLibraryDetailView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .focusable()
                     .focused($comparisonFocused)
+                    .onMoveCommand { direction in
+                        switch direction {
+                        case .left: adjustSplit(by: -0.05)
+                        case .right: adjustSplit(by: 0.05)
+                        default: break
+                        }
+                    }
                     .onChange(of: comparisonFocused) { _, focused in
                         viewModel.setLUTDetailFocused(focused)
                     }
@@ -141,7 +148,8 @@ private struct LUTLibraryDetailView: View {
                 if let rendered {
                     // Keep comparison semantics consistent with Viewer:
                     // Before is always on the left and After is on the right.
-                    Image(nsImage: rendered.graded)
+                    Image(nsImage: viewModel.isShowingLibraryOriginal
+                          ? rendered.original : rendered.graded)
                         .resizable().scaledToFit()
                         .frame(width: geo.size.width, height: geo.size.height)
                     if viewModel.isShowingLibraryOriginal == false {
@@ -186,7 +194,29 @@ private struct LUTLibraryDetailView: View {
                 .padding(12)
             }
             .help("Drag to compare. Hold Space to show the complete original.")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Before and After comparison")
+            .accessibilityValue(comparisonAccessibilityValue)
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: adjustSplit(by: 0.05)
+                case .decrement: adjustSplit(by: -0.05)
+                @unknown default: break
+                }
+            }
         }
+    }
+
+    private var comparisonAccessibilityValue: String {
+        if viewModel.isShowingLibraryOriginal {
+            return "Before, 100 percent"
+        }
+        return "Before \(Int(split * 100)) percent, After \(Int((1 - split) * 100)) percent"
+    }
+
+    private func adjustSplit(by amount: Double) {
+        comparisonFocused = true
+        split = min(max(split + amount, 0), 1)
     }
 
     private func comparisonLabel(_ text: String) -> some View {

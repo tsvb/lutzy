@@ -142,6 +142,10 @@ LUT detail SHALL compare the original and LUT-rendered result in one aligned lar
 - **WHEN** the user drags the Before/After divider left or right
 - **THEN** the visible proportion changes while both sides remain pixel-aligned to the same sample image
 
+#### Scenario: Adjust comparison without a pointer
+- **WHEN** the focused divider receives Left or Right or an assistive-technology increment or decrement action
+- **THEN** the split moves in bounded steps and announces the visible Before and After proportions
+
 #### Scenario: Hold Space
 - **WHEN** the user holds Space while LUT detail has focus
 - **THEN** the preview temporarily shows the complete original image and restores the prior LUT comparison and split position on release

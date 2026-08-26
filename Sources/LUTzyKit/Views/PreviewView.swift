@@ -7,6 +7,7 @@ struct PreviewView: View {
 
     /// Where the wipe's edge sits, as a fraction of the width.
     @State private var wipePosition: CGFloat = 0.5
+    @FocusState private var wipeFocused: Bool
 
     private let bgColor = Color(nsColor: NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1))
 
@@ -141,9 +142,32 @@ struct PreviewView: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
+                                wipeFocused = true
                                 wipePosition = min(max(value.location.x / geo.size.width, 0), 1)
                             }
                     )
+                    .focusable()
+                    .focused($wipeFocused)
+                    .onChange(of: wipeFocused) { _, focused in
+                        viewModel.setViewerWipeFocused(focused)
+                    }
+                    .onMoveCommand { direction in
+                        switch direction {
+                        case .left: adjustWipe(by: -0.05)
+                        case .right: adjustWipe(by: 0.05)
+                        default: break
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Before and After divider")
+                    .accessibilityValue(wipeAccessibilityValue)
+                    .accessibilityAdjustableAction { direction in
+                        switch direction {
+                        case .increment: adjustWipe(by: 0.05)
+                        case .decrement: adjustWipe(by: -0.05)
+                        @unknown default: break
+                        }
+                    }
 
                 HStack {
                     CompareBaseMenu(
@@ -158,6 +182,18 @@ struct PreviewView: View {
             }
         }
         .padding(8)
+        .onDisappear {
+            viewModel.setViewerWipeFocused(false)
+        }
+    }
+
+    private var wipeAccessibilityValue: String {
+        "Before \(Int(wipePosition * 100)) percent, After \(Int((1 - wipePosition) * 100)) percent"
+    }
+
+    private func adjustWipe(by amount: CGFloat) {
+        wipeFocused = true
+        wipePosition = min(max(wipePosition + amount, 0), 1)
     }
 
     // MARK: - Difference

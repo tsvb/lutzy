@@ -32,6 +32,26 @@ final class AppViewModelTests: TempDirectoryTestCase {
         XCTAssertFalse(viewModel.isShowingOriginal)
     }
 
+    func testViewerWipeFocusOwnsArrowsOnlyWhileTheHandleIsFocused() {
+        let viewModel = AppViewModel(engine: FakeRenderEngine())
+        viewModel.section = .viewer
+        viewModel.setLayout(.wipe)
+
+        viewModel.setViewerWipeFocused(true)
+        XCTAssertTrue(viewModel.isViewerWipeFocused)
+
+        viewModel.setLayout(.split)
+        XCTAssertFalse(viewModel.isViewerWipeFocused)
+
+        viewModel.setLayout(.wipe)
+        viewModel.setViewerWipeFocused(true)
+        viewModel.section = .mediaLibrary
+        XCTAssertFalse(viewModel.isViewerWipeFocused)
+
+        viewModel.setViewerWipeFocused(true)
+        XCTAssertFalse(viewModel.isViewerWipeFocused, "hidden Viewer controls cannot claim focus")
+    }
+
     func testCreatingCollectionFromManagerSelectionCapturesExactlyThoseRecords() throws {
         let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("collection-catalog.json"))
         let firstURL = try Fixtures.writeCube(
