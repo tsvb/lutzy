@@ -64,6 +64,10 @@ final class LUTLibrary: ObservableObject {
     /// move to a different folder or the library goes away.
     private var scopedURL: URL?
     private var scanTask: Task<Void, Never>?
+    /// All writers target the same managed folder. Keep their read-deduplicate-
+    /// choose-name-write transaction in one queue so two quick drops cannot
+    /// both claim the same free filename and overwrite one another.
+    private static let importQueue = LUTImportQueue()
 
     deinit {
         scopedURL?.stopAccessingSecurityScopedResource()
@@ -166,7 +170,7 @@ final class LUTLibrary: ObservableObject {
     /// doing nothing.
     func importLUTs(from urls: [URL]) async -> ImportResult {
         let destination = Self.managedFolder
-        let result = await Task.detached { Self.copyIn(urls, to: destination) }.value
+        let result = await Self.importQueue.copyIn(urls, to: destination)
         if isManaged {
             scan(destination)
         } else {
@@ -459,5 +463,22 @@ final class LUTLibrary: ObservableObject {
                 : "No .cube files in “\(folder.lastPathComponent)”.")
         }
         return .success(cats)
+    }
+}
+
+/// Serialises the filesystem transaction while retaining detached I/O. The
+/// actor records a predecessor before suspending, so reentrant calls join the
+/// tail instead of starting a competing snapshot of the managed folder.
+actor LUTImportQueue {
+    private var tail: Task<Void, Never>?
+
+    func copyIn(_ urls: [URL], to destination: URL) async -> LUTLibrary.ImportResult {
+        let predecessor = tail
+        let work = Task.detached(priority: .userInitiated) {
+            await predecessor?.value
+            return LUTLibrary.copyIn(urls, to: destination)
+        }
+        tail = Task { _ = await work.value }
+        return await work.value
     }
 }

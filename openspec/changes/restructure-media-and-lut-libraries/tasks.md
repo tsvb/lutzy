@@ -74,3 +74,4 @@
 - [x] 8.8 Audit the supplied real LUT corpus, reject unsupported `.cube` imports before copying, and validate the running Gallery and Manager with a curated 400+ LUT hierarchy
 - [x] 8.9 Add complete visible measured-tag buckets, versioned remeasurement, and preservation checks for user-authored Tags
 - [x] 8.10 Add same-input-space post-import similarity review with confidence floor, explanations, exact-duplicate exclusion, and no metadata side effects
+- [x] 8.11 Serialize process-wide Library writes and each window's complete import-to-review pipeline, with concurrent same-name coverage

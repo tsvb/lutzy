@@ -224,3 +224,7 @@ After importing one or more new LUTs, the application SHALL offer a local review
 #### Scenario: Review without metadata mutation
 - **WHEN** similarity recommendations are generated or dismissed
 - **THEN** LUT filenames, physical folders, origin, user Tags, Collections, and Starred state remain unchanged
+
+#### Scenario: Import two batches back to back
+- **WHEN** two file or folder imports are submitted before the first batch has finished scanning and measuring
+- **THEN** the application serializes each complete import pipeline, preserves distinct same-name LUTs under unique managed filenames, reports truthful tallies, and retains both batches of recommendations until the user dismisses or inspects them

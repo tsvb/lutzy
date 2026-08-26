@@ -683,6 +683,34 @@ do {
     let clashOK = clashed.imported == 1 && atRoot.contains("a.cube")
     print("import a name clash -> \(atRoot) -> \(clashOK ? "PASS" : "FAIL")")
 
+    // Two UI drops may arrive before the first copy finishes. The Library's
+    // queue must make the whole deduplicate/name/write transaction serial, so
+    // distinct LUTs with the same basename both survive and both tallies stay
+    // truthful.
+    let concurrentA = root.appendingPathComponent("concurrent-a")
+    let concurrentB = root.appendingPathComponent("concurrent-b")
+    let concurrentLibrary = root.appendingPathComponent("concurrent-library")
+    try? FileManager.default.createDirectory(at: concurrentA, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: concurrentB, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: concurrentLibrary, withIntermediateDirectories: true)
+    writeCube(concurrentA.appendingPathComponent("same.cube"), white: 0.61)
+    writeCube(concurrentB.appendingPathComponent("same.cube"), white: 0.73)
+    let queue = LUTImportQueue()
+    async let queuedFirst = queue.copyIn(
+        [concurrentA.appendingPathComponent("same.cube")], to: concurrentLibrary
+    )
+    async let queuedSecond = queue.copyIn(
+        [concurrentB.appendingPathComponent("same.cube")], to: concurrentLibrary
+    )
+    let (concurrentFirst, concurrentSecond) = await (queuedFirst, queuedSecond)
+    let concurrentNames = (try? FileManager.default.contentsOfDirectory(
+        atPath: concurrentLibrary.path
+    ))?.sorted() ?? []
+    let concurrentOK = concurrentFirst.imported + concurrentSecond.imported == 2
+        && concurrentFirst.failed + concurrentSecond.failed == 0
+        && concurrentNames == ["same 2.cube", "same.cube"]
+    print("concurrent imports keep both same-name LUTs -> \(concurrentNames) -> \(concurrentOK ? "PASS" : "FAIL")")
+
     // Anything that is not a cube is reported rather than silently dropped.
     let junk = root.appendingPathComponent("notes.txt")
     try? "hello".write(to: junk, atomically: true, encoding: .utf8)
@@ -720,7 +748,7 @@ do {
         && AppViewModel.importSummary(LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 0)) == "Nothing to import"
     print("import summary -> \(summaryOK ? "PASS" : "FAIL")")
 
-    importOK = folderOK && repeatOK && clashOK && junkOK && rejectedOK
+    importOK = folderOK && repeatOK && clashOK && concurrentOK && junkOK && rejectedOK
         && summaryOK && deepOK && deepRepeatOK
 }
 print("import -> \(importOK ? "PASS" : "FAIL")")

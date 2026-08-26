@@ -270,6 +270,10 @@ final class AppViewModel: ObservableObject {
     /// The current content-metric pass. Import review awaits the scan-owned
     /// pass instead of launching a second full-library measurement.
     private var tagIndexTask: Task<Void, Never>?
+    /// One window owns one complete import pipeline. Serialising only the file
+    /// copy is insufficient: a later scan can cancel an earlier scan before it
+    /// has identified and measured the LUTs needed by its review.
+    private var lutImportPipelineTail: Task<Void, Never>?
 
     @Published var isLoading: Bool = false
     @Published var statusMessage: String = "Open an image to get started"
@@ -1649,29 +1653,54 @@ final class AppViewModel: ObservableObject {
 
     /// The same import, for a drop.
     func importLUTs(from urls: [URL]) {
-        statusMessage = "Importing LUTs…"
-        Task {
-            let result = await library.importLUTs(from: urls)
-            await library.scanCompletion()
-            let importedPaths = Set(result.importedURLs.map {
-                $0.standardizedFileURL.resolvingSymlinksInPath().path
-            })
-            let imported = library.allLUTs.filter {
-                importedPaths.contains($0.url.standardizedFileURL.resolvingSymlinksInPath().path)
-            }
-
-            // The scan owns one full-library index pass. Await that exact task
-            // rather than racing it with a duplicate measurement pass.
-            await tagIndexTask?.value
-            statusMessage = Self.importSummary(result)
-            if imported.isEmpty == false {
-                lutImportReview = makeImportReview(
-                    imported: imported,
-                    excludingPaths: importedPaths,
-                    result: result
-                )
-            }
+        let predecessor = lutImportPipelineTail
+        let work = Task { [weak self] in
+            await predecessor?.value
+            guard let self else { return }
+            await self.performLUTImport(from: urls)
         }
+        lutImportPipelineTail = work
+    }
+
+    private func performLUTImport(from urls: [URL]) async {
+        statusMessage = "Importing LUTs…"
+        let result = await library.importLUTs(from: urls)
+        await library.scanCompletion()
+        let importedPaths = Set(result.importedURLs.map {
+            $0.standardizedFileURL.resolvingSymlinksInPath().path
+        })
+        let imported = library.allLUTs.filter {
+            importedPaths.contains($0.url.standardizedFileURL.resolvingSymlinksInPath().path)
+        }
+
+        // The scan owns one full-library index pass. Await that exact task
+        // rather than racing it with a duplicate measurement pass.
+        await tagIndexTask?.value
+        statusMessage = Self.importSummary(result)
+        if imported.isEmpty == false {
+            presentImportReview(makeImportReview(
+                imported: imported,
+                excludingPaths: importedPaths,
+                result: result
+            ))
+        }
+    }
+
+    /// A second queued import may finish while the first review sheet is still
+    /// open. Preserve both batches instead of replacing the user's first set
+    /// of recommendations before it can be inspected.
+    private func presentImportReview(_ review: LUTImportReview) {
+        guard let pending = lutImportReview else {
+            lutImportReview = review
+            return
+        }
+        lutImportReview = LUTImportReview(
+            imported: pending.imported + review.imported,
+            duplicates: pending.duplicates + review.duplicates,
+            failed: pending.failed + review.failed,
+            comparedAgainst: max(pending.comparedAgainst, review.comparedAgainst),
+            recommendations: pending.recommendations + review.recommendations
+        )
     }
 
     private func makeImportReview(

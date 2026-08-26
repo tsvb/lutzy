@@ -70,7 +70,7 @@ struct LUTImportReviewView: View {
                 HStack(spacing: 5) {
                     Text(item.inputSpace == .vlog ? "V-Log" : "Display")
                     Text("·")
-                    Text(item.matches.isEmpty ? "No clear match" : "(item.matches.count) similar")
+                    Text(item.matches.isEmpty ? "No clear match" : "\(item.matches.count) similar")
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
