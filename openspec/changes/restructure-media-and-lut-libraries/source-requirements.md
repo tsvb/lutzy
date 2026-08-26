@@ -54,7 +54,8 @@ This file preserves the user's original intent and the evolution of decisions be
 13. LUT Library samples are fixed built-in app assets. Users do not add or manage Library samples through Media Library; personal-image testing remains in Viewer.
 14. The built-in set contains four images: skin-tone portrait, outdoor sky/foliage, indoor mixed light, and saturated objects with neutral references.
 15. LUT detail uses a vertically divided Before/After image with a horizontally draggable split. Holding Space temporarily shows the complete original and release restores the comparison.
-16. Gallery cards show at most three Tags. User-authored Tags take priority, then measured Tags fill remaining positions; each group uses stable alphabetical order and users do not manage a separate card-display order.
+16. Across Viewer and LUT Library comparisons, Before stays on the left and After stays on the right.
+17. Gallery cards show at most three Tags. User-authored Tags take priority, then measured Tags fill remaining positions; each group uses stable alphabetical order and users do not manage a separate card-display order.
 
 ### Colour consistency
 
@@ -251,6 +252,7 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5d49264b-f669-4619-a06a-638252e97e46.png` | Consolidated Gallery-card metadata request |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5411ffd7-3444-4663-a8b9-ec10b4e680ac.png` | Reference for the now-resolved split between visual display and management |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-d7b694ea-8224-471d-a234-1e01f4c58459.png` | Finder Icon View reference clarifying Media Library Grid density and thumbnail treatment |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-4756ca78-8bce-4996-8f1e-4d8723189751.png` | Clarifies the global comparison convention: After is always on the right |
 
 ## OpenSpec record map
 

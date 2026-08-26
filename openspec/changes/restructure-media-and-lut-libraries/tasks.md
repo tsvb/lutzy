@@ -61,6 +61,7 @@
 - [x] 7.3 Render Gallery/detail from an isolated neutral 100%-intensity Library baseline through the production RenderEngine
 - [x] 7.4 Build LUT detail with sample thumbnails, a draggable vertical Before/After split, hold-Space original, and complete metadata
 - [x] 7.5 Restore LUT Library source, selection, sample, and Gallery scroll context on Back
+- [x] 7.6 Keep Before on the left and After on the right across Viewer and LUT Library comparisons
 
 ## 8. Verification
 

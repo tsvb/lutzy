@@ -139,11 +139,13 @@ private struct LUTLibraryDetailView: View {
             ZStack(alignment: .leading) {
                 Color.black.opacity(0.9)
                 if let rendered {
-                    Image(nsImage: rendered.original)
+                    // Keep comparison semantics consistent with Viewer:
+                    // Before is always on the left and After is on the right.
+                    Image(nsImage: rendered.graded)
                         .resizable().scaledToFit()
                         .frame(width: geo.size.width, height: geo.size.height)
                     if viewModel.isShowingLibraryOriginal == false {
-                        Image(nsImage: rendered.graded)
+                        Image(nsImage: rendered.original)
                             .resizable().scaledToFit()
                             .frame(width: geo.size.width, height: geo.size.height)
                             .mask(alignment: .leading) {
@@ -173,15 +175,25 @@ private struct LUTLibraryDetailView: View {
                     split = min(max(value.location.x / max(geo.size.width, 1), 0), 1)
                 }
             )
-            .overlay(alignment: .topLeading) {
-                Text(viewModel.isShowingLibraryOriginal ? "Original" : "After  ·  Before")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 8).padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .padding(12)
+            .overlay(alignment: .top) {
+                HStack {
+                    comparisonLabel("Before")
+                    Spacer()
+                    if viewModel.isShowingLibraryOriginal == false {
+                        comparisonLabel("After")
+                    }
+                }
+                .padding(12)
             }
             .help("Drag to compare. Hold Space to show the complete original.")
         }
+    }
+
+    private func comparisonLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(.ultraThinMaterial, in: Capsule())
     }
 
     private var sampleStrip: some View {

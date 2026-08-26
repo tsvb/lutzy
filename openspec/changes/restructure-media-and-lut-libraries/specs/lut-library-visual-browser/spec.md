@@ -132,7 +132,11 @@ Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fi
 - **THEN** LUT Library restores the originating Gallery source, selection, and scroll context
 
 ### Requirement: Draggable Before/After comparison
-LUT detail SHALL compare the original and LUT-rendered result in one aligned large preview using a vertically divided image with a horizontally draggable split position.
+LUT detail SHALL compare the original and LUT-rendered result in one aligned large preview using a vertically divided image with a horizontally draggable split position. Before SHALL remain on the left and After SHALL remain on the right, matching Viewer comparison orientation.
+
+#### Scenario: Read comparison direction
+- **WHEN** LUT detail shows both sides of the selected sample
+- **THEN** the original Before image and label appear on the left and the LUT-rendered After image and label appear on the right
 
 #### Scenario: Drag comparison split
 - **WHEN** the user drags the Before/After divider left or right
