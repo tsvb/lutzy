@@ -11,9 +11,14 @@ struct LUTManagerSelectionState: Equatable {
     let commonOrigin: LUTOrigin?
     let allStarred: Bool
 
-    init(records: [LUTRecord]) {
+    init(
+        records: [LUTRecord],
+        visibleTagsByRecordID: [LUTRecordID: Set<String>] = [:]
+    ) {
         recordIDs = Set(records.map(\.id))
-        let tagSets = records.map { Set($0.typedTags) }
+        let tagSets = records.map { record in
+            visibleTagsByRecordID[record.id] ?? Set(record.typedTags)
+        }
         let common = tagSets.dropFirst().reduce(tagSets.first ?? []) { $0.intersection($1) }
         let union = tagSets.reduce(into: Set<String>()) { $0.formUnion($1) }
         commonTags = common.sorted()
@@ -42,8 +47,6 @@ struct LibraryManagerView: View {
     @ObservedObject var viewModel: AppViewModel
 
     @State private var selection: Set<LUTID> = []
-    @State private var isTagging = false
-    @State private var isMoving = false
     @State private var newTag = ""
     @State private var newFolder = ""
     @State private var displayName = ""
@@ -57,8 +60,8 @@ struct LibraryManagerView: View {
             switch self {
             case .mixed: return "Mixed"
             case .unknown: return "Unknown"
-            case .vendor: return "Vendor"
-            case .custom: return "Custom"
+            case .vendor: return "Brand"
+            case .custom: return "Self-made"
             }
         }
     }
@@ -72,7 +75,12 @@ struct LibraryManagerView: View {
     private var selectedIDs: Set<LUTID> { Set(selected.map(\.lutID)) }
 
     private var selectionState: LUTManagerSelectionState {
-        LUTManagerSelectionState(records: selected.compactMap(viewModel.catalog.record(for:)))
+        LUTManagerSelectionState(
+            records: selected.compactMap(viewModel.catalog.record(for:)),
+            visibleTagsByRecordID: Dictionary(uniqueKeysWithValues: selected.map {
+                ($0.lutID, Set(viewModel.allTags(for: $0).filter { $0.hasPrefix("input:") == false }))
+            })
+        )
     }
 
     var body: some View {
@@ -152,36 +160,7 @@ struct LibraryManagerView: View {
             }
             .tableStyle(.inset)
 
-            Divider()
-            actionBar
         }
-        .sheet(isPresented: $isTagging) { tagSheet }
-        .sheet(isPresented: $isMoving) { moveSheet }
-    }
-
-    /// Actions for the selection, disabled rather than hidden when nothing is
-    /// selected — so it is obvious that selecting is what makes them work.
-    private var actionBar: some View {
-        HStack(spacing: 10) {
-            Text(selection.isEmpty ? "\(rows.count) LUTs" : "\(selection.count) selected")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            // Only the buttons dim: the count is still worth reading with
-            // nothing selected, and dimming the whole bar would hide it.
-            Group {
-                Button("Star") { viewModel.setFavourite(selected) }
-                Button("Tag…") { newTag = ""; isTagging = true }
-                Button("Move…") { newFolder = ""; isMoving = true }
-                Button("Remove", role: .destructive) { viewModel.remove(selected) }
-            }
-            .disabled(selection.isEmpty)
-            .buttonStyle(.bordered)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
     }
 
     private var metadataInspector: some View {
@@ -197,7 +176,7 @@ struct LibraryManagerView: View {
                 if selection.isEmpty {
                     ContentUnavailableView(
                         "Select LUTs", systemImage: "slider.horizontal.3",
-                        description: Text("Edit names, origin, Tags, Starred, and Collections here.")
+                        description: Text("Edit Name, Brand / Source, Tags, folders, Starred, and Collections here.")
                     )
                     .frame(maxWidth: .infinity)
                 } else {
@@ -212,6 +191,8 @@ struct LibraryManagerView: View {
                     folderSection
                     Divider()
                     starredSection
+                    Divider()
+                    removeSection
                     Text("Transform and colour changes belong in LUT Editor.")
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
@@ -223,7 +204,7 @@ struct LibraryManagerView: View {
 
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Display Name").font(.subheadline.weight(.semibold))
+            Text("Name").font(.subheadline.weight(.semibold))
             TextField(selection.count == 1 ? "Uses filename when empty" : "Available for one LUT", text: $displayName)
                 .textFieldStyle(.roundedBorder)
                 .disabled(selection.count != 1)
@@ -245,8 +226,8 @@ struct LibraryManagerView: View {
 
     private var originSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Origin").font(.subheadline.weight(.semibold))
-            Picker("Origin", selection: $originChoice) {
+            Text("Brand / Source").font(.subheadline.weight(.semibold))
+            Picker("Brand / Source", selection: $originChoice) {
                 ForEach(OriginChoice.allCases, id: \.self) { choice in
                     Text(choice.label).tag(choice)
                 }
@@ -257,37 +238,36 @@ struct LibraryManagerView: View {
                 commitOrigin()
             }
             if originChoice == .vendor {
-                TextField("Vendor name", text: $vendorName)
+                TextField("Brand name", text: $vendorName)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(commitOrigin)
-                Button("Apply Vendor", action: commitOrigin).buttonStyle(.bordered)
+                Button("Apply Brand", action: commitOrigin).buttonStyle(.bordered)
             }
+            Text("Used for Brand browsing; it does not change the LUT file.")
+                .font(.caption2).foregroundStyle(.tertiary)
         }
     }
 
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Tags").font(.subheadline.weight(.semibold))
-            if commonTypedTags.isEmpty == false || mixedTypedTags.isEmpty == false {
+            if commonVisibleTags.isEmpty == false || mixedVisibleTags.isEmpty == false {
                 FlowLayout(spacing: 5, lineSpacing: 5) {
-                    ForEach(commonTypedTags, id: \.self) { tag in
-                        Button { viewModel.catalog.removeTag(tag, from: selectedIDs) } label: {
+                    ForEach(commonVisibleTags, id: \.self) { tag in
+                        Button { viewModel.removeTag(tag, from: selected) } label: {
                             Label(tag, systemImage: "xmark").labelStyle(.titleAndIcon)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .help("Remove from selection")
                     }
-                    ForEach(mixedTypedTags, id: \.self) { tag in
-                        Button { viewModel.catalog.addTag(tag, to: selectedIDs) } label: {
-                            Text("\(tag) —")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .foregroundStyle(.secondary)
-                        .help("Present on part of the selection; click to add to all")
+                    ForEach(mixedVisibleTags, id: \.self) { tag in
+                        mixedTagChip(tag)
                     }
                 }
+            } else {
+                Text("No Tags")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             HStack {
                 TextField("Add Tag", text: $newTag)
@@ -298,6 +278,37 @@ struct LibraryManagerView: View {
                     .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
+    }
+
+    private func mixedTagChip(_ tag: String) -> some View {
+        HStack(spacing: 5) {
+            Text(tag)
+                .foregroundStyle(.secondary)
+            Text("Mixed")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            Button {
+                viewModel.addTag(tag, to: selected)
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add \(tag) to all selected LUTs")
+            .help("Add to all selected LUTs")
+            Button {
+                viewModel.removeTag(tag, from: selected)
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(tag) from selected LUTs")
+            .help("Remove from every selected LUT that has this Tag")
+        }
+        .font(.caption)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.08), in: Capsule())
+        .accessibilityElement(children: .contain)
     }
 
     private var collectionsSection: some View {
@@ -369,27 +380,53 @@ struct LibraryManagerView: View {
                 Text(inspectorFolder.isEmpty ? "Library root" : inspectorFolder)
                     .font(.caption2).foregroundStyle(.tertiary)
             } else {
-                Text("Select one LUT to change its physical folder. Use Move for batch changes.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Picker("Folder", selection: $newFolder) {
+                    Text("Top Level").tag("")
+                    ForEach(viewModel.library.categoryNames, id: \.self) { folder in
+                        Text(folder).tag(folder)
+                    }
+                }
+                TextField("or enter a new folder", text: $newFolder)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(commitMove)
+                Button("Move \(selection.count) LUTs", action: commitMove)
+                    .buttonStyle(.bordered)
             }
         }
     }
 
-    private var commonTypedTags: [String] {
+    private var removeSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Library").font(.subheadline.weight(.semibold))
+                Text("Moves managed LUT files to the Trash.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(selection.count == 1 ? "Remove LUT" : "Remove \(selection.count) LUTs", role: .destructive) {
+                viewModel.remove(selected)
+                selection.removeAll()
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private var commonVisibleTags: [String] {
         selectionState.commonTags
     }
 
-    private var mixedTypedTags: [String] {
+    private var mixedVisibleTags: [String] {
         selectionState.mixedTags
     }
 
     private func refreshInspectorDrafts() {
         guard let first = selected.first else {
-            displayName = ""; originChoice = .unknown; vendorName = ""; inspectorFolder = ""; return
+            displayName = ""; originChoice = .unknown; vendorName = ""; inspectorFolder = ""; newFolder = ""; return
         }
         displayName = selected.count == 1
             ? (viewModel.catalog.record(for: first)?.displayNameOverride ?? "") : ""
         inspectorFolder = selected.count == 1 ? (selectedRows.first?.category ?? "") : ""
+        newFolder = ""
         guard let origin = selectionState.commonOrigin else {
             originChoice = .mixed; vendorName = ""; return
         }
@@ -424,58 +461,8 @@ struct LibraryManagerView: View {
         newTag = ""
     }
 
-    private var tagSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Tag \(selected.count) LUT\(selected.count == 1 ? "" : "s")")
-                .font(.headline)
-            TextField("e.g. 日系, 婚禮", text: $newTag)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(commitTag)
-            HStack {
-                Spacer()
-                Button("Cancel") { isTagging = false }
-                Button("Add") { commitTag() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(16)
-        .frame(width: 320)
-    }
-
-    private var moveSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Move \(selected.count) LUT\(selected.count == 1 ? "" : "s")")
-                .font(.headline)
-            Picker("Folder", selection: $newFolder) {
-                Text("Top Level").tag("")
-                ForEach(viewModel.library.categoryNames, id: \.self) { name in
-                    Text(name).tag(name)
-                }
-            }
-            TextField("or a new folder", text: $newFolder)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(commitMove)
-            HStack {
-                Spacer()
-                Button("Cancel") { isMoving = false }
-                Button("Move") { commitMove() }
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(16)
-        .frame(width: 340)
-    }
-
-    private func commitTag() {
-        let tag = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard tag.isEmpty == false else { return }
-        viewModel.addTag(tag, to: selected)
-        isTagging = false
-    }
-
     private func commitMove() {
         viewModel.move(selected, toCategory: newFolder.trimmingCharacters(in: .whitespacesAndNewlines))
-        isMoving = false
+        newFolder = ""
     }
 }

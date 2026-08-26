@@ -246,7 +246,7 @@ struct LUTSidebar: View {
     /// back. Typed ones are the user's, and are the only ones that can go.
     @ViewBuilder
     private func tagMenu(for lut: CubeLUT) -> some View {
-        let measured = viewModel.measuredTags(for: lut)
+        let measured = viewModel.visibleMeasuredTags(for: lut)
         let typed = viewModel.typedTags(for: lut)
 
         Button("Add Tag…") {

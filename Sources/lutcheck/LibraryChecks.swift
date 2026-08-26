@@ -31,14 +31,55 @@ func runDurableLibraryChecks() async -> Bool {
         catalog.addTag("soft", to: [firstID])
         catalog.setOrigin(.custom, for: [firstID])
         catalog.setStarred(true, for: [firstID])
+        catalog.removeTag("persisted-auto", from: [firstID], hidingMeasuredFor: [firstID])
 
         let relaunchedCatalog = LUTCatalog(fileURL: catalogURL)
         let catalogOK = relaunchedCatalog.members(of: collection.id) == Set([firstID, secondID])
             && relaunchedCatalog.record(for: firstID)?.typedTags == ["soft"]
             && relaunchedCatalog.record(for: firstID)?.origin == .custom
             && relaunchedCatalog.record(for: firstID)?.isStarred == true
+            && relaunchedCatalog.excludedMeasuredTags(for: firstID) == ["persisted-auto"]
             && relaunchedCatalog.loadLUT(for: firstID)?.lutID == firstID
         print("durable LUT catalog -> \(catalogOK ? "PASS" : "FAIL")")
+
+        relaunchedCatalog.removeTag(
+            "mixed-auto", from: [firstID, secondID], hidingMeasuredFor: [firstID]
+        )
+        let mixedSelectionTagOK = relaunchedCatalog.excludedMeasuredTags(for: firstID)
+                == ["mixed-auto", "persisted-auto"]
+            && relaunchedCatalog.excludedMeasuredTags(for: secondID).isEmpty
+            && (relaunchedCatalog.record(for: firstID)?.typedTags.contains("mixed-auto") ?? true) == false
+            && (relaunchedCatalog.record(for: secondID)?.typedTags.contains("mixed-auto") ?? true) == false
+        relaunchedCatalog.addTag("mixed-auto", to: [firstID, secondID])
+        relaunchedCatalog.removeTag("mixed-auto", from: [firstID, secondID])
+        print("Manager mixed Tag batch-remove does not add to absent LUTs -> \(mixedSelectionTagOK ? "PASS" : "FAIL")")
+
+        let metadataTagStore = LUTTagStore(fileURL: root.appendingPathComponent("metadata-tags.json"))
+        let durableFirst = first.withRecordID(firstID)
+        metadataTagStore.indexNow([durableFirst])
+        let measuredTag = metadataTagStore.measuredTags(for: durableFirst)
+            .first { $0.hasPrefix("input:") == false }
+        let metadataLibrary = LUTLibrary(catalog: relaunchedCatalog)
+        let metadataViewModel = AppViewModel(
+            projects: ProjectStore(root: root.appendingPathComponent("Metadata Projects")),
+            tags: metadataTagStore,
+            media: MediaLibrary(
+                root: root.appendingPathComponent("Metadata Media"),
+                manifestURL: root.appendingPathComponent("metadata-media.json")
+            ),
+            library: metadataLibrary
+        )
+        var visibleTagEditingOK = false
+        if let measuredTag {
+            metadataViewModel.removeTag(measuredTag, from: durableFirst)
+            let removed = metadataViewModel.allTags(for: durableFirst).contains(measuredTag) == false
+            metadataViewModel.addTag(measuredTag, to: [durableFirst])
+            visibleTagEditingOK = removed
+                && metadataViewModel.allTags(for: durableFirst).filter { $0 == measuredTag }.count == 1
+                && relaunchedCatalog.typedTags(for: durableFirst) == ["soft", measuredTag].sorted()
+                && relaunchedCatalog.excludedMeasuredTags(for: durableFirst) == ["persisted-auto"]
+        }
+        print("Manager visible measured-Tag remove and restore -> \(visibleTagEditingOK ? "PASS" : "FAIL")")
 
         let recoveredScope = root.appendingPathComponent("External Scope", isDirectory: true)
         try FileManager.default.createDirectory(at: recoveredScope, withIntermediateDirectories: true)
@@ -269,7 +310,8 @@ func runDurableLibraryChecks() async -> Bool {
             && Set(relaunchedMedia.records.map(\.id)) == mediaIDs
             && relaunchedMedia.records.contains { $0.logicalPath == "Shoot/Day 1/frame.png" }
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
-        return catalogOK && recoveryOK && recoveredSessionOK && discoveryOK && focusRecoveryOK
+        return catalogOK && mixedSelectionTagOK && visibleTagEditingOK && recoveryOK
+            && recoveredSessionOK && discoveryOK && focusRecoveryOK
             && previewCacheOK && legacyMigrationOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")

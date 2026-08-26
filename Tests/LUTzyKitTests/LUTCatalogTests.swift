@@ -53,6 +53,30 @@ final class LUTCatalogTests: TempDirectoryTestCase {
         XCTAssertEqual(library.catalog.origin(for: rescanned), .vendor("Panasonic"))
     }
 
+    func testMeasuredTagExclusionIsPerRecordAndSurvivesRelaunch() throws {
+        let firstURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "First.cube", in: tempDirectory
+        )
+        let secondURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Second.cube", in: tempDirectory
+        )
+        let catalogURL = tempDirectory.appendingPathComponent("tag-exclusions.json")
+        let catalog = LUTCatalog(fileURL: catalogURL)
+        let firstID = try XCTUnwrap(catalog.adoptSavedLUT(try CubeLUT(url: firstURL)))
+        let secondID = try XCTUnwrap(catalog.adoptSavedLUT(try CubeLUT(url: secondURL)))
+
+        catalog.removeTag("高對比", from: [firstID], hidingMeasuredFor: [firstID])
+        catalog.removeTag("混合自動", from: [firstID, secondID], hidingMeasuredFor: [firstID])
+
+        let relaunched = LUTCatalog(fileURL: catalogURL)
+        XCTAssertEqual(relaunched.excludedMeasuredTags(for: firstID), ["混合自動", "高對比"])
+        XCTAssertEqual(relaunched.excludedMeasuredTags(for: secondID), [])
+
+        relaunched.addTag("高對比", to: [firstID])
+        XCTAssertEqual(relaunched.excludedMeasuredTags(for: firstID), ["混合自動"])
+        XCTAssertEqual(relaunched.record(for: firstID)?.typedTags, ["高對比"])
+    }
+
     func testOneMissingAndTwoUnmatchedIdenticalFilesIsAmbiguousAsABatch() async throws {
         let original = try Fixtures.writeCube(
             Fixtures.identityCubeText(size: 2), named: "Original.cube", in: tempDirectory

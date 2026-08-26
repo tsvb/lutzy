@@ -213,6 +213,17 @@ The Media Library presentation previously specified as Finder-like Columns is re
 > image viewer那邊  
 > 所謂column應該是這樣 或者可以叫gallery mode?
 
+### 2026-08-27 — Manager Inspector terminology and action ownership
+
+The Manager Inspector lists every visible Tag beside the selected LUT and provides direct add/remove controls. Removing a measured Tag is a durable per-record exclusion; it does not rewrite the shared measurement and does not reappear after a rescan. The display-name override is labelled `Name`, while the Vendor/Custom/Unknown namespace is labelled `Brand / Source` instead of exposing the ambiguous internal term `Origin`. Tag, folder move, Starred, Collection membership, and Remove actions belong in the Inspector, so the duplicated bottom action row is removed.
+
+> 這邊tag應該要能列在旁邊 然後新增 刪除吧
+>
+> 另外Origin是啥 有夠混淆
+> 還有disaply Name應該就是Name吧？
+>
+> 還有底下那行star, tag,move, remove 是不是跟右手邊重疊 那就免了吧？
+
 ## Implementation contracts added after independent gate review
 
 These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.
@@ -267,6 +278,7 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8a2d8975-742e-46d1-900f-522f393eee53.png` | Multi-row local LUT discovery home with horizontal carousel rhythm |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-78ae362e-550f-4164-bcd7-fdb8d88ea733.png` | Complete Grid reached after opening one discovery shelf |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-40b37c6f-a2d9-4b28-b150-6f70fae57b69.png` | Fixed-sample LUT detail reached after activating one LUT; styling remains non-normative |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-de81a0d6-d025-4db0-8d9c-0208a953c3c2.png` | Manager Inspector terminology, visible Tag editing, and removal of the duplicated bottom action row |
 
 ## OpenSpec record map
 

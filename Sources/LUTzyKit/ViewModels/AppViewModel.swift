@@ -1116,7 +1116,7 @@ final class AppViewModel: ObservableObject {
             for lut in scoped {
                 let tags = LUTGalleryMetadata.browsableTags(
                     typed: typedTags(for: lut),
-                    measured: measuredTags(for: lut)
+                    measured: visibleMeasuredTags(for: lut)
                 )
                 for tag in Set(tags).filter({ $0.isEmpty == false }) {
                     groups[tag, default: []].append(lut)
@@ -1137,8 +1137,12 @@ final class AppViewModel: ObservableObject {
 
     func typedTags(for lut: CubeLUT) -> [String] { catalog.typedTags(for: lut) }
     func measuredTags(for lut: CubeLUT) -> [String] { tags.measuredTags(for: lut) }
+    func visibleMeasuredTags(for lut: CubeLUT) -> [String] {
+        let excluded = Set(catalog.excludedMeasuredTags(for: lut))
+        return measuredTags(for: lut).filter { excluded.contains($0) == false }
+    }
     func allTags(for lut: CubeLUT) -> [String] {
-        Array(Set(typedTags(for: lut) + measuredTags(for: lut))).sorted()
+        Array(Set(typedTags(for: lut) + visibleMeasuredTags(for: lut))).sorted()
     }
     func isStarred(_ lut: CubeLUT) -> Bool { catalog.isStarred(lut) }
     var starredCount: Int { library.allLUTs.filter(isStarred).count }
@@ -1149,7 +1153,13 @@ final class AppViewModel: ObservableObject {
     }
 
     func removeTag(_ tag: String, from lut: CubeLUT) {
-        catalog.removeTag(tag, from: [lut.lutID])
+        removeTag(tag, from: [lut])
+    }
+
+    func removeTag(_ tag: String, from luts: [CubeLUT]) {
+        let selectedIDs = Set(luts.map(\.lutID))
+        let measuredIDs = Set(luts.filter { measuredTags(for: $0).contains(tag) }.map(\.lutID))
+        catalog.removeTag(tag, from: selectedIDs, hidingMeasuredFor: measuredIDs)
         objectWillChange.send()
     }
 

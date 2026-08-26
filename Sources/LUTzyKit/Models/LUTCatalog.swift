@@ -42,6 +42,11 @@ struct LUTRecord: Identifiable, Codable, Sendable, Equatable {
     var displayNameOverride: String?
     var origin: LUTOrigin = .unknown
     var typedTags: [String] = []
+    /// Per-record curation of content-level measured tags. Optional keeps
+    /// catalogs written before this field was introduced decode-compatible.
+    /// The measurement itself remains shared by content hash; hiding it here
+    /// lets identical physical files be organised independently.
+    var excludedMeasuredTags: [String]?
     var isStarred: Bool = false
     var collectionIDs: Set<UUID> = []
 
@@ -181,6 +186,12 @@ final class LUTCatalog: ObservableObject {
 
     func origin(for lut: CubeLUT) -> LUTOrigin { record(for: lut)?.origin ?? .unknown }
     func typedTags(for lut: CubeLUT) -> [String] { record(for: lut)?.typedTags ?? [] }
+    func excludedMeasuredTags(for id: LUTRecordID) -> [String] {
+        record(for: id)?.excludedMeasuredTags ?? []
+    }
+    func excludedMeasuredTags(for lut: CubeLUT) -> [String] {
+        excludedMeasuredTags(for: lut.lutID)
+    }
     func isStarred(_ lut: CubeLUT) -> Bool { record(for: lut)?.isStarred ?? false }
 
     func setDisplayName(_ name: String?, for ids: Set<LUTRecordID>) {
@@ -204,14 +215,26 @@ final class LUTCatalog: ObservableObject {
         let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
         guard cleaned.isEmpty == false else { return }
         mutate(ids) {
+            $0.excludedMeasuredTags?.removeAll { $0 == cleaned }
+            if $0.excludedMeasuredTags?.isEmpty == true { $0.excludedMeasuredTags = nil }
             guard $0.typedTags.contains(cleaned) == false else { return }
             $0.typedTags.append(cleaned)
             $0.typedTags.sort()
         }
     }
 
-    func removeTag(_ tag: String, from ids: Set<LUTRecordID>) {
-        mutate(ids) { $0.typedTags.removeAll { $0 == tag } }
+    func removeTag(
+        _ tag: String,
+        from ids: Set<LUTRecordID>,
+        hidingMeasuredFor measuredIDs: Set<LUTRecordID> = []
+    ) {
+        mutate(ids) {
+            $0.typedTags.removeAll { $0 == tag }
+            guard measuredIDs.contains($0.id) else { return }
+            var excluded = Set($0.excludedMeasuredTags ?? [])
+            excluded.insert(tag)
+            $0.excludedMeasuredTags = excluded.sorted()
+        }
     }
 
     @discardableResult

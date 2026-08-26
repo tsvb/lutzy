@@ -9,7 +9,11 @@ LUT Manager SHALL provide a persistent right-side Inspector for selected LUT met
 
 #### Scenario: Select one LUT
 - **WHEN** the user selects one LUT
-- **THEN** the Inspector displays its name, Vendor/Custom/Unknown origin, tags, Collection memberships, physical folder, and Starred state
+- **THEN** the Inspector displays its Name, Brand/Source, visible tags, Collection memberships, physical folder, and Starred state
+
+#### Scenario: Clear metadata labels
+- **WHEN** the user reads the Inspector
+- **THEN** the display-name override is labelled `Name`, and the dedicated Vendor/Custom/Unknown namespace is labelled `Brand / Source` rather than the ambiguous internal term `Origin`
 
 ### Requirement: Direct tag editing
 The Inspector SHALL display existing tags as individually removable chips and SHALL provide direct tag addition without opening the current add-only Tag sheet.
@@ -17,6 +21,14 @@ The Inspector SHALL display existing tags as individually removable chips and SH
 #### Scenario: Remove existing tag
 - **WHEN** the user removes a tag chip from a selected LUT
 - **THEN** that tag is removed from the LUT metadata and the table, visual Library card, filters, and detail update consistently
+
+#### Scenario: Remove an automatically measured tag
+- **WHEN** the user removes a visible measured-tag chip from a LUT record
+- **THEN** that record persistently excludes the measured tag across rescan and relaunch without changing the content-level measurement shared by identical files
+
+#### Scenario: Restore a removed measured tag
+- **WHEN** the user adds the same text as a measured tag previously removed from that record
+- **THEN** the record-level exclusion is cleared and the tag appears once as user-authored metadata
 
 #### Scenario: Add tag
 - **WHEN** the user enters a valid new tag in the Inspector
@@ -55,6 +67,17 @@ For multiple selected LUTs, the Inspector SHALL distinguish common, absent, and 
 #### Scenario: Unsafe batch field
 - **WHEN** multiple LUTs are selected
 - **THEN** display-name editing and any other field without defined batch semantics are disabled rather than applying an ambiguous change
+
+### Requirement: One Manager action surface
+Selection actions SHALL live in the persistent Inspector instead of being duplicated in a bottom action bar.
+
+#### Scenario: Inspect Manager actions
+- **WHEN** one or more LUTs are selected
+- **THEN** Tag, physical-folder move, Starred, Collection membership, and Remove actions are available from the Inspector and the table has no duplicate bottom action row
+
+#### Scenario: Batch move and remove
+- **WHEN** multiple LUTs are selected
+- **THEN** the Inspector provides explicit batch folder movement and removal while preserving the existing managed-library safety semantics
 
 ### Requirement: Metadata-only Manager editing
 LUT Manager SHALL edit descriptive metadata and organisation without exposing controls that change LUT colour values or transforms; LUT Editor SHALL remain the exclusive destination for transform editing.

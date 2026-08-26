@@ -55,6 +55,7 @@
 - [x] 6.3 Build a persistent right-side Manager Inspector for single and multi-selection metadata editing
 - [x] 6.4 Replace the add-only Tag sheet with visible tag chips, direct add/remove, and common/mixed multi-selection states
 - [x] 6.5 Keep Manager mutations metadata-only, leave filenames unchanged for display-name edits, and route transform-changing actions to LUT Editor
+- [x] 6.6 List all visible Tags in the Inspector, persist per-record measured-Tag exclusions, relabel Name and Brand/Source, and remove the duplicate bottom action row while retaining batch Move/Remove in the Inspector
 
 ## 7. LUT Library and sample detail
 

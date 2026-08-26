@@ -58,15 +58,54 @@ final class LUTLibraryMetadataTests: TempDirectoryTestCase {
             ),
         ]
 
-        let state = LUTManagerSelectionState(records: records)
+        let state = LUTManagerSelectionState(
+            records: records,
+            visibleTagsByRecordID: [
+                first: ["soft", "warm", "標準對比"],
+                second: ["mono", "soft", "標準對比"],
+            ]
+        )
 
-        XCTAssertEqual(state.commonTags, ["soft"])
+        XCTAssertEqual(state.commonTags, ["soft", "標準對比"])
         XCTAssertEqual(state.mixedTags, ["mono", "warm"])
         XCTAssertNil(state.commonOrigin)
         XCTAssertFalse(state.allStarred)
         XCTAssertEqual(state.membership(in: []), .none)
         XCTAssertEqual(state.membership(in: [first]), .mixed)
         XCTAssertEqual(state.membership(in: [first, second]), .all)
+    }
+
+    @MainActor
+    func testRemovingVisibleMeasuredTagHidesItAndAddingItRestoresOneTypedValue() throws {
+        let cubeURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "candidate.cube", in: tempDirectory
+        )
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("catalog.json"))
+        let parsed = try CubeLUT(url: cubeURL)
+        let id = try XCTUnwrap(catalog.adoptSavedLUT(parsed))
+        let lut = parsed.withRecordID(id)
+        let tagStore = LUTTagStore(fileURL: tempDirectory.appendingPathComponent("tags.json"))
+        tagStore.indexNow([lut])
+        let tag = try XCTUnwrap(tagStore.measuredTags(for: lut).first { $0.hasPrefix("input:") == false })
+        let library = LUTLibrary(catalog: catalog)
+        let viewModel = AppViewModel(
+            projects: ProjectStore(root: tempDirectory.appendingPathComponent("Projects")),
+            tags: tagStore,
+            media: MediaLibrary(
+                root: tempDirectory.appendingPathComponent("Media"),
+                manifestURL: tempDirectory.appendingPathComponent("media.json")
+            ),
+            library: library
+        )
+
+        XCTAssertTrue(viewModel.allTags(for: lut).contains(tag))
+        viewModel.removeTag(tag, from: lut)
+        XCTAssertFalse(viewModel.allTags(for: lut).contains(tag))
+
+        viewModel.addTag(tag, to: [lut])
+        XCTAssertEqual(viewModel.allTags(for: lut).filter { $0 == tag }.count, 1)
+        XCTAssertEqual(catalog.typedTags(for: lut), [tag])
+        XCTAssertEqual(catalog.excludedMeasuredTags(for: lut), [])
     }
 
     @MainActor

@@ -223,7 +223,7 @@ struct LUTPreviewCard: View {
     private var visibleTags: [String] {
         LUTGalleryMetadata.visibleTags(
             typed: viewModel.typedTags(for: lut),
-            measured: viewModel.measuredTags(for: lut)
+            measured: viewModel.visibleMeasuredTags(for: lut)
         )
     }
 
