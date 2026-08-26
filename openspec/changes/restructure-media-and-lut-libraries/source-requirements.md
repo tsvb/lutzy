@@ -122,6 +122,12 @@ These excerpts preserve the user's wording. Line breaks were normalised only for
 
 > 先試試看inspector吧 沒意見
 
+> /Users/world4jason/Documents/luts  
+> /Users/world4jason/code_ground/Film-Luts/luts  
+> /Users/world4jason/code_ground/claude lut  
+> /Users/world4jason/code_ground/V-Log-Alchemy  
+> 另外這底下還一堆lut 看一下怎擺進去適合
+
 ## Requirement evolution and supersession
 
 | Earlier direction | Current direction | Status |
@@ -172,6 +178,12 @@ The earlier reference with a central Before/After divider and sample thumbnails 
 ### 2026-08-26 — Gallery Tag priority
 
 Cards display at most three Tags. User-authored Tags fill the available slots first in stable alphabetical order, followed by measured Tags in stable alphabetical order. Full Tags remain visible in detail and Manager; no manual card-tag ordering feature is added.
+
+### 2026-08-26 — Real-library corpus and import boundary
+
+The supplied local corpus is acceptance data, not a request to mutate or redistribute the source repositories. Physical organisation preserves provenance and input purpose rather than flattening nearly two thousand files into All LUTs. Camera/vendor packs, V-Log-ready looks, display-referred film emulations, and technical adapters remain visibly distinct; cross-folder style groupings belong in Tags or Collections.
+
+The corpus mixes renderable 3D LUTs with 1D shapers, archived revisions, SD-card short-name aliases, generated test fixtures, and unclassified community files. Only supported, parseable 3D `.cube` files may be reported as imported. Unsupported or malformed `.cube` files are reported as failures instead of being copied and disappearing on the following scan.
 
 ## Implementation contracts added after independent gate review
 

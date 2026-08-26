@@ -561,13 +561,27 @@ do {
     let junkOK = junked == LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 1)
     print("import a non-LUT -> \(junked) -> \(junkOK ? "PASS" : "FAIL")")
 
+    // Vendor folders commonly contain 1D shapers and malformed .cube files
+    // beside their 3D looks. They must be rejected before copying; otherwise
+    // import reports success and the next library scan makes them disappear.
+    let oneD = root.appendingPathComponent("shaper.cube")
+    let malformed = root.appendingPathComponent("malformed.cube")
+    try? "LUT_1D_SIZE 2\n0 0 0\n1 1 1\n".write(to: oneD, atomically: true, encoding: .utf8)
+    try? "LUT_3D_SIZE 2\n0 0 0\n".write(to: malformed, atomically: true, encoding: .utf8)
+    let rejected = LUTLibrary.copyIn([oneD, malformed], to: library)
+    let rejectedOK = rejected == LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 2)
+        && FileManager.default.fileExists(atPath: library.appendingPathComponent("shaper.cube").path) == false
+        && FileManager.default.fileExists(atPath: library.appendingPathComponent("malformed.cube").path) == false
+    print("import rejects unreadable cubes -> \(rejected) -> \(rejectedOK ? "PASS" : "FAIL")")
+
     // And the summary says so, including the case where nothing happened.
     let summaryOK = AppViewModel.importSummary(first).contains("Imported 2")
         && AppViewModel.importSummary(again).contains("already in the library")
         && AppViewModel.importSummary(LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 0)) == "Nothing to import"
     print("import summary -> \(summaryOK ? "PASS" : "FAIL")")
 
-    importOK = folderOK && repeatOK && clashOK && junkOK && summaryOK && deepOK && deepRepeatOK
+    importOK = folderOK && repeatOK && clashOK && junkOK && rejectedOK
+        && summaryOK && deepOK && deepRepeatOK
 }
 print("import -> \(importOK ? "PASS" : "FAIL")")
 

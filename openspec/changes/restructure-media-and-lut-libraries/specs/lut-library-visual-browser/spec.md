@@ -11,6 +11,17 @@ LUT Library SHALL display only LUTs already imported into or created by the loca
 - **WHEN** LUT Library groups or highlights local LUTs visually
 - **THEN** the section is derived from local library metadata and does not imply that the LUT can be downloaded from a remote service
 
+### Requirement: Import only renderable 3D LUTs
+Local LUT import SHALL copy and report as imported only `.cube` files that the production 3D LUT parser can render. Unsupported 1D LUTs and malformed `.cube` files SHALL be reported as failures and SHALL NOT be copied into the managed LUT folder.
+
+#### Scenario: Mixed vendor folder
+- **WHEN** the user imports a folder containing valid 3D LUTs, 1D shapers, and malformed `.cube` files
+- **THEN** valid 3D LUTs are imported, unsupported files contribute to the failed count, and the next scan shows every item reported as imported
+
+#### Scenario: Re-import valid duplicate
+- **WHEN** a valid 3D LUT has the same content fingerprint as an existing managed LUT
+- **THEN** it is reported as a duplicate and does not create another physical file or record
+
 ### Requirement: Separate discovery and management responsibilities
 The application SHALL provide a visual LUT Library for discovery and sample-based evaluation separately from LUT Manager's table-based file, metadata, collection, and bulk-management work.
 

@@ -171,6 +171,21 @@ Folder mirrors the recursively nested filesystem and remains the only place wher
 
 Collections are manual in this change. The condition-builder shown in one reference would be a separate Smart Collection capability because it needs predicates, live evaluation, and explainable matching.
 
+### Ingest a real LUT corpus without flattening it
+
+The supplied acceptance corpus contains four materially different sources, so source folders remain the provenance boundary:
+
+- V-Log-ready creative looks: LUTcraft and the current non-Archive V-Log Alchemy sets, grouped by producer and then target look family.
+- Display-referred creative looks: G'MIC Film LUTs, retaining its film-process folders.
+- Technical transforms: LUTcraft adapters and Panasonic Standard-to-V-Log conversions, kept outside creative Gallery folders.
+- Camera/vendor and unclassified archives: retained by brand or source package, but not mixed into the first ready-to-preview set until their input profile is supported or confirmed.
+
+Generated aliases and historical material are not separate visual records: LUTcraft `sd-card` short names, virtual-environment fixtures, comparison pairs, and V-Log Alchemy `Archive` are excluded when their canonical/current file is present. FreshLUTs remains an Inbox/Unclassified source because filenames and input assumptions are inconsistent; it must not silently become a confirmed vendor or camera folder.
+
+Folder hierarchy answers “where did this LUT come from and what input family does it belong to?” Tags and Collections answer cross-folder questions such as low saturation, monochrome, portrait, or favourites. This keeps physical moves meaningful and avoids encoding subjective style in the filesystem.
+
+Import validates each candidate through the production 3D LUT parser before copying. A `.cube` extension alone is insufficient: 1D shapers and malformed files increment the failed count and never enter the managed folder. Content-identical supported 3D LUTs retain the existing duplicate-by-fingerprint behaviour.
+
 ### Preserve Manager table work and add a separate visual Library path
 
 LUT Manager remains the place for folder moves, Collection creation/rename/deletion, full membership editing, tagging, origin editing, removal, and other batch work. LUT Library consumes the same source-filtered LUT data for browsing without exposing destructive bulk controls. Its only write actions are Star, add to an existing Collection, and open in Viewer. Gallery cards prioritise the rendered look, then show the LUT name, confirmed vendor name or Custom/Unknown origin, and up to three tags. User-authored tags fill those slots first in stable alphabetical order; measured tags fill any remaining slots in their own stable alphabetical order. Extra tags remain available in detail and Manager metadata editing; the card may show a non-tag overflow count. The design does not add manual per-LUT card-tag ordering.

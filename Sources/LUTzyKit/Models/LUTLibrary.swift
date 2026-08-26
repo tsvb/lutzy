@@ -230,6 +230,14 @@ final class LUTLibrary: ObservableObject {
     private nonisolated static func copyOne(_ source: URL, into folder: URL,
                                             existing: inout Set<String>, result: inout ImportResult) {
         let fm = FileManager.default
+        // A .cube extension does not mean LUTzy can render the file. In
+        // particular, vendor packs often mix 1D shaper LUTs with 3D looks.
+        // Validate before copying so the import summary never says a LUT was
+        // imported only for the following scan to silently omit it.
+        guard (try? CubeLUT(url: source)) != nil else {
+            result.failed += 1
+            return
+        }
         guard let data = try? Data(contentsOf: source) else {
             result.failed += 1
             return
