@@ -1059,6 +1059,36 @@ final class AppViewModel: ObservableObject {
         let scoped = luts(for: libraryLUTSource)
 
         switch grouping {
+        case .folder:
+            let selectedFolder: String?
+            if case .folder(let path) = libraryLUTSource { selectedFolder = path }
+            else { selectedFolder = nil }
+            return LUTLibraryDiscovery.folderShelves(
+                from: scoped,
+                selectedFolder: selectedFolder
+            )
+
+        case .collectionAndStar:
+            let scopedIDs = Set(scoped.map(\.lutID))
+            var shelves: [LUTLibraryShelf] = []
+            let starred = scoped.filter(isStarred)
+            if starred.isEmpty == false {
+                shelves.append(LUTLibraryShelf(
+                    id: "starred", title: "Starred", luts: starred
+                ))
+            }
+            shelves.append(contentsOf: catalog.collections.compactMap { collection in
+                let members = catalog.members(of: collection.id).intersection(scopedIDs)
+                let values = scoped.filter { members.contains($0.lutID) }
+                guard values.isEmpty == false else { return nil }
+                return LUTLibraryShelf(
+                    id: "collection:\(collection.id.uuidString)",
+                    title: collection.name,
+                    luts: values
+                )
+            })
+            return shelves
+
         case .brand:
             var groups: [String: (title: String, luts: [CubeLUT])] = [:]
             for lut in scoped {
@@ -1100,18 +1130,6 @@ final class AppViewModel: ObservableObject {
                 return $0.title.localizedStandardCompare($1.title) == .orderedAscending
             }
 
-        case .collection:
-            let scopedIDs = Set(scoped.map(\.lutID))
-            return catalog.collections.compactMap { collection in
-                let members = catalog.members(of: collection.id).intersection(scopedIDs)
-                let values = scoped.filter { members.contains($0.lutID) }
-                guard values.isEmpty == false else { return nil }
-                return LUTLibraryShelf(
-                    id: "collection:\(collection.id.uuidString)",
-                    title: collection.name,
-                    luts: values
-                )
-            }
         }
     }
 

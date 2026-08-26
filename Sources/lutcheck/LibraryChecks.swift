@@ -30,11 +30,13 @@ func runDurableLibraryChecks() async -> Bool {
         catalog.setMembership(true, collectionID: collection.id, recordIDs: [firstID, secondID])
         catalog.addTag("soft", to: [firstID])
         catalog.setOrigin(.custom, for: [firstID])
+        catalog.setStarred(true, for: [firstID])
 
         let relaunchedCatalog = LUTCatalog(fileURL: catalogURL)
         let catalogOK = relaunchedCatalog.members(of: collection.id) == Set([firstID, secondID])
             && relaunchedCatalog.record(for: firstID)?.typedTags == ["soft"]
             && relaunchedCatalog.record(for: firstID)?.origin == .custom
+            && relaunchedCatalog.record(for: firstID)?.isStarred == true
             && relaunchedCatalog.loadLUT(for: firstID)?.lutID == firstID
         print("durable LUT catalog -> \(catalogOK ? "PASS" : "FAIL")")
 
@@ -91,20 +93,50 @@ func runDurableLibraryChecks() async -> Bool {
 
         let brandShelves = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
         let tagShelves = recoveryViewModel.libraryDiscoveryShelves(for: .tag)
-        let collectionShelves = recoveryViewModel.libraryDiscoveryShelves(for: .collection)
+        let collectionShelves = recoveryViewModel.libraryDiscoveryShelves(for: .collectionAndStar)
+        let folderShelves = recoveryViewModel.libraryDiscoveryShelves(for: .folder)
         let brandOK = brandShelves.first(where: { $0.title == "Custom" })?.luts.map(\.lutID).contains(firstID) == true
             && brandShelves.first(where: { $0.title == "Unknown" })?.luts.map(\.lutID).contains(secondID) == true
         let tagOK = tagShelves.first(where: { $0.title == "soft" })?.luts.map(\.lutID) == [firstID]
             && tagShelves.contains(where: { $0.title.hasPrefix("input:") }) == false
+            && tagShelves.contains(where: { $0.title == "Custom" || $0.title == "Unknown" }) == false
         let collectionOK = Set(
             collectionShelves.first(where: { $0.title == "低飽和" })?.luts.map(\.lutID) ?? []
         ) == Set([firstID, secondID])
+            && collectionShelves.first?.id == "starred"
+            && collectionShelves.first?.luts.map(\.lutID) == [firstID]
+        let folderOK = Set(
+            folderShelves.first(where: { $0.title == "General" })?.luts.map(\.lutID) ?? []
+        ).isSuperset(of: [firstID, secondID])
+        let folderCube = [SIMD3<Float>](repeating: .zero, count: 8)
+        let nestedFolderLUTs = [
+            CubeLUT(cube: folderCube, size: 2, name: "Film Direct", category: "Fuji/Film"),
+            CubeLUT(cube: folderCube, size: 2, name: "Kodak", category: "Fuji/Film/Kodak"),
+            CubeLUT(cube: folderCube, size: 2, name: "BW", category: "Fuji/BW"),
+        ]
+        let topFolders = LUTLibraryDiscovery.folderShelves(
+            from: nestedFolderLUTs, selectedFolder: nil
+        )
+        let fujiFolders = LUTLibraryDiscovery.folderShelves(
+            from: nestedFolderLUTs, selectedFolder: "Fuji"
+        )
+        let filmFolders = LUTLibraryDiscovery.folderShelves(
+            from: Array(nestedFolderLUTs.prefix(2)), selectedFolder: "Fuji/Film"
+        )
+        let folderHierarchyOK = topFolders.count == 1
+            && topFolders.first?.title == "Fuji"
+            && topFolders.first?.luts.count == 3
+            && fujiFolders.first(where: { $0.title == "Film" })?.luts.count == 2
+            && fujiFolders.first(where: { $0.title == "BW" })?.luts.count == 1
+            && filmFolders.first(where: { $0.title == "Film" })?.luts.count == 1
+            && filmFolders.first(where: { $0.title == "Kodak" })?.luts.count == 1
         recoveryViewModel.setLUTSource(.collection(collection.id), for: .library)
         let scopedCount = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
             .reduce(0) { $0 + $1.luts.count }
-        let discoveryOK = brandOK && tagOK && collectionOK && scopedCount == 2
+        let discoveryOK = brandOK && tagOK && collectionOK && folderOK
+            && folderHierarchyOK && scopedCount == 2
         recoveryViewModel.setLUTSource(.all, for: .library)
-        print("LUT discovery Brand/Tag/Collection shelves and source scope -> \(discoveryOK ? "PASS" : "FAIL")")
+        print("LUT discovery Folder/Collection & Star/Brand/Tag shelves and source scope -> \(discoveryOK ? "PASS" : "FAIL")")
 
         let survivingShelf = LUTLibraryShelf(
             id: "tag:soft", title: "soft", luts: [first]

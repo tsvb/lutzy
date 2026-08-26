@@ -62,7 +62,7 @@
 - [x] 7.4 Build LUT detail with sample thumbnails, a draggable vertical Before/After split, hold-Space original, and complete metadata
 - [x] 7.5 Restore LUT Library source, selection, sample, and Gallery scroll context on Back
 - [x] 7.6 Keep Before on the left and After on the right across Viewer and LUT Library comparisons
-- [x] 7.7 Add Brand/Tag/Collection discovery grouping over the active local LUT source
+- [x] 7.7 Add ordered Folder/Collection & Star/Brand/Tag discovery facets over the active local LUT source, keeping Brand separate from descriptive Tags
 - [x] 7.8 Build a vertically scrolling discovery home of horizontal LUT shelves with accessible View All actions
 - [x] 7.9 Add complete shelf Grid navigation and restore the originating home/Grid when leaving LUT detail
 - [x] 7.10 Restore originating shelf/card selection plus keyboard and assistive-technology focus across Back navigation, with safe fallback when Starred removal destroys that origin

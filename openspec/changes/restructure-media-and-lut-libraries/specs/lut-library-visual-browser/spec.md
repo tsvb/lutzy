@@ -42,7 +42,7 @@ LUT Library SHALL provide a local discovery home made of multiple horizontally s
 
 #### Scenario: Browse the discovery home
 - **WHEN** the user enters LUT Library without an open shelf or LUT detail
-- **THEN** the surface shows a Brand, Tag, and Collection grouping control and multiple vertically stacked horizontal LUT shelves, with Tag as the initial grouping so a measured local library immediately exposes several discovery rows
+- **THEN** the surface shows Folder, Collection & Star, Brand, and Tag facets in that order above multiple vertically stacked horizontal LUT shelves, with Folder active initially
 
 #### Scenario: Scope discovery from the source sidebar
 - **WHEN** the user chooses a Folder, Collection, or Starred source in the existing secondary sidebar
@@ -50,15 +50,19 @@ LUT Library SHALL provide a local discovery home made of multiple horizontally s
 
 #### Scenario: Group by Brand
 - **WHEN** Brand grouping is active
-- **THEN** LUTs are grouped by confirmed Origin metadata, Custom remains explicit, and absent origin is shown as Unknown rather than inferred from a filename or folder
+- **THEN** LUTs are grouped by the dedicated confirmed Origin metadata namespace, Custom remains explicit, absent origin is shown as Unknown rather than inferred from a filename or folder, and Brand values do not enter ordinary descriptive Tag shelves
+
+#### Scenario: Group by Folder
+- **WHEN** Folder grouping is active at All LUTs or a selected Folder source
+- **THEN** shelves represent the next physical folder level inside that source, include descendant LUTs, and retain a row for LUTs stored directly at the selected level
 
 #### Scenario: Group by Tag
 - **WHEN** Tag grouping is active
 - **THEN** each non-empty user-authored or measured Tag becomes a shelf containing the scoped LUTs carrying that Tag, except internal `input:*` pipeline metadata which remains represented by the dedicated Input field
 
-#### Scenario: Group by Collection
-- **WHEN** Collection grouping is active
-- **THEN** each non-empty local virtual Collection becomes a shelf containing its scoped members and no marketplace or remote grouping appears
+#### Scenario: Group by Collection and Star
+- **WHEN** Collection & Star grouping is active
+- **THEN** Starred appears as a separate built-in shelf when non-empty and each non-empty local virtual Collection becomes another shelf containing its scoped members, with no marketplace or remote grouping
 
 #### Scenario: Open a complete shelf
 - **WHEN** the user activates a shelf heading or View All action

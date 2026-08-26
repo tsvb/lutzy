@@ -1,28 +1,31 @@
 import Foundation
 
-/// The three ways the visual Library can turn one local source into shelves.
+/// The four ways the visual Library can turn one local source into shelves.
 /// These are browsing facets, not new metadata owners: Manager still edits the
 /// Origin, Tags, and Collections that feed them.
 enum LUTLibraryGrouping: String, CaseIterable, Identifiable, Sendable {
+    case folder
+    case collectionAndStar
     case brand
     case tag
-    case collection
 
     var id: Self { self }
 
     var label: String {
         switch self {
+        case .folder: return "Folder"
+        case .collectionAndStar: return "Collection & Star"
         case .brand: return "Brand"
         case .tag: return "Tag"
-        case .collection: return "Collection"
         }
     }
 
     var symbol: String {
         switch self {
+        case .folder: return "folder"
+        case .collectionAndStar: return "rectangle.stack.badge.person.crop"
         case .brand: return "building.2"
         case .tag: return "tag"
-        case .collection: return "rectangle.stack"
         }
     }
 }
@@ -34,6 +37,50 @@ struct LUTLibraryShelf: Identifiable, Sendable {
     let id: String
     let title: String
     let luts: [CubeLUT]
+}
+
+enum LUTLibraryDiscovery {
+    /// Roll physical categories into the immediate children of the active
+    /// folder source. From All LUTs this yields top-level folders; from a
+    /// selected folder it yields that folder's next level while keeping any
+    /// LUTs stored directly in the selected folder in their own row.
+    static func folderShelves(
+        from luts: [CubeLUT],
+        selectedFolder: String?
+    ) -> [LUTLibraryShelf] {
+        let base = selectedFolder?
+            .split(separator: "/")
+            .map(String.init) ?? []
+        var groups: [String: (title: String, luts: [CubeLUT])] = [:]
+
+        for lut in luts {
+            let category = lut.category == "General"
+                ? [] : lut.category.split(separator: "/").map(String.init)
+            let relative = category.dropFirst(min(base.count, category.count))
+
+            let path: String
+            let title: String
+            if let next = relative.first {
+                let components = base + [next]
+                path = components.joined(separator: "/")
+                title = next
+            } else if let selectedFolder, selectedFolder.isEmpty == false {
+                path = selectedFolder
+                title = base.last ?? selectedFolder
+            } else {
+                path = "General"
+                title = "General"
+            }
+
+            if groups[path] == nil { groups[path] = (title, []) }
+            groups[path]?.luts.append(lut)
+        }
+
+        return groups.map { path, group in
+            LUTLibraryShelf(id: "folder:\(path)", title: group.title, luts: group.luts)
+        }
+        .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+    }
 }
 
 /// Stable keyboard and assistive-technology return points across the three

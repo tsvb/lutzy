@@ -4,7 +4,7 @@ import SwiftUI
 /// silently mutate the Viewer document.
 struct LUTLibraryView: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var grouping: LUTLibraryGrouping = .tag
+    @State private var grouping: LUTLibraryGrouping = .folder
     @State private var selectedShelfID: String?
     @State private var shelfReturnFocus: LUTLibraryFocusTarget?
     @State private var selectedCardTarget: LUTLibraryFocusTarget?
@@ -108,7 +108,7 @@ struct LUTLibraryView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 330)
+            .frame(width: 520)
             .accessibilityLabel("Group LUTs")
             .focused($keyboardFocus, equals: .groupingControl)
             .accessibilityFocused($accessibilityFocus, equals: .groupingControl)
@@ -260,17 +260,19 @@ struct LUTLibraryView: View {
 
     private var emptyTitle: String {
         switch grouping {
+        case .folder: return "No Folders in This Source"
+        case .collectionAndStar: return "No Collections or Starred LUTs"
         case .brand: return "No Brands in This Source"
         case .tag: return "No Tags in This Source"
-        case .collection: return "No Collections in This Source"
         }
     }
 
     private var emptyDescription: String {
         switch grouping {
+        case .folder: return "Import LUT folders or choose another source."
+        case .collectionAndStar: return "Create Collections in LUT Manager or Star LUTs while browsing."
         case .brand: return "Set Origin metadata in LUT Manager to organise confirmed brands."
         case .tag: return "Add Tags in LUT Manager or let local measurement finish."
-        case .collection: return "Create and edit local Collections in LUT Manager."
         }
     }
 }
