@@ -73,6 +73,7 @@ struct LUTLibraryView: View {
                 } description: {
                     Text(emptyDescription)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 24) {
@@ -85,6 +86,7 @@ struct LUTLibraryView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 

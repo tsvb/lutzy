@@ -64,6 +64,10 @@ LUT Library SHALL provide a local discovery home made of multiple horizontally s
 - **WHEN** Collection & Star grouping is active
 - **THEN** Starred appears as a separate built-in shelf when non-empty and each non-empty local virtual Collection becomes another shelf containing its scoped members, with no marketplace or remote grouping
 
+#### Scenario: Active grouping has no shelves
+- **WHEN** the selected discovery facet has no shelves inside the active source
+- **THEN** the discovery header remains at the top and a clear empty state fills the remaining area without preserved carousel space or a vertically displaced page
+
 #### Scenario: Open a complete shelf
 - **WHEN** the user activates a shelf heading or View All action
 - **THEN** LUT Library replaces the discovery home with a complete searchable Grid for that shelf

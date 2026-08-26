@@ -68,6 +68,7 @@
 - [x] 7.9 Add complete shelf Grid navigation and restore the originating home/Grid when leaving LUT detail
 - [x] 7.10 Restore originating shelf/card selection plus keyboard and assistive-technology focus across Back navigation, with safe fallback when Starred removal destroys that origin
 - [x] 7.11 Move LUT detail Back into a persistent full-width navigation header with contextual destination and Escape support
+- [x] 7.12 Keep the discovery header top-aligned and fill the remaining surface when a grouping has no shelves
 
 ## 8. Verification
 

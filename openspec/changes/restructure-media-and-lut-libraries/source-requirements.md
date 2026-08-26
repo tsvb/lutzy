@@ -61,6 +61,7 @@ This file preserves the user's original intent and the evolution of decisions be
 20. The existing left Folder/Collection/Starred source remains a scope over the discovery home; it is not replaced by the grouping subtabs.
 21. Activating a shelf opens a complete Grid like the second reference. Activating a LUT from either level opens the existing fixed-sample Before/After detail like the third reference.
 22. LUT detail exposes Back in a persistent full-width navigation header, names the originating facet or shelf, and supports Escape. Back navigation restores the originating level: detail to its Grid or discovery home, and Grid to discovery home. It also restores the originating selection and keyboard/assistive-technology focus target.
+23. When a discovery facet has no shelves in the active source, its header stays at the top and the empty state fills the remaining content area without retaining blank carousel space above it.
 
 ### Colour consistency
 
