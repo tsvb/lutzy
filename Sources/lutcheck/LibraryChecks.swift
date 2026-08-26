@@ -37,11 +37,17 @@ func runDurableLibraryChecks() async -> Bool {
             && relaunchedCatalog.loadLUT(for: firstID)?.lutID == firstID
         print("durable LUT catalog -> \(catalogOK ? "PASS" : "FAIL")")
 
-        let recoveredURL = root.appendingPathComponent("Recovered.cube")
+        let recoveredScope = root.appendingPathComponent("External Scope", isDirectory: true)
+        try FileManager.default.createDirectory(at: recoveredScope, withIntermediateDirectories: true)
+        let recoveredURL = recoveredScope.appendingPathComponent("Recovered.cube")
         let transientID = LUTID(raw: "derived://lutcheck/interrupted")
-        let markerOK = relaunchedCatalog.beginSaveRecovery(
+        let scopeBookmark = try? recoveredScope.bookmarkData(
+            options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
+        )
+        let markerOK = scopeBookmark != nil && relaunchedCatalog.beginSaveRecovery(
             for: recoveredURL, replacing: transientID,
-            expectedFingerprint: first.contentHash
+            expectedFingerprint: first.contentHash, bookmark: scopeBookmark,
+            bookmarkRelativePath: recoveredURL.lastPathComponent
         )
         try cubeText.write(to: recoveredURL, atomically: true, encoding: .utf8)
         let afterInterruptedSave = LUTCatalog(fileURL: catalogURL)

@@ -177,10 +177,15 @@ final class LUTCatalogTests: TempDirectoryTestCase {
         )
         let serialized = try CubeLUT(url: scratch)
         let transientID = LUTID(raw: "derived://interrupted-save")
+        let scopeBookmark = try tempDirectory.bookmarkData(
+            options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
+        )
         let first = LUTCatalog(fileURL: manifest)
         XCTAssertTrue(first.beginSaveRecovery(
             for: destination, replacing: transientID,
-            expectedFingerprint: serialized.contentHash
+            expectedFingerprint: serialized.contentHash,
+            bookmark: scopeBookmark,
+            bookmarkRelativePath: destination.lastPathComponent
         ))
         try Fixtures.identityCubeText(size: 2).write(to: destination, atomically: true, encoding: .utf8)
 

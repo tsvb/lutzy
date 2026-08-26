@@ -471,12 +471,15 @@ final class AppViewModel: ObservableObject {
         derive.libraryFolder = { [weak self] in self?.library.folderURL }
         derive.onWillSave = { [weak self] destination, transient, fingerprint in
             guard let self else { return false }
-            let bookmark = try? destination.bookmarkData(
-                options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
-            )
+            let access = self.securityBookmark(forSavedLUT: destination)
+            guard self.savedLUTRequiresBookmark(destination) == false || access.data != nil else {
+                self.presentError("The selected external location could not be retained for relaunch recovery. Choose a location inside the LUT library or grant access and try again.")
+                return false
+            }
             guard self.catalog.beginSaveRecovery(
                 for: destination, replacing: transient,
-                expectedFingerprint: fingerprint, bookmark: bookmark
+                expectedFingerprint: fingerprint, bookmark: access.data,
+                bookmarkRelativePath: access.relativePath
             ) else {
                 self.presentError("The LUT could not be prepared for a recoverable save. Check the library location and try again.")
                 return false
@@ -520,12 +523,15 @@ final class AppViewModel: ObservableObject {
             presentError("The saved LUT could not be read back for registration. Try saving again.")
             return false
         }
-        let bookmark = try? destination.bookmarkData(
-            options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
-        )
+        let access = securityBookmark(forSavedLUT: destination)
+        guard savedLUTRequiresBookmark(destination) == false || access.data != nil else {
+            presentError("The LUT file was saved, but access to its external location could not be retained. Grant access and try saving again.")
+            return false
+        }
         let transientID = derive.derivedLUT?.lutID
         guard let recordID = catalog.adoptSavedLUT(
-            saved, bookmark: bookmark, replacing: transientID
+            saved, bookmark: access.data, bookmarkRelativePath: access.relativePath,
+            replacing: transientID
         ) else {
             presentError("The LUT file was saved, but it could not be registered in the library. Try saving again.")
             return false
@@ -541,6 +547,32 @@ final class AppViewModel: ObservableObject {
         schedulePreview()
         scheduleSessionSave()
         return true
+    }
+
+    /// A Save panel can authorize a brand-new filename before that file exists,
+    /// but bookmark creation for the file URL is not guaranteed until after the
+    /// write. Fall back to a bookmark for its existing parent and remember the
+    /// filename relative to that scope.
+    private func securityBookmark(forSavedLUT destination: URL) -> (data: Data?, relativePath: String?) {
+        if let data = try? destination.bookmarkData(
+            options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
+        ) {
+            return (data, nil)
+        }
+        let parent = destination.deletingLastPathComponent()
+        if let data = try? parent.bookmarkData(
+            options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
+        ) {
+            return (data, destination.lastPathComponent)
+        }
+        return (nil, nil)
+    }
+
+    private func savedLUTRequiresBookmark(_ destination: URL) -> Bool {
+        guard let root = library.folderURL else { return true }
+        let path = destination.standardizedFileURL.resolvingSymlinksInPath().path
+        let rootPath = root.standardizedFileURL.resolvingSymlinksInPath().path
+        return path != rootPath && path.hasPrefix(rootPath + "/") == false
     }
 
     /// Replace exact legacy path references only after the catalog knows the

@@ -24,6 +24,11 @@ struct LUTRecord: Identifiable, Codable, Sendable, Equatable {
     let id: LUTRecordID
     var locator: String
     var bookmark: Data?
+    /// Nil means the bookmark resolves the file itself. A value means the
+    /// bookmark resolves an ancestor directory and this relative path locates
+    /// the file inside it (needed when a brand-new save target cannot yet make
+    /// a file bookmark).
+    var bookmarkRelativePath: String? = nil
     var fingerprint: String
     var isAvailable: Bool
     var displayNameOverride: String?
@@ -62,6 +67,7 @@ final class LUTCatalog: ObservableObject {
     private struct SaveRecovery: Codable {
         let locator: String
         let bookmark: Data?
+        let bookmarkRelativePath: String?
         let transientID: LUTRecordID?
         let expectedFingerprint: String?
     }
@@ -119,7 +125,9 @@ final class LUTCatalog: ObservableObject {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             ) {
-                url = resolved
+                url = record.bookmarkRelativePath.map {
+                    resolved.appendingPathComponent($0)
+                } ?? resolved
                 didAccessSecurityScope = resolved.startAccessingSecurityScopedResource()
                 if isStale,
                    let refreshed = try? resolved.bookmarkData(
@@ -357,10 +365,12 @@ final class LUTCatalog: ObservableObject {
         for destination: URL,
         replacing transientID: LUTRecordID? = nil,
         expectedFingerprint: String? = nil,
-        bookmark: Data? = nil
+        bookmark: Data? = nil,
+        bookmarkRelativePath: String? = nil
     ) -> Bool {
         let marker = SaveRecovery(
             locator: Self.normalized(destination), bookmark: bookmark,
+            bookmarkRelativePath: bookmarkRelativePath,
             transientID: transientID, expectedFingerprint: expectedFingerprint
         )
         let encoder = JSONEncoder()
@@ -386,7 +396,8 @@ final class LUTCatalog: ObservableObject {
     /// Adopt a successfully written LUT immediately, including paths outside
     /// the scanned root. Known locators retain record metadata.
     func adoptSavedLUT(
-        _ lut: CubeLUT, bookmark: Data? = nil, replacing transientID: LUTRecordID? = nil
+        _ lut: CubeLUT, bookmark: Data? = nil, bookmarkRelativePath: String? = nil,
+        replacing transientID: LUTRecordID? = nil
     ) -> LUTRecordID? {
         let locator = Self.normalized(lut.url)
         if let existing = records.values.first(where: { $0.locator == locator })?.id {
@@ -394,6 +405,7 @@ final class LUTCatalog: ObservableObject {
             let previousAliases = identityAliases
             records[existing]?.fingerprint = lut.contentHash
             records[existing]?.bookmark = bookmark ?? records[existing]?.bookmark
+            if bookmark != nil { records[existing]?.bookmarkRelativePath = bookmarkRelativePath }
             records[existing]?.isAvailable = true
             registerAlias(from: transientID, to: existing)
             guard persistReportingFailure() else {
@@ -409,6 +421,7 @@ final class LUTCatalog: ObservableObject {
         let previousAliases = identityAliases
         records[id] = LUTRecord(
             id: id, locator: locator, bookmark: bookmark,
+            bookmarkRelativePath: bookmarkRelativePath,
             fingerprint: lut.contentHash, isAvailable: true
         )
         registerAlias(from: transientID, to: id)
@@ -466,11 +479,35 @@ final class LUTCatalog: ObservableObject {
         guard let data = try? Data(contentsOf: recoveryURL),
               let marker = try? JSONDecoder().decode(SaveRecovery.self, from: data)
         else { return }
-        let url = URL(fileURLWithPath: marker.locator)
+        var url = URL(fileURLWithPath: marker.locator)
+        var scopeURL: URL?
+        var didAccessSecurityScope = false
+        if let bookmark = marker.bookmark {
+            var isStale = false
+            guard let resolved = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: [.withSecurityScope], relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ) else {
+                // Keep the marker: access may become available after the user
+                // remounts a volume or repairs permissions.
+                return
+            }
+            scopeURL = resolved
+            didAccessSecurityScope = resolved.startAccessingSecurityScopedResource()
+            url = marker.bookmarkRelativePath.map {
+                resolved.appendingPathComponent($0)
+            } ?? resolved
+        }
+        defer {
+            if didAccessSecurityScope { scopeURL?.stopAccessingSecurityScopedResource() }
+        }
         guard FileManager.default.fileExists(atPath: url.path),
               let lut = try? CubeLUT(url: url, category: "Recovered")
         else {
-            clearSaveRecovery(matching: marker.locator)
+            // With a persisted external scope, an access failure is retryable;
+            // without one, absence proves the atomic replacement never landed.
+            if marker.bookmark == nil { clearSaveRecovery(matching: marker.locator) }
             return
         }
         guard marker.expectedFingerprint == nil || marker.expectedFingerprint == lut.contentHash else {
@@ -479,7 +516,11 @@ final class LUTCatalog: ObservableObject {
             clearSaveRecovery(matching: marker.locator)
             return
         }
-        _ = adoptSavedLUT(lut, bookmark: marker.bookmark, replacing: marker.transientID)
+        _ = adoptSavedLUT(
+            lut, bookmark: marker.bookmark,
+            bookmarkRelativePath: marker.bookmarkRelativePath,
+            replacing: marker.transientID
+        )
     }
 
     private func registerAlias(from transientID: LUTRecordID?, to durableID: LUTRecordID) {
