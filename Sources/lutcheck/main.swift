@@ -1433,6 +1433,56 @@ let baseOK = baseSet == [.compare, .wipe, .diff]
 layoutOK = layoutOK && baseOK
 print("layout chosen-base family -> \(baseOK ? "PASS" : "FAIL")")
 
+let differenceFrames = DifferenceComparisonLayout.frames(
+    in: CGSize(width: 1202, height: 602), spacing: 2
+)
+let differenceLayoutOK = DifferenceRegion.allCases == [.a, .b, .difference]
+    && differenceFrames[.a] == CGRect(x: 0, y: 0, width: 400, height: 300)
+    && differenceFrames[.b] == CGRect(x: 0, y: 302, width: 400, height: 300)
+    && differenceFrames[.difference] == CGRect(x: 402, y: 0, width: 800, height: 602)
+layoutOK = layoutOK && differenceLayoutOK
+print("difference layout stacks A/B left and spans Diff right -> \(differenceLayoutOK ? "PASS" : "FAIL")")
+
+// A frame/develop/intensity change schedules A and B independently. If B is
+// quicker than A, Difference must wait for A rather than subtracting the new B
+// from the old A and flashing a false result. Repeat with the opposite landing
+// order so the contract does not depend on which render happens to be faster.
+let differenceGenerationVM = AppViewModel()
+differenceGenerationVM.comparisonLayout = .diff
+differenceGenerationVM.cellImages = [solidImage(80)]
+differenceGenerationVM.previewNSImage = solidImage(120)
+differenceGenerationVM.refreshDifference()
+let hadCompleteDifference = differenceGenerationVM.diffNSImage != nil
+
+differenceGenerationVM.prepareDifferencePreviewRender(rerenderBase: true)
+let invalidatedBothSides = differenceGenerationVM.cellImages.first! == nil
+    && differenceGenerationVM.previewNSImage == nil
+    && differenceGenerationVM.diffNSImage == nil
+
+differenceGenerationVM.previewNSImage = solidImage(130)
+differenceGenerationVM.refreshDifference()
+let waitsWhenBFinishesFirst = differenceGenerationVM.diffNSImage == nil
+differenceGenerationVM.cellImages[0] = solidImage(90)
+differenceGenerationVM.refreshDifference()
+let publishesAfterACompletes = differenceGenerationVM.diffNSImage != nil
+
+differenceGenerationVM.prepareDifferencePreviewRender(rerenderBase: true)
+differenceGenerationVM.cellImages[0] = solidImage(100)
+differenceGenerationVM.refreshDifference()
+let waitsWhenAFinishesFirst = differenceGenerationVM.diffNSImage == nil
+differenceGenerationVM.previewNSImage = solidImage(140)
+differenceGenerationVM.refreshDifference()
+let publishesAfterBCompletes = differenceGenerationVM.diffNSImage != nil
+
+let differenceGenerationOK = hadCompleteDifference
+    && invalidatedBothSides
+    && waitsWhenBFinishesFirst
+    && publishesAfterACompletes
+    && waitsWhenAFinishesFirst
+    && publishesAfterBCompletes
+layoutOK = layoutOK && differenceGenerationOK
+print("difference waits for the current A/B render pair -> \(differenceGenerationOK ? "PASS" : "FAIL")")
+
 let focusVM = AppViewModel()
 focusVM.section = .viewer
 focusVM.setLayout(.wipe)

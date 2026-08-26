@@ -237,6 +237,13 @@ The horizontal media thumbnail strip between Viewer's comparison region and LUT 
 
 > 怎麼這邊中間還是有這塊？ 不是說要拿掉了？
 
+### 2026-08-27 — Contextual Viewer Difference layout
+
+Difference is no longer a full-preview result that hides both compared LUT renders. The layout keeps A LUT in the upper-left, B LUT in the lower-left, and a larger DIFF region spanning the full right side. A uses the existing comparison-base selection and B uses the current LUT selected from the Viewer Gallery.
+
+> diff這功能這邊 怎麼還是toggle?
+> 還是這邊可以弄成 A lut / B lut 在左側上下，DIFF 在右側跨滿
+
 ## Implementation contracts added after independent gate review
 
 These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.
@@ -295,6 +302,7 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-566f9aef-cb80-44df-aec3-6b84b70738ec.png` | Viewer secondary-column Media/LUT divider that should become vertically resizable |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-25255502-a2a8-4962-8353-96da9d955af4.png` | Duplicate inline Viewer media filmstrip that must be removed |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-b9c8e67a-a6d3-418d-aef7-a2e8179b5d3c.png` | Close crop of the duplicate strip between comparison and LUT Gallery |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-31291e52-3a42-4796-b89b-69e3ce52627c.png` | Existing full-preview Difference result to replace with contextual A/B/DIFF layout |
 
 ## OpenSpec record map
 

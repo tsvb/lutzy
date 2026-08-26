@@ -142,6 +142,8 @@ Viewer's secondary column is vertically composed. A compact Media section at the
 
 The current Images/Back to Viewer toolbar control and `viewerSurface == .images` route are retired. List/Gallery is not a Viewer presentation setting.
 
+Viewer Difference is a contextual three-region layout rather than a full-preview on/off result. A compact left column keeps A above B, while the amplified difference map spans the larger right column. A continues to use the chosen comparison-base LUT, B continues to use the current Viewer LUT selected from the Gallery, and the right map continues to use `DifferenceComposer`; no alternate colour pipeline or third LUT-selection model is introduced.
+
 ### Give display modes distinct ownership and names
 
 The display surfaces solve different tasks and must not share copy or persisted state:
@@ -205,6 +207,8 @@ Opening a shelf heading or View All replaces the home with a complete searchable
 LUT Library Gallery uses one shared selected sample image across every visible LUT card. Per-LUT cover images are not used: keeping the source constant makes card-to-card differences attributable to the LUT rather than the photograph. LUT detail exposes the complete sample set through thumbnails below a large preview. The preview uses a vertically divided Before/After image with a horizontally draggable split position: Before is consistently on the left and After on the right, matching Viewer. Holding Space temporarily shows the complete original; releasing Space restores the LUT comparison. The reference supplies this interaction direction, not a pixel-level visual style.
 
 LUT Library owns an immutable sample baseline instead of inheriting the mutable Viewer document. Each sample render uses neutral develop/adjustments, the selected LUT at 100% intensity, the sample's declared display source space, and the application's current working/output space. Gallery and detail may create separate requests, but they use that same baseline and never inherit Viewer exposure, adjustments, source-space override, selected LUT, or intensity.
+
+Viewer Difference keeps the measured result contextual: A is the chosen base in the upper-left, B is the current Viewer LUT in the lower-left, and the amplified DIFF map occupies the full-height right region. A and B still use the normal Viewer renderer. Because those renders complete independently, any change that replaces both invalidates both old inputs before scheduling; DIFF stays pending until the current pair is complete instead of momentarily subtracting a new side from a stale side.
 
 Every LUT Library Gallery and detail preview goes through the same `EditDocument`, source-space resolution, `RenderEngine`, colour profile, and LUT transform semantics as Viewer. Cross-surface parity is tested by passing the exact Library baseline request to both surfaces; preview caching may differ, but output RGB must agree within the renderer's existing tolerance.
 

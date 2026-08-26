@@ -172,6 +172,13 @@ extension AppViewModel {
         guard cellLUTIDs.indices.contains(index), let imageSource else { return }
         cellTasks[index]?.cancel()
 
+        // A chosen-base change is the other half of the same pairing rule as
+        // `prepareDifferencePreviewRender`: never leave the previous A available for a new B.
+        if comparisonLayout == .diff {
+            cellImages[index] = nil
+            diffNSImage = nil
+        }
+
         let lut = cellLUTIDs[index].flatMap { lutForCell($0) }
         var request = document
         request.lut.lutID = lut?.lutID
@@ -207,6 +214,20 @@ extension AppViewModel {
             base: cellImages.first ?? nil,
             graded: previewNSImage
         )
+    }
+
+    /// Clear every Difference input that the next preview scheduling pass will replace.
+    ///
+    /// Kept as a small internal seam so the out-of-order completion contract can be checked by
+    /// `lutcheck` without making a renderer deliberately slow. When `rerenderBase` is true both
+    /// tasks belong to the same visual generation, so neither old side may survive into it.
+    func prepareDifferencePreviewRender(rerenderBase: Bool) {
+        guard comparisonLayout == .diff else { return }
+        previewNSImage = nil
+        diffNSImage = nil
+        if rerenderBase, cellImages.indices.contains(0) {
+            cellImages[0] = nil
+        }
     }
 
     /// The render size for one cell of the current layout.

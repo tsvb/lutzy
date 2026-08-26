@@ -1464,6 +1464,12 @@ final class AppViewModel: ObservableObject {
 
         if refreshGallery { lutGalleryRevision &+= 1 }
 
+        // Difference is assembled from two independently-rendered pictures. Invalidate the pair
+        // before either replacement task can land, otherwise a quick B render can be subtracted
+        // from the previous A while a slow RAW/develop render is still in flight. A false flash is
+        // worse than a short pending state because it looks like a real measured difference.
+        prepareDifferencePreviewRender(rerenderBase: renderGridCells)
+
         guard let imageSource else {
             previewNSImage = nil
             return

@@ -13,8 +13,8 @@ import Foundation
 ///   Three ways of putting two pictures together, because they answer different
 ///   questions. Side by side keeps both whole but makes the eye travel, so
 ///   small differences get lost on the way. A wipe puts them in the same place
-///   at the cost of never showing either whole. A difference image shows only
-///   what changed, at the cost of showing nothing else — the last resort when
+///   at the cost of never showing either whole. Difference keeps compact A and
+///   B references visible beside a larger amplified map — the last resort when
 ///   two looks are close enough that neither of the first two settles it.
 /// - The grids are a **contact sheet**: several LUTs on the same frame at once,
 ///   for choosing rather than for judging one.
@@ -26,7 +26,7 @@ enum ComparisonLayout: String, Codable, Sendable, CaseIterable, Equatable {
     case split      // original | current LUT
     case compare    // chosen base | current LUT, side by side
     case wipe       // chosen base under current LUT, split by a draggable edge
-    case diff       // what the current LUT changes relative to the chosen base
+    case diff       // compact A/B references left, amplified difference right
     case grid1x2
     case grid2x2
     case grid3x2

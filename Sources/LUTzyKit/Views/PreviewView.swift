@@ -198,39 +198,88 @@ struct PreviewView: View {
 
     // MARK: - Difference
 
-    /// What the current LUT changes relative to the base, amplified.
-    ///
-    /// Black means the two agree. Everything else is where they do not, and the
-    /// hue of what shows is the direction of the disagreement.
+    /// A and B remain visible as compact references while the amplified map
+    /// occupies the full right side. Black means agreement; every other colour
+    /// shows the magnitude and direction of disagreement.
     private var differenceView: some View {
-        ZStack(alignment: .bottom) {
-            bgColor
+        GeometryReader { geometry in
+            let frames = DifferenceComparisonLayout.frames(in: geometry.size)
 
-            if let diff = viewModel.diffNSImage {
-                Image(nsImage: diff)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding(8)
-            } else {
-                ProgressView().controlSize(.small)
-            }
-
-            VStack {
-                HStack {
-                    CompareBaseMenu(
-                        name: viewModel.compareBaseLUT?.name ?? "No LUT",
-                        luts: viewModel.library.allLUTs,
-                        choose: { viewModel.setCell(0, to: $0) }
-                    )
-                    Spacer()
-                    ComparisonBadge(text: viewModel.selectedLUT?.name ?? "Adjusted")
+            ZStack(alignment: .topLeading) {
+                ForEach(DifferenceRegion.allCases) { region in
+                    if let frame = frames[region] {
+                        differencePanel(region)
+                            .frame(width: frame.width, height: frame.height)
+                            .position(x: frame.midX, y: frame.midY)
+                    }
                 }
-                Spacer()
-                ComparisonBadge(
-                    text: "difference ×\(Int(DifferenceComposer.defaultGain)) — black means identical"
-                )
             }
-            .padding(12)
+        }
+        .padding(8)
+    }
+
+    @ViewBuilder
+    private func differencePanel(_ region: DifferenceRegion) -> some View {
+        switch region {
+        case .a:
+            ZStack(alignment: .topLeading) {
+                bgColor
+                if let base = viewModel.cellImages.first ?? nil {
+                    Image(nsImage: base)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ProgressView().controlSize(.small)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                CompareBaseMenu(
+                    name: "A · \(viewModel.compareBaseLUT?.name ?? "No LUT")",
+                    luts: viewModel.library.allLUTs,
+                    choose: { viewModel.setCell(0, to: $0) }
+                )
+                .padding(10)
+            }
+            .clipped()
+
+        case .b:
+            ZStack(alignment: .topLeading) {
+                bgColor
+                if let graded = viewModel.previewNSImage {
+                    Image(nsImage: graded)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ProgressView().controlSize(.small)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                ComparisonBadge(text: "B · \(viewModel.selectedLUT?.name ?? "Adjusted")")
+                    .padding(10)
+            }
+            .clipped()
+
+        case .difference:
+            ZStack(alignment: .bottom) {
+                bgColor
+                if let diff = viewModel.diffNSImage {
+                    Image(nsImage: diff)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+                VStack {
+                    ComparisonBadge(text: "DIFF")
+                    Spacer()
+                    ComparisonBadge(
+                        text: "×\(Int(DifferenceComposer.defaultGain)) · black means identical"
+                    )
+                }
+                .padding(10)
+            }
+            .clipped()
         }
     }
 

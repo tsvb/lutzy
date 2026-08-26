@@ -41,6 +41,8 @@
 - [x] 4.4 Keep the existing comparison region and LUT gallery mounted while media or LUT source changes
 - [x] 4.5 Make the Viewer Media/LUT divider draggable with usable minimum pane heights and keep video records visibly browseable without claiming playback
 - [x] 4.6 Remove the duplicate inline media filmstrip so Viewer detail contains only comparison/preview above and LUT Gallery below
+- [x] 4.7 Replace the full-preview Difference result with A upper-left, B lower-left, and a full-height DIFF region on the right
+- [x] 4.8 Invalidate stale Difference inputs before asynchronous A/B replacement renders and verify both out-of-order completion sequences
 
 ## 5. LUT sources and Collections
 
