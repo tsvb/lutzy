@@ -27,7 +27,7 @@
 ## 3. Media Library
 
 - [x] 3.1 Support mixed image/video copy import with complete nested hierarchy, durable records, duplicate detection, unique backing names, and partial-failure reporting
-- [x] 3.2 Build shared-selection List and Finder-like Columns presentations over the media manifest
+- [x] 3.2 Build shared-selection Finder-like Grid and List presentations over the media manifest
 - [x] 3.3 Show colliding legacy names without hiding records and use legacy-source detail only as a disambiguator
 - [x] 3.4 Open supported images in Viewer by MediaRecordID while keeping videos browseable without promising playback
 

@@ -9,7 +9,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 - Add **Media Library** and **LUT Library** beside Viewer, LUT Manager, and LUT Editor in the Workspace sidebar.
 - Replace Viewer's whole-surface Images mode with a secondary column that shows media at the top and LUT sources below it.
 - Keep Viewer's right side stable: comparison/preview above and the LUT gallery below.
-- Let Media Library import images and videos and browse them in Finder-like List or Columns presentations.
+- Let Media Library import images and videos and browse them in Finder-like Grid or List presentations.
 - Organise Viewer, LUT Library, and LUT Manager sources into physical Folders, metadata-backed Collections, and the built-in Starred filter.
 - Add manual Collections that can group LUTs across physical folders without moving or copying files.
 - Keep LUT Manager focused on physical organisation, metadata, collections, and bulk actions.
@@ -26,7 +26,7 @@ The application needs a clearer ownership model for the same local LUT set: Work
 ### New Capabilities
 
 - `workspace-library-navigation`: Defines the five Workspace destinations, Viewer's secondary column, stable workbench, and workspace-state boundaries.
-- `media-library`: Defines image/video import, Finder-like List/Columns browsing, and handoff of images to Viewer.
+- `media-library`: Defines image/video import, Finder-like Grid/List browsing, and handoff of images to Viewer.
 - `lut-virtual-collections`: Defines physical folders, manual metadata collections, and Starred as distinct LUT source types.
 - `lut-library-visual-browser`: Defines the separation between visual LUT discovery and management, gallery card metadata, LUT details, and sample-image rendering.
 - `lut-manager-metadata-inspector`: Defines single- and multi-selection metadata editing through a persistent Manager Inspector.

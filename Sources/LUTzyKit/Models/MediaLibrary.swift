@@ -50,7 +50,7 @@ struct MediaRecord: Identifiable, Codable, Sendable, Equatable {
 }
 
 enum MediaLibraryViewMode: String, Codable, Sendable, CaseIterable {
-    case columns
+    case grid
     case list
 }
 
@@ -71,7 +71,7 @@ final class MediaLibrary: ObservableObject {
 
     @Published private(set) var records: [MediaRecord] = []
     @Published var selectedID: MediaRecordID?
-    @Published var viewMode: MediaLibraryViewMode = .columns
+    @Published var viewMode: MediaLibraryViewMode = .grid
 
     let managedRoot: URL
     private let manifestURL: URL

@@ -33,7 +33,7 @@ The requested screenshots demonstrate useful relationships—media beside the wo
 | Workspace destination | Secondary column | Detail area |
 | --- | --- | --- |
 | Viewer | Media chooser at the top; LUT Folders, Collections, and Starred below | Existing comparison/preview above; existing LUT gallery below |
-| Media Library | Media locations and folder hierarchy | Finder-like List or Columns browser and media actions |
+| Media Library | Media locations and folder hierarchy | Finder-like Grid or List browser and media actions |
 | LUT Library | LUT Folders, Collections, and Starred | Visual Gallery and sample-based LUT detail |
 | LUT Manager | LUT Folders, Collections, and Starred | Existing table and bulk organisation/metadata actions |
 | LUT Editor | Existing LUT-oriented navigation | Existing editor |
@@ -146,7 +146,7 @@ The current Images/Back to Viewer toolbar control and `viewerSurface == .images`
 
 The display surfaces solve different tasks and must not share copy or persisted state:
 
-- Media Library: **List / Columns**. Columns means a Finder-style hierarchical column browser, not a thumbnail grid.
+- Media Library: **Grid / List**. Grid is a Finder-like thumbnail surface with natural-aspect-ratio previews and filenames; folder hierarchy stays in the secondary sidebar.
 - LUT Library: **Gallery / LUT detail**.
 - LUT Manager: management **Table**.
 - Viewer: no whole-surface library mode.
@@ -161,7 +161,7 @@ Alternative: preserve every nested Manager location across Workspace switches. R
 
 ### Make Media Library Finder-like without copying Finder
 
-List provides a sortable, information-dense view. Columns traverses media folders one hierarchy level per column. Both operate on the same imported media and selected item. The current backing workspace remains an implementation detail; user-facing copy says Media Library rather than Project.
+Grid provides a dense thumbnail browser comparable to Finder's Icon View: previews fit without cropping, filenames remain visible, and selection is shared with List. List provides a sortable, information-dense view. Folder traversal remains in the Media Library sidebar in both presentations. The current backing workspace remains an implementation detail; user-facing copy says Media Library rather than Project.
 
 Media Library accepts supported images and videos. Images can be opened in Viewer. Videos remain browseable library records, but playback and LUT processing are deliberately deferred.
 
@@ -219,7 +219,7 @@ Temporary-original state is explicitly cleared when its owning Workspace/detail 
 1. Add decodable Media Library and LUT Library `AppSection` cases while continuing to decode all existing section values.
 2. Create the media manifest and global managed Media Library root, then idempotently index every legacy project Images folder without moving, merging, or deleting files.
 3. Replace saved basename-only image selection with MediaRecordID. Migrate the old current-project basename only on an unambiguous match.
-4. Retire the persisted Viewer image-presentation preference. An old `imageManager.presentation` value is ignored rather than mapped to Media Library because Gallery and Columns have different meanings.
+4. Retire the persisted Viewer image-presentation preference. An old `imageManager.presentation` value is ignored rather than mapped automatically; Media Library owns its independent Grid/List presentation.
 5. Create one LUT catalog record per scanned file, including identical-content duplicates, then migrate typed tags and favourites from content-hash storage to each corresponding record. Keep measured metrics/tags content-level.
 6. Migrate persisted path-based Viewer and comparison-cell references to LUTRecordID through exact scanned locator matching. Unresolved legacy paths remain non-destructive missing references rather than selecting another identical LUT.
 7. Add Collection membership, origin, display-name override, and record-level tag/favourite metadata with tolerant decoding; existing LUTs begin with no Collections, Unknown origin, and no display-name override.
@@ -229,7 +229,7 @@ Temporary-original state is explicitly cleared when its owning Workspace/detail 
 ## Risks / Trade-offs
 
 - **The Viewer secondary column could become dense.** → Give Media and LUT sources clear section headers, independently scrollable or collapsible regions, and minimum useful heights.
-- **Columns may be mistaken for a thumbnail grid.** → Use Finder terminology, column disclosure behaviour, and accessibility labels that describe hierarchy traversal.
+- **Grid may be confused with LUT Gallery.** → Label the Media Library control `Grid`, keep folder navigation in its sidebar, and reserve `Gallery` for sample-based LUT discovery.
 - **Video import may imply playback.** → Label unsupported Viewer actions clearly and keep playback outside acceptance criteria.
 - **Vendor metadata is missing for existing LUTs.** → Use Unknown and provide explicit metadata editing; never present an inferred folder name as confirmed fact.
 - **Legacy projects can contain colliding paths and basenames.** → Aggregate by stable records, keep legacy origin internally, show a secondary disambiguator only for collisions, and never guess an ambiguous saved selection.
@@ -242,7 +242,7 @@ Temporary-original state is explicitly cleared when its owning Workspace/detail 
 
 None. Product-level decisions raised during the requested grilling session are resolved and recorded in `source-requirements.md`.
 
-Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; video playback is future work.
+Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Media Library uses Grid/List while folder hierarchy remains in its sidebar; video playback is future work.
 
 ## Complete measured taxonomy and local similarity
 

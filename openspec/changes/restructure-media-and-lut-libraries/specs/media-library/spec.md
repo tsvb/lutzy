@@ -30,16 +30,20 @@ The Media Library manifest SHALL persist MediaRecordID, kind, display name, full
 - **WHEN** a presentation model or thumbnail scan rebuilds its rows
 - **THEN** it uses MediaRecordID and does not expose a newly generated ephemeral UUID as durable identity
 
-### Requirement: List and Columns presentations
-Media Library SHALL provide List and Finder-like Columns presentations over the same media set and selection, where Columns traverses folder hierarchy one level per column rather than displaying a thumbnail grid.
+### Requirement: Grid and List presentations
+Media Library SHALL provide Grid and List presentations over the same media set, folder scope, and selection. Grid SHALL use Finder-like thumbnail browsing while folder traversal remains in the Media Library sidebar.
 
 #### Scenario: Switch presentation
-- **WHEN** the user switches between List and Columns
+- **WHEN** the user switches between Grid and List
 - **THEN** the same media location and selected item remain active
 
-#### Scenario: Traverse columns
-- **WHEN** the user selects a folder in Columns
-- **THEN** its child folders and media appear in the next column while ancestor columns remain visible
+#### Scenario: Browse media in Grid
+- **WHEN** the user selects Grid
+- **THEN** available media appears in a responsive thumbnail grid with uncropped natural-aspect-ratio previews and visible filenames
+
+#### Scenario: Change Grid folder scope
+- **WHEN** the user selects a folder in the Media Library sidebar while Grid is active
+- **THEN** the grid shows media in that folder scope without adding a second hierarchical browser inside the content surface
 
 #### Scenario: List media
 - **WHEN** the user selects List

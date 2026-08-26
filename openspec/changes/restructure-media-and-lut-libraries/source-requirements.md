@@ -25,7 +25,7 @@ This file preserves the user's original intent and the evolution of decisions be
 
 1. Add Media Library as a first-class Workspace destination.
 2. Media Library imports images and videos.
-3. Media Library supports List and Finder-like Columns browsing. “Columns” means hierarchical Finder columns, not the removed image thumbnail Gallery.
+3. Media Library supports Grid and List browsing. The user initially called the thumbnail layout “Columns”, then clarified with a Finder reference that the intended surface is an icon-like thumbnail grid, not hierarchical Finder columns.
 4. Existing project-backed media must be preserved; Project is not a visible navigation level.
 
 ### LUT organisation
@@ -194,6 +194,13 @@ After a successful local import, the application may recommend existing LUTs who
 > 1. 不是所有都有標籤 先補上  
 > 2. 匯入lut的時候 是不是可以有類似推薦或是匹配的系統 說這跟哪一個比較像
 
+### 2026-08-26 — Media thumbnail Grid clarification
+
+The Media Library presentation previously specified as Finder-like Columns is replaced by Grid. Grid shows a responsive field of uncropped natural-aspect-ratio media thumbnails with visible filenames, while List remains the information-dense alternative. Folder hierarchy stays in the Media Library sidebar. The control is labelled `Grid`, not `Gallery`, so it is not confused with LUT Library's sample-based visual Gallery.
+
+> image viewer那邊  
+> 所謂column應該是這樣 或者可以叫gallery mode?
+
 ## Implementation contracts added after independent gate review
 
 These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.
@@ -243,13 +250,14 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-d0181aac-c1d2-4658-9667-514bec8e0b36.png` | Consolidated LUT sample-detail request |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5d49264b-f669-4619-a06a-638252e97e46.png` | Consolidated Gallery-card metadata request |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5411ffd7-3444-4663-a8b9-ec10b4e680ac.png` | Reference for the now-resolved split between visual display and management |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-d7b694ea-8224-471d-a234-1e01f4c58459.png` | Finder Icon View reference clarifying Media Library Grid density and thumbnail treatment |
 
 ## OpenSpec record map
 
 | OpenSpec change | What it records | Relationship to this change |
 | --- | --- | --- |
 | `align-color-pipeline` | RGB and LUT-render consistency | Required foundation; new previews reuse it |
-| `add-image-gallery-mode` | Earlier image List/Gallery manager | Superseded by Media Library List/Columns and Viewer toggle removal |
+| `add-image-gallery-mode` | Earlier image List/Gallery manager | Superseded by Media Library Grid/List and Viewer toggle removal |
 | `simplify-primary-navigation` | Removal of Project level and stable primary modes | Extended by Media Library and the visual-LUT placement decision |
 | `add-viewer-folder-contact-sheet` | Folder-first Viewer and lower visual LUT sheet | Retained |
 | `support-deep-lut-folder-tree` | Unlimited recursive folder presentation and descendant scope | Retained |

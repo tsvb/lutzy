@@ -63,7 +63,7 @@ struct MediaLibraryView: View {
                     get: { viewModel.media.viewMode },
                     set: { viewModel.media.viewMode = $0 }
                 )) {
-                    Label("Columns", systemImage: "rectangle.split.3x1").tag(MediaLibraryViewMode.columns)
+                    Label("Grid", systemImage: "square.grid.3x2").tag(MediaLibraryViewMode.grid)
                     Label("List", systemImage: "list.bullet").tag(MediaLibraryViewMode.list)
                 }
                 .pickerStyle(.segmented).fixedSize()
@@ -74,7 +74,7 @@ struct MediaLibraryView: View {
             Group {
                 if records.isEmpty { emptyState }
                 else if viewModel.media.viewMode == .list { listView }
-                else { columnsView }
+                else { gridView }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -107,8 +107,92 @@ struct MediaLibraryView: View {
         }
     }
 
-    private var columnsView: some View {
-        MediaColumnsBrowser(viewModel: viewModel, searchText: searchText)
+    /// Finder-style icon browsing: the image keeps its natural aspect ratio
+    /// inside a consistent cell, while the filename remains the primary label.
+    /// Folder traversal belongs to the Media Library sidebar, not another
+    /// hierarchy nested inside the presentation itself.
+    private var gridView: some View {
+        ScrollView {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 14)],
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(records) { record in
+                    mediaCard(record)
+                }
+            }
+            .padding(16)
+        }
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.28))
+    }
+
+    private func mediaCard(_ record: MediaRecord) -> some View {
+        let isSelected = viewModel.media.selectedID == record.id
+        return VStack(spacing: 7) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color.black.opacity(0.22))
+
+                if let image = viewModel.thumbnail(for: record) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
+                } else {
+                    Image(systemName: record.kind == .video ? "film" : "photo")
+                        .font(.system(size: 36, weight: .light))
+                        .foregroundStyle(.tertiary)
+                }
+
+                if record.kind == .video {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .black.opacity(0.58))
+                        .padding(8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
+            }
+            .frame(height: 132)
+
+            Text(record.displayName)
+                .font(.caption)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .top)
+
+            if let detail = viewModel.media.disambiguator(for: record) {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(7)
+        .background(
+            isSelected ? Color.accentColor.opacity(0.18) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 9)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 9))
+        .onTapGesture(count: 2) {
+            viewModel.media.selectedID = record.id
+            if record.kind == .image { viewModel.openMedia(record) }
+        }
+        .onTapGesture {
+            viewModel.media.selectedID = record.id
+        }
+        .contextMenu {
+            Button("Open in Viewer") { viewModel.openMedia(record) }
+                .disabled(record.kind == .video)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(record.displayName), \(record.kind == .image ? "Image" : "Video")")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     private func mediaName(_ record: MediaRecord) -> some View {

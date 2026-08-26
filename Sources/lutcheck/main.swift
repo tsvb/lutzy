@@ -937,13 +937,14 @@ print("projects -> \(projectOK ? "PASS" : "FAIL")")
 
 let formerImagesSection = try? JSONDecoder().decode(AppSection.self, from: Data(#""images""#.utf8))
 let navigationOwnershipOK = AppSection.allCases == [.viewer, .mediaLibrary, .lutLibrary, .manager, .editor]
+    && MediaLibraryViewMode.allCases == [.grid, .list]
     && AppSection.viewer.label == "Viewer"
     && AppSection.mediaLibrary.label == "Media Library"
     && AppSection.lutLibrary.label == "LUT Library"
     && AppSection.manager.label == "LUT Manager"
     && AppSection.editor.label == "LUT Editor"
     && formerImagesSection == .mediaLibrary
-print("sidebar has five stable modes and migrates former Images to Media Library -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
+print("sidebar has five stable modes; Media Library presents Grid/List -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
 
 let folderTree = LUTFolderHierarchy.tree(from: [
     "Sony": 2,
@@ -985,6 +986,7 @@ let implicitVM = AppViewModel(
 let implicitWorkspaceOK = startedWithoutWorkspace
     && implicitProjects.current != nil
     && implicitProjects.currentImagesFolder != nil
+    && implicitVM.media.viewMode == .grid
 print("fresh install gets an implicit image workspace -> \(implicitWorkspaceOK ? "PASS" : "FAIL")")
 
 
