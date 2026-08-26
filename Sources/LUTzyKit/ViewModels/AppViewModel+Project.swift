@@ -208,7 +208,7 @@ extension AppViewModel {
     /// about a file the user never chose directly.
     func restoreSession(_ session: Project.Session) {
         restoreDepth += 1
-        defer { restoreDepth -= 1 }
+        defer { finishSessionRestore() }
         section = session.section
         comparisonLayout = session.layout
         tagFilter = Set(session.tagFilter)
@@ -240,19 +240,27 @@ extension AppViewModel {
         // undo whatever the user did in the meantime — measured: opening the
         // editor during startup switched the preview to its before/after
         // layout, and the late restore put the viewer's 3x3 back.
-        if let raw = session.selectedLUT {
+        let hasSavedLUTReferences = session.selectedLUT != nil
+            || session.cellLUTs.contains(where: { $0 != nil })
+        if hasSavedLUTReferences {
             // Raised here, not inside the task: the synchronous pass releases
             // its own hold as soon as it returns, and a hold taken only once
             // the task starts would leave a gap where a save could fire.
+            let restoringProjectID = projects.current?.id
             restoreDepth += 1
             Task {
-                defer { restoreDepth -= 1 }
+                defer { finishSessionRestore() }
                 await library.scanCompletion()
+                guard projects.current?.id == restoringProjectID else { return }
+                migrateLegacyLUTReferences()
                 // Only when it resolves. A LUT that has been deleted from the
                 // library should leave the project's record alone rather than
                 // clearing it — the file may come back.
-                guard let lut = resolvedLUT(LUTID(raw: raw)) else { return }
+                guard let raw = session.selectedLUT else { return }
+                let migratedID = library.migratedRecordID(for: LUTID(raw: raw))
+                guard let lut = resolvedLUT(migratedID) else { return }
                 selectLUT(lut)
+                if lut.lutID.raw != raw { scheduleMigratedSessionSave() }
             }
         }
 
@@ -266,5 +274,6 @@ extension AppViewModel {
               let index = collection.items.firstIndex(where: { $0.id == id.rawValue })
         else { return }
         selectCollectionImage(at: index)
+        if directID == nil { scheduleMigratedSessionSave() }
     }
 }

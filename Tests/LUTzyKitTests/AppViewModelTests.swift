@@ -117,6 +117,112 @@ final class AppViewModelTests: TempDirectoryTestCase {
         XCTAssertNil(library.allLUTs.first(where: { $0.url.standardizedFileURL == externalURL.standardizedFileURL }))
     }
 
+    func testInterruptedDerivedSaveRecoversPersistedSessionAndWritesDurableIDBack() async throws {
+        let catalogURL = tempDirectory.appendingPathComponent("crash-catalog.json")
+        let projectRoot = tempDirectory.appendingPathComponent("Crash Projects")
+        let projects = ProjectStore(root: projectRoot)
+        _ = projects.create(named: "Interrupted Save")
+        let transientID = LUTID(raw: "derived://interrupted/session")
+        var session = Project.Session()
+        session.selectedLUT = transientID.raw
+        projects.updateSession(session)
+
+        let scratch = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Serialized.cube", in: tempDirectory
+        )
+        let destination = tempDirectory.appendingPathComponent("outside/Recovered.cube")
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let firstCatalog = LUTCatalog(fileURL: catalogURL)
+        XCTAssertTrue(firstCatalog.beginSaveRecovery(
+            for: destination, replacing: transientID,
+            expectedFingerprint: try CubeLUT(url: scratch).contentHash
+        ))
+        try Data(contentsOf: scratch).write(to: destination, options: .atomic)
+
+        let relaunchedCatalog = LUTCatalog(fileURL: catalogURL)
+        let scanRoot = tempDirectory.appendingPathComponent("empty-library", isDirectory: true)
+        try FileManager.default.createDirectory(at: scanRoot, withIntermediateDirectories: true)
+        let library = LUTLibrary(catalog: relaunchedCatalog)
+        library.setFolder(scanRoot)
+        let relaunchedProjects = ProjectStore(root: projectRoot)
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(),
+            projects: relaunchedProjects,
+            tags: LUTTagStore(fileURL: tempDirectory.appendingPathComponent("crash-tags.json")),
+            media: MediaLibrary(
+                root: tempDirectory.appendingPathComponent("Crash Media"),
+                manifestURL: tempDirectory.appendingPathComponent("crash-media.json")
+            ),
+            library: library
+        )
+
+        let deadline = Date().addingTimeInterval(5)
+        while viewModel.document.lut.lutID?.isRecord != true {
+            if Date() > deadline { return XCTFail("recovered derived session never adopted a durable ID") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let durableID = try XCTUnwrap(viewModel.document.lut.lutID)
+        XCTAssertEqual(viewModel.selectedLUT?.url.standardizedFileURL, destination.standardizedFileURL)
+        while relaunchedProjects.current?.session.selectedLUT != durableID.raw {
+            if Date() > deadline { return XCTFail("recovered durable ID was not written back to the session") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(ProjectStore(root: projectRoot).current?.session.selectedLUT, durableID.raw)
+    }
+
+    func testLegacyLUTGridAndMediaSessionReferencesArePersistentlyMigrated() async throws {
+        let lutRoot = tempDirectory.appendingPathComponent("Legacy LUTs", isDirectory: true)
+        try FileManager.default.createDirectory(at: lutRoot, withIntermediateDirectories: true)
+        let lutURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Legacy.cube", in: lutRoot
+        )
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("legacy-catalog.json"))
+        let library = LUTLibrary(catalog: catalog)
+        library.setFolder(lutRoot)
+        while library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
+        let recordID = try XCTUnwrap(library.allLUTs.first?.lutID)
+
+        let projectRoot = tempDirectory.appendingPathComponent("Legacy Projects")
+        let projects = ProjectStore(root: projectRoot)
+        let project = projects.create(named: "Legacy Session")
+        let imageURL = try Fixtures.writeGradientPNG(
+            width: 16, height: 12, named: "legacy-image.png", in: projects.imagesFolder(for: project)
+        )
+        var session = Project.Session()
+        session.selectedLUT = lutURL.standardizedFileURL.path
+        session.cellLUTs = [lutURL.standardizedFileURL.path]
+        session.imageName = imageURL.lastPathComponent
+        projects.updateSession(session)
+
+        let media = MediaLibrary(
+            root: tempDirectory.appendingPathComponent("Legacy Media"),
+            manifestURL: tempDirectory.appendingPathComponent("legacy-media.json")
+        )
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(),
+            projects: projects,
+            tags: LUTTagStore(fileURL: tempDirectory.appendingPathComponent("legacy-tags.json")),
+            media: media,
+            library: library
+        )
+
+        let deadline = Date().addingTimeInterval(5)
+        while projects.current?.session.selectedLUT != recordID.raw
+                || projects.current?.session.cellLUTs != [recordID.raw]
+                || projects.current?.session.mediaRecordID == nil {
+            if Date() > deadline { return XCTFail("legacy session identities were not written back") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let persisted = try XCTUnwrap(ProjectStore(root: projectRoot).current?.session)
+        XCTAssertEqual(persisted.selectedLUT, recordID.raw)
+        XCTAssertEqual(persisted.cellLUTs, [recordID.raw])
+        XCTAssertNotNil(persisted.mediaRecordID)
+        XCTAssertEqual(viewModel.document.lut.lutID, recordID)
+    }
+
     func testExportStatusReachesTheStatusBar() {
         let viewModel = AppViewModel()
         viewModel.export.onStatus?("Exported: photo.jpg")
@@ -289,9 +395,23 @@ final class AppViewModelTests: TempDirectoryTestCase {
     /// the honest reference — it is what a fresh launch would resolve, and it is what a rescan puts
     /// in the library.
     func testSavingADerivedLUTRepointsTheDocumentAtTheSavedFile() async throws {
-        let viewModel = AppViewModel(engine: FakeRenderEngine())
-        viewModel.library.setFolder(tempDirectory)
-        while viewModel.library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
+        let projectRoot = tempDirectory.appendingPathComponent("Projects")
+        let projects = ProjectStore(root: projectRoot)
+        _ = projects.create(named: "Durable Save")
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("save-catalog.json"))
+        let library = LUTLibrary(catalog: catalog)
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(),
+            projects: projects,
+            tags: LUTTagStore(fileURL: tempDirectory.appendingPathComponent("save-tags.json")),
+            media: MediaLibrary(
+                root: tempDirectory.appendingPathComponent("Media"),
+                manifestURL: tempDirectory.appendingPathComponent("save-media.json")
+            ),
+            library: library
+        )
+        library.setFolder(tempDirectory)
+        while library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
 
         let (lut, _) = try deriveAndSelect(on: viewModel)
         XCTAssertTrue(try XCTUnwrap(viewModel.document.lut.lutID).isDerived)
@@ -306,6 +426,14 @@ final class AppViewModelTests: TempDirectoryTestCase {
         XCTAssertEqual(viewModel.catalog.record(for: durableID)?.locator, destination.standardizedFileURL.path)
         XCTAssertEqual(viewModel.selectedLUT?.url.standardizedFileURL, destination.standardizedFileURL,
                        "and it must still resolve — to the saved file")
+
+        let deadline = Date().addingTimeInterval(5)
+        while projects.current?.session.selectedLUT != durableID.raw {
+            if Date() > deadline { return XCTFail("durable LUT identity was not written to the project session") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let relaunchedProjects = ProjectStore(root: projectRoot)
+        XCTAssertEqual(relaunchedProjects.current?.session.selectedLUT, durableID.raw)
     }
 
     /// The Save panel does not force the LUT folder, so a save can land somewhere the library never

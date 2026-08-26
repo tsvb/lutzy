@@ -278,7 +278,11 @@ final class LUTLibrary: ObservableObject {
     /// untouched so it can reconnect if the file returns.
     func migratedRecordID(for id: LUTID) -> LUTID {
         guard id.isRecord == false, id.isDerived == false else { return id }
-        return allLUTs.first(where: { $0.id == id.raw })?.lutID ?? id
+        let legacyPath = URL(fileURLWithPath: id.raw)
+            .standardizedFileURL.resolvingSymlinksInPath().path
+        return allLUTs.first(where: {
+            $0.url.standardizedFileURL.resolvingSymlinksInPath().path == legacyPath
+        })?.lutID ?? id
     }
 
     /// Move a LUT into another folder of the app's own library.

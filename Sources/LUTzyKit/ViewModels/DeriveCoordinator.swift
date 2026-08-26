@@ -32,7 +32,10 @@ final class DeriveCoordinator: ObservableObject {
     /// Bracket the atomic file write with durable catalog recovery/adoption.
     /// Returning false prevents a write or reports that registration did not
     /// complete, so "Saved" is never published ahead of the catalog.
-    var onWillSave: ((URL) -> Bool)?
+    /// The transient ID and fingerprint describe the exact serialized scratch
+    /// bytes, not the higher-precision in-memory cube, so launch recovery can
+    /// distinguish a completed atomic replacement from an untouched old file.
+    var onWillSave: ((URL, LUTRecordID?, String) -> Bool)?
     var onSaved: ((URL) -> Bool)?
     var onSaveFailed: ((URL) -> Void)?
 
@@ -193,7 +196,12 @@ final class DeriveCoordinator: ObservableObject {
     /// the file, then publish success only if catalog adoption also succeeds.
     @discardableResult
     func save(to destination: URL) throws -> Bool {
-        if let onWillSave, onWillSave(destination) == false { return false }
+        guard let scratchURL else { throw SaveError.nothingToSave }
+        let serialized = try CubeLUT(url: scratchURL, category: "Derived")
+        if let onWillSave,
+           onWillSave(destination, derivedLUT?.lutID, serialized.contentHash) == false {
+            return false
+        }
         do {
             try performSave(to: destination)
         } catch {

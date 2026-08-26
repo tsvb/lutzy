@@ -213,6 +213,7 @@ final class AppViewModel: ObservableObject {
     /// asynchronous ones that finish independently, and whichever finished
     /// first would clear a boolean while the others were still restoring.
     var restoreDepth = 0
+    private var pendingSessionSaveAfterRestore = false
     var isRestoringSession: Bool { restoreDepth > 0 }
     /// What V returns to. Remembered so a glance at the single view does not
     /// cost the user their 3×3.
@@ -441,10 +442,10 @@ final class AppViewModel: ObservableObject {
     /// owns the status bar and the alert. They report *what* happened; deciding
     /// how to show it stays here.
     private func wireCoordinators() {
-        // A rescan can mean the bytes behind an unchanged `LUTID` have changed — a path is the
-        // identity, so a `.cube` replaced in place keeps it. Drop the engine's cube filters rather
-        // than go on serving the old cube. Wired here, before `restoreFolder()` runs below, so the
-        // launch scan is covered too.
+        // A rescan can mean the bytes behind an unchanged durable record have changed — a `.cube`
+        // replaced at the same locator keeps its record identity. Drop the engine's cube filters
+        // rather than go on serving the old cube. Wired here, before `restoreFolder()` runs below,
+        // so the launch scan is covered too.
         library.onScanned = { [weak self] in
             guard let self else { return }
             self.catalog.migrateLegacyMetadata(for: self.library.allLUTs, from: self.tags)
@@ -468,12 +469,15 @@ final class AppViewModel: ObservableObject {
             self.selectLUT(lut)
         }
         derive.libraryFolder = { [weak self] in self?.library.folderURL }
-        derive.onWillSave = { [weak self] destination in
+        derive.onWillSave = { [weak self] destination, transient, fingerprint in
             guard let self else { return false }
             let bookmark = try? destination.bookmarkData(
                 options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
             )
-            guard self.catalog.beginSaveRecovery(for: destination, bookmark: bookmark) else {
+            guard self.catalog.beginSaveRecovery(
+                for: destination, replacing: transient,
+                expectedFingerprint: fingerprint, bookmark: bookmark
+            ) else {
                 self.presentError("The LUT could not be prepared for a recoverable save. Check the library location and try again.")
                 return false
             }
@@ -519,7 +523,10 @@ final class AppViewModel: ObservableObject {
         let bookmark = try? destination.bookmarkData(
             options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
         )
-        guard let recordID = catalog.adoptSavedLUT(saved, bookmark: bookmark) else {
+        let transientID = derive.derivedLUT?.lutID
+        guard let recordID = catalog.adoptSavedLUT(
+            saved, bookmark: bookmark, replacing: transientID
+        ) else {
             presentError("The LUT file was saved, but it could not be registered in the library. Try saving again.")
             return false
         }
@@ -532,16 +539,22 @@ final class AppViewModel: ObservableObject {
         document.lut.lutID = recordID
         Task { await engine.invalidateLUTCache() }
         schedulePreview()
+        scheduleSessionSave()
         return true
     }
 
     /// Replace exact legacy path references only after the catalog knows the
     /// file. Missing paths remain non-destructive unresolved references.
-    private func migrateLegacyLUTReferences() {
+    func migrateLegacyLUTReferences() {
+        let previousDocumentID = document.lut.lutID
+        let previousCells = cellLUTIDs
         if let id = document.lut.lutID { document.lut.lutID = library.migratedRecordID(for: id) }
         cellLUTIDs = cellLUTIDs.map { $0.map(library.migratedRecordID(for:)) }
         if let id = editorBaseID { editorBaseID = library.migratedRecordID(for: id) }
         if let id = editorStackID { editorStackID = library.migratedRecordID(for: id) }
+        if document.lut.lutID != previousDocumentID || cellLUTIDs != previousCells {
+            scheduleMigratedSessionSave()
+        }
     }
 
     /// Open the first image of the source folder once its scan completes.
@@ -1023,6 +1036,30 @@ final class AppViewModel: ObservableObject {
             guard Task.isCancelled == false else { return }
             self?.captureSession()
         }
+    }
+
+    /// Unlike ordinary restoration setters, a successful identity migration
+    /// must be written after the restore guard is released. Keeping this
+    /// explicit prevents an unresolved legacy reference from being erased just
+    /// because unrelated restored properties fired their `didSet` hooks.
+    func scheduleMigratedSessionSave() {
+        if isRestoringSession {
+            pendingSessionSaveAfterRestore = true
+        } else {
+            scheduleSessionSave()
+        }
+    }
+
+    /// Release one synchronous/asynchronous restore hold. Mutations made while
+    /// restoring are coalesced and written only after every hold is gone, so a
+    /// failed lookup cannot erase a reference while successful identity
+    /// migrations still become durable.
+    func finishSessionRestore() {
+        precondition(restoreDepth > 0)
+        restoreDepth -= 1
+        guard restoreDepth == 0, pendingSessionSaveAfterRestore else { return }
+        pendingSessionSaveAfterRestore = false
+        scheduleSessionSave()
     }
 
     /// Put the viewer back to having nothing open. Used when switching or

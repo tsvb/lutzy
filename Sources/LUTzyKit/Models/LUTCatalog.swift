@@ -53,15 +53,22 @@ final class LUTCatalog: ObservableObject {
         var version: Int = 1
         var records: [LUTRecord]
         var collections: [LUTCollectionRecord]
+        /// Old transient references that must continue to resolve after a
+        /// crash interrupted document/session adoption. Optional so version-1
+        /// catalogs written before recovery aliases remain readable.
+        var identityAliases: [String: String]?
     }
 
     private struct SaveRecovery: Codable {
         let locator: String
         let bookmark: Data?
+        let transientID: LUTRecordID?
+        let expectedFingerprint: String?
     }
 
     @Published private(set) var records: [LUTRecordID: LUTRecord] = [:]
     @Published private(set) var collections: [LUTCollectionRecord] = []
+    private var identityAliases: [String: String] = [:]
 
     private let fileURL: URL
     private let recoveryURL: URL
@@ -86,9 +93,9 @@ final class LUTCatalog: ObservableObject {
         return folder.appendingPathComponent("lut-catalog.json")
     }
 
-    func record(for id: LUTRecordID) -> LUTRecord? { records[id] }
+    func record(for id: LUTRecordID) -> LUTRecord? { records[resolvedRecordID(for: id)] }
 
-    func record(for lut: CubeLUT) -> LUTRecord? { records[lut.lutID] }
+    func record(for lut: CubeLUT) -> LUTRecord? { record(for: lut.lutID) }
 
     func recordID(for locator: URL) -> LUTRecordID? {
         let path = Self.normalized(locator)
@@ -99,7 +106,8 @@ final class LUTCatalog: ObservableObject {
     /// root. This is what makes an explicitly saved outside-root LUT survive a
     /// relaunch instead of leaving a durable ID that cannot produce pixels.
     func loadLUT(for id: LUTRecordID) -> CubeLUT? {
-        guard var record = records[id] else { return nil }
+        let durableID = resolvedRecordID(for: id)
+        guard var record = records[durableID] else { return nil }
         var url = record.url
         var didAccessSecurityScope = false
 
@@ -132,7 +140,7 @@ final class LUTCatalog: ObservableObject {
         else {
             if record.isAvailable {
                 record.isAvailable = false
-                records[id] = record
+                records[durableID] = record
                 persist()
             }
             return nil
@@ -141,9 +149,9 @@ final class LUTCatalog: ObservableObject {
         record.locator = Self.normalized(url)
         record.fingerprint = parsed.contentHash
         record.isAvailable = true
-        records[id] = record
+        records[durableID] = record
         persist()
-        return parsed.withRecordID(id)
+        return parsed.withRecordID(durableID)
     }
 
     func effectiveName(for lut: CubeLUT) -> String {
@@ -345,8 +353,16 @@ final class LUTCatalog: ObservableObject {
     /// Persist intent before a derived LUT replaces anything at `destination`.
     /// If the process stops after the file write but before catalog adoption,
     /// the marker lets the next launch finish the same adoption deterministically.
-    func beginSaveRecovery(for destination: URL, bookmark: Data? = nil) -> Bool {
-        let marker = SaveRecovery(locator: Self.normalized(destination), bookmark: bookmark)
+    func beginSaveRecovery(
+        for destination: URL,
+        replacing transientID: LUTRecordID? = nil,
+        expectedFingerprint: String? = nil,
+        bookmark: Data? = nil
+    ) -> Bool {
+        let marker = SaveRecovery(
+            locator: Self.normalized(destination), bookmark: bookmark,
+            transientID: transientID, expectedFingerprint: expectedFingerprint
+        )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         guard let data = try? encoder.encode(marker) else { return false }
@@ -369,15 +385,20 @@ final class LUTCatalog: ObservableObject {
 
     /// Adopt a successfully written LUT immediately, including paths outside
     /// the scanned root. Known locators retain record metadata.
-    func adoptSavedLUT(_ lut: CubeLUT, bookmark: Data? = nil) -> LUTRecordID? {
+    func adoptSavedLUT(
+        _ lut: CubeLUT, bookmark: Data? = nil, replacing transientID: LUTRecordID? = nil
+    ) -> LUTRecordID? {
         let locator = Self.normalized(lut.url)
         if let existing = records.values.first(where: { $0.locator == locator })?.id {
             let previous = records[existing]
+            let previousAliases = identityAliases
             records[existing]?.fingerprint = lut.contentHash
             records[existing]?.bookmark = bookmark ?? records[existing]?.bookmark
             records[existing]?.isAvailable = true
+            registerAlias(from: transientID, to: existing)
             guard persistReportingFailure() else {
                 if let previous { records[existing] = previous }
+                identityAliases = previousAliases
                 return nil
             }
             clearSaveRecovery(matching: locator)
@@ -385,12 +406,15 @@ final class LUTCatalog: ObservableObject {
         }
 
         let id = LUTID(recordUUID: UUID())
+        let previousAliases = identityAliases
         records[id] = LUTRecord(
             id: id, locator: locator, bookmark: bookmark,
             fingerprint: lut.contentHash, isAvailable: true
         )
+        registerAlias(from: transientID, to: id)
         guard persistReportingFailure() else {
             records.removeValue(forKey: id)
+            identityAliases = previousAliases
             return nil
         }
         clearSaveRecovery(matching: locator)
@@ -435,6 +459,7 @@ final class LUTCatalog: ObservableObject {
         else { return }
         records = Dictionary(uniqueKeysWithValues: snapshot.records.map { ($0.id, $0) })
         collections = snapshot.collections
+        identityAliases = snapshot.identityAliases ?? [:]
     }
 
     private func recoverPendingSave() {
@@ -444,8 +469,31 @@ final class LUTCatalog: ObservableObject {
         let url = URL(fileURLWithPath: marker.locator)
         guard FileManager.default.fileExists(atPath: url.path),
               let lut = try? CubeLUT(url: url, category: "Recovered")
-        else { return }
-        _ = adoptSavedLUT(lut, bookmark: marker.bookmark)
+        else {
+            clearSaveRecovery(matching: marker.locator)
+            return
+        }
+        guard marker.expectedFingerprint == nil || marker.expectedFingerprint == lut.contentHash else {
+            // The marker was written, but the atomic replacement never landed;
+            // keep an existing destination untouched and discard the stale intent.
+            clearSaveRecovery(matching: marker.locator)
+            return
+        }
+        _ = adoptSavedLUT(lut, bookmark: marker.bookmark, replacing: marker.transientID)
+    }
+
+    private func registerAlias(from transientID: LUTRecordID?, to durableID: LUTRecordID) {
+        guard let transientID, transientID != durableID else { return }
+        identityAliases[transientID.raw] = durableID.raw
+    }
+
+    private func resolvedRecordID(for id: LUTRecordID) -> LUTRecordID {
+        var raw = id.raw
+        var visited: Set<String> = []
+        while let next = identityAliases[raw], visited.insert(raw).inserted {
+            raw = next
+        }
+        return LUTRecordID(raw: raw)
     }
 
     private func clearSaveRecovery(matching locator: String) {
@@ -459,7 +507,10 @@ final class LUTCatalog: ObservableObject {
     private func persist() { _ = persistReportingFailure() }
 
     private func persistReportingFailure() -> Bool {
-        let snapshot = Snapshot(records: Array(records.values), collections: collections)
+        let snapshot = Snapshot(
+            records: Array(records.values), collections: collections,
+            identityAliases: identityAliases.isEmpty ? nil : identityAliases
+        )
         guard let data = try? Self.encoder.encode(snapshot) else { return false }
         do {
             try FileManager.default.createDirectory(

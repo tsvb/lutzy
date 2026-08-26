@@ -158,9 +158,11 @@ final class DeriveCoordinatorTests: TempDirectoryTestCase {
         _ = try installScratchResult(on: coordinator)
         let destination = tempDirectory.appendingPathComponent("Transactional.cube")
         var events: [String] = []
-        coordinator.onWillSave = { url in
+        coordinator.onWillSave = { url, transientID, fingerprint in
             XCTAssertEqual(url, destination)
             XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+            XCTAssertEqual(transientID, coordinator.derivedLUT?.lutID)
+            XCTAssertFalse(fingerprint.isEmpty)
             events.append("marker")
             return true
         }
@@ -182,7 +184,7 @@ final class DeriveCoordinatorTests: TempDirectoryTestCase {
         let destination = tempDirectory.appendingPathComponent("is-a-directory")
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         var cancelled: URL?
-        coordinator.onWillSave = { _ in true }
+        coordinator.onWillSave = { _, _, _ in true }
         coordinator.onSaveFailed = { cancelled = $0 }
 
         XCTAssertThrowsError(try coordinator.save(to: destination))

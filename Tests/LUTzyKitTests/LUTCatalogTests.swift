@@ -172,16 +172,46 @@ final class LUTCatalogTests: TempDirectoryTestCase {
     func testPendingDerivedSaveIsRecoveredOnCatalogRelaunch() throws {
         let manifest = tempDirectory.appendingPathComponent("recovery.json")
         let destination = tempDirectory.appendingPathComponent("Recovered.cube")
+        let scratch = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Scratch.cube", in: tempDirectory
+        )
+        let serialized = try CubeLUT(url: scratch)
+        let transientID = LUTID(raw: "derived://interrupted-save")
         let first = LUTCatalog(fileURL: manifest)
-        XCTAssertTrue(first.beginSaveRecovery(for: destination))
+        XCTAssertTrue(first.beginSaveRecovery(
+            for: destination, replacing: transientID,
+            expectedFingerprint: serialized.contentHash
+        ))
         try Fixtures.identityCubeText(size: 2).write(to: destination, atomically: true, encoding: .utf8)
 
         let relaunched = LUTCatalog(fileURL: manifest)
         let id = try XCTUnwrap(relaunched.recordID(for: destination))
-        let resolved = try XCTUnwrap(relaunched.loadLUT(for: id))
+        let resolved = try XCTUnwrap(relaunched.loadLUT(for: transientID))
 
         XCTAssertEqual(resolved.url.standardizedFileURL, destination.standardizedFileURL)
         XCTAssertTrue(id.isRecord)
+        XCTAssertEqual(resolved.lutID, id, "the persisted derived:// session alias must adopt the recovered record")
+    }
+
+    func testRecoveryDoesNotAdoptAnUntouchedOverwriteDestination() throws {
+        let manifest = tempDirectory.appendingPathComponent("stale-recovery.json")
+        let destination = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "Known.cube", in: tempDirectory
+        )
+        let replacement = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 3), named: "Replacement.cube", in: tempDirectory
+        )
+        let transientID = LUTID(raw: "derived://replacement-that-never-landed")
+        let first = LUTCatalog(fileURL: manifest)
+        XCTAssertTrue(first.beginSaveRecovery(
+            for: destination, replacing: transientID,
+            expectedFingerprint: try CubeLUT(url: replacement).contentHash
+        ))
+
+        let relaunched = LUTCatalog(fileURL: manifest)
+
+        XCTAssertNil(relaunched.loadLUT(for: transientID))
+        XCTAssertNil(relaunched.recordID(for: destination))
     }
 
     func testFailedFileWriteCanCancelPendingRecovery() throws {
@@ -219,8 +249,8 @@ final class LUTCatalogTests: TempDirectoryTestCase {
         try await waitForScan(library)
         let durableID = try XCTUnwrap(library.allLUTs.first?.lutID)
 
-        XCTAssertEqual(library.migratedRecordID(for: LUTID(url: file)), durableID)
-        let missing = LUTID(url: tempDirectory.appendingPathComponent("Missing.cube"))
+        XCTAssertEqual(library.migratedRecordID(for: LUTID(raw: file.path)), durableID)
+        let missing = LUTID(raw: tempDirectory.appendingPathComponent("Missing.cube").path)
         XCTAssertEqual(library.migratedRecordID(for: missing), missing)
     }
 

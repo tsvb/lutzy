@@ -38,15 +38,92 @@ func runDurableLibraryChecks() async -> Bool {
         print("durable LUT catalog -> \(catalogOK ? "PASS" : "FAIL")")
 
         let recoveredURL = root.appendingPathComponent("Recovered.cube")
-        let markerOK = relaunchedCatalog.beginSaveRecovery(for: recoveredURL)
+        let transientID = LUTID(raw: "derived://lutcheck/interrupted")
+        let markerOK = relaunchedCatalog.beginSaveRecovery(
+            for: recoveredURL, replacing: transientID,
+            expectedFingerprint: first.contentHash
+        )
         try cubeText.write(to: recoveredURL, atomically: true, encoding: .utf8)
         let afterInterruptedSave = LUTCatalog(fileURL: catalogURL)
         let recoveredID = afterInterruptedSave.recordID(for: recoveredURL)
         let recoveryOK = markerOK
             && recoveredID?.isRecord == true
-            && recoveredID.flatMap(afterInterruptedSave.loadLUT(for:))?.url.standardizedFileURL
+            && afterInterruptedSave.loadLUT(for: transientID)?.url.standardizedFileURL
                 == recoveredURL.standardizedFileURL
+            && afterInterruptedSave.loadLUT(for: transientID)?.lutID == recoveredID
         print("derived save recovery -> \(recoveryOK ? "PASS" : "FAIL")")
+
+        let recoveryProjectRoot = root.appendingPathComponent("Recovery Projects", isDirectory: true)
+        let recoveryProjects = ProjectStore(root: recoveryProjectRoot)
+        _ = recoveryProjects.create(named: "Interrupted Save")
+        var recoverySession = Project.Session()
+        recoverySession.selectedLUT = transientID.raw
+        recoveryProjects.updateSession(recoverySession)
+        let recoveryLibrary = LUTLibrary(catalog: afterInterruptedSave)
+        recoveryLibrary.setFolder(root)
+        await recoveryLibrary.scanCompletion()
+        let recoveryMedia = MediaLibrary(
+            root: root.appendingPathComponent("Recovery Media", isDirectory: true),
+            manifestURL: root.appendingPathComponent("recovery-media.json")
+        )
+        let recoveryViewModel = AppViewModel(
+            projects: recoveryProjects,
+            tags: LUTTagStore(fileURL: root.appendingPathComponent("recovery-tags.json")),
+            media: recoveryMedia,
+            library: recoveryLibrary
+        )
+        let recoveryDeadline = Date().addingTimeInterval(3)
+        while recoveryProjects.current?.session.selectedLUT != recoveredID?.raw,
+              Date() < recoveryDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let recoveredSessionOK = recoveryViewModel.document.lut.lutID == recoveredID
+            && recoveryProjects.current?.session.selectedLUT == recoveredID?.raw
+            && ProjectStore(root: recoveryProjectRoot).current?.session.selectedLUT == recoveredID?.raw
+        print("derived session adoption -> \(recoveredSessionOK ? "PASS" : "FAIL")")
+
+        let legacyProjectRoot = root.appendingPathComponent("Legacy Projects", isDirectory: true)
+        let legacyProjects = ProjectStore(root: legacyProjectRoot)
+        let legacyProject = legacyProjects.create(named: "Legacy")
+        let legacyImage = legacyProjects.imagesFolder(for: legacyProject)
+            .appendingPathComponent("legacy.png")
+        let legacyImageOK = writeJPEG(description: nil, to: legacyImage, colourful: true)
+        var legacySession = Project.Session()
+        legacySession.selectedLUT = cubeA.path
+        legacySession.cellLUTs = [cubeA.path]
+        legacySession.imageName = legacyImage.lastPathComponent
+        legacyProjects.updateSession(legacySession)
+        let legacyLibrary = LUTLibrary(catalog: afterInterruptedSave)
+        legacyLibrary.setFolder(root)
+        await legacyLibrary.scanCompletion()
+        let legacyMedia = MediaLibrary(
+            root: root.appendingPathComponent("Legacy Media", isDirectory: true),
+            manifestURL: root.appendingPathComponent("legacy-media.json")
+        )
+        let legacyViewModel = AppViewModel(
+            projects: legacyProjects,
+            tags: LUTTagStore(fileURL: root.appendingPathComponent("legacy-tags.json")),
+            media: legacyMedia,
+            library: legacyLibrary
+        )
+        let legacyDeadline = Date().addingTimeInterval(3)
+        while (legacyProjects.current?.session.selectedLUT != firstID.raw
+                || legacyProjects.current?.session.cellLUTs != [firstID.raw]
+                || legacyProjects.current?.session.mediaRecordID == nil),
+              Date() < legacyDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let relaunchedLegacySession = ProjectStore(root: legacyProjectRoot).current?.session
+        let legacyMigrationOK = legacyImageOK
+            && legacyViewModel.document.lut.lutID == firstID
+            && relaunchedLegacySession?.selectedLUT == firstID.raw
+            && relaunchedLegacySession?.cellLUTs == [firstID.raw]
+            && relaunchedLegacySession?.mediaRecordID != nil
+        print("legacy session migration -> \(legacyMigrationOK ? "PASS" : "FAIL")")
+        if legacyMigrationOK == false {
+            print("  image \(legacyImageOK), document \(legacyViewModel.document.lut.lutID?.raw ?? "nil"), selected \(relaunchedLegacySession?.selectedLUT ?? "nil"), cells \(relaunchedLegacySession?.cellLUTs ?? []), media \(relaunchedLegacySession?.mediaRecordID ?? "nil")")
+            print("  restoring \(legacyViewModel.restoreDepth), scanned \(legacyLibrary.allLUTs.map { "\($0.id)=\($0.lutID.raw)" })")
+        }
 
         let importFolder = root.appendingPathComponent("Shoot/Day 1", isDirectory: true)
         try FileManager.default.createDirectory(at: importFolder, withIntermediateDirectories: true)
@@ -68,7 +145,7 @@ func runDurableLibraryChecks() async -> Bool {
             && Set(relaunchedMedia.records.map(\.id)) == mediaIDs
             && relaunchedMedia.records.contains { $0.logicalPath == "Shoot/Day 1/frame.png" }
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
-        return catalogOK && recoveryOK && mediaOK
+        return catalogOK && recoveryOK && recoveredSessionOK && legacyMigrationOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")
         return false
