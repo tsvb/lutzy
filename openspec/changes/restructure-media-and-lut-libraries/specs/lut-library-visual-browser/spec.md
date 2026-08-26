@@ -178,6 +178,10 @@ Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fi
 - **WHEN** the user leaves LUT detail with Back
 - **THEN** LUT Library restores the originating discovery home or complete Grid, active grouping/source, card selection, scroll context, and keyboard/assistive-technology focus target
 
+#### Scenario: Find the previous-page action
+- **WHEN** LUT detail is open
+- **THEN** a persistent full-width navigation header exposes a leading Back action named for the originating facet or shelf, and pressing Escape invokes that same action without requiring the metadata Inspector
+
 ### Requirement: Draggable Before/After comparison
 LUT detail SHALL compare the original and LUT-rendered result in one aligned large preview using a vertically divided image with a horizontally draggable split position. Before SHALL remain on the left and After SHALL remain on the right, matching Viewer comparison orientation.
 

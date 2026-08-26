@@ -60,7 +60,7 @@ This file preserves the user's original intent and the evolution of decisions be
 19. The discovery home uses four facets in this order: Folder, Collection & Star, Brand, and Tag. Folder is the initial facet. Folder rows follow the next physical folder level inside the active sidebar source; Collection & Star combines non-empty virtual Collections with the separate built-in Starred row. Brand uses its own confirmed Origin namespace and may be curated later like categorical metadata, but it never mixes into ordinary descriptive Tags. Internal `input:*` pipeline metadata is not a Tag shelf.
 20. The existing left Folder/Collection/Starred source remains a scope over the discovery home; it is not replaced by the grouping subtabs.
 21. Activating a shelf opens a complete Grid like the second reference. Activating a LUT from either level opens the existing fixed-sample Before/After detail like the third reference.
-22. Back navigation restores the originating level: detail to its Grid or discovery home, and Grid to discovery home. It also restores the originating selection and keyboard/assistive-technology focus target.
+22. LUT detail exposes Back in a persistent full-width navigation header, names the originating facet or shelf, and supports Escape. Back navigation restores the originating level: detail to its Grid or discovery home, and Grid to discovery home. It also restores the originating selection and keyboard/assistive-technology focus target.
 
 ### Colour consistency
 

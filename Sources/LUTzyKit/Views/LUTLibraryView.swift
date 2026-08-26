@@ -36,7 +36,7 @@ struct LUTLibraryView: View {
                 LUTLibraryDetailView(
                     lut: lut,
                     viewModel: viewModel,
-                    backLabel: selectedShelf.map { "Back to \($0.title)" } ?? "Back to Discover",
+                    backLabel: selectedShelf.map { "Back to \($0.title)" } ?? "Back to \(grouping.label)",
                     accessibilityFocus: $accessibilityFocus
                 ) {
                     let returnTarget = selectedCardTarget
@@ -295,82 +295,79 @@ private struct LUTLibraryDetailView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                comparison
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .focusable()
-                    .focused($comparisonFocused)
-                    .onMoveCommand { direction in
-                        switch direction {
-                        case .left: adjustSplit(by: -0.05)
-                        case .right: adjustSplit(by: 0.05)
-                        default: break
-                        }
-                    }
-                    .onChange(of: comparisonFocused) { _, focused in
-                        viewModel.setLUTDetailFocused(focused)
-                    }
-                Divider()
-                sampleStrip
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+        VStack(spacing: 0) {
+            detailNavigation
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Button {
-                        onBack()
-                    } label: {
-                        Label(backLabel, systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityFocused(accessibilityFocus, equals: .detailBack)
-
-                    Text(viewModel.catalog.effectiveName(for: lut))
-                        .font(.title2.weight(.semibold))
-                    LabeledContent("Origin", value: viewModel.catalog.origin(for: lut).label)
-                    LabeledContent("Input", value: lut.inputSpace == .vlog ? "V-Log" : "Display")
-                    LabeledContent("Size", value: "\(lut.size)³")
-                    LabeledContent("Sample", value: viewModel.selectedLibrarySample.name)
-                    Text(viewModel.selectedLibrarySample.note)
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text(viewModel.selectedLibrarySample.colorProfile)
-                        .font(.caption2).foregroundStyle(.tertiary)
-                    Text(viewModel.selectedLibrarySample.provenance)
-                        .font(.caption2).foregroundStyle(.tertiary)
-
-                    if viewModel.allTags(for: lut).isEmpty == false {
-                        Text("Tags").font(.subheadline.weight(.semibold))
-                        FlowLayout(spacing: 5, lineSpacing: 5) {
-                            ForEach(viewModel.allTags(for: lut), id: \.self) { tag in
-                                Text(tag).font(.caption2)
-                                    .padding(.horizontal, 7).padding(.vertical, 4)
-                                    .background(Color.primary.opacity(0.08), in: Capsule())
+            HStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    comparison
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .focusable()
+                        .focused($comparisonFocused)
+                        .onMoveCommand { direction in
+                            switch direction {
+                            case .left: adjustSplit(by: -0.05)
+                            case .right: adjustSplit(by: 0.05)
+                            default: break
                             }
                         }
-                    }
-
-                    Button("Open in Viewer") { viewModel.openLibraryLUTInViewer(lut) }
-                        .buttonStyle(.borderedProminent)
-                    Button(viewModel.isStarred(lut) ? "Unstar" : "Star") {
-                        viewModel.toggleStarred(lut)
-                    }
-                    Menu("Add to Collection") {
-                        ForEach(viewModel.catalog.collections) { collection in
-                            Button(collection.name) {
-                                viewModel.catalog.setMembership(
-                                    true, collectionID: collection.id, recordIDs: [lut.lutID]
-                                )
-                            }
+                        .onChange(of: comparisonFocused) { _, focused in
+                            viewModel.setLUTDetailFocused(focused)
                         }
-                    }
-                    .disabled(viewModel.catalog.collections.isEmpty)
+                    Divider()
+                    sampleStrip
                 }
-                .padding(18)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Divider()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(viewModel.catalog.effectiveName(for: lut))
+                            .font(.title2.weight(.semibold))
+                        LabeledContent("Origin", value: viewModel.catalog.origin(for: lut).label)
+                        LabeledContent("Input", value: lut.inputSpace == .vlog ? "V-Log" : "Display")
+                        LabeledContent("Size", value: "\(lut.size)³")
+                        LabeledContent("Sample", value: viewModel.selectedLibrarySample.name)
+                        Text(viewModel.selectedLibrarySample.note)
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(viewModel.selectedLibrarySample.colorProfile)
+                            .font(.caption2).foregroundStyle(.tertiary)
+                        Text(viewModel.selectedLibrarySample.provenance)
+                            .font(.caption2).foregroundStyle(.tertiary)
+
+                        if viewModel.allTags(for: lut).isEmpty == false {
+                            Text("Tags").font(.subheadline.weight(.semibold))
+                            FlowLayout(spacing: 5, lineSpacing: 5) {
+                                ForEach(viewModel.allTags(for: lut), id: \.self) { tag in
+                                    Text(tag).font(.caption2)
+                                        .padding(.horizontal, 7).padding(.vertical, 4)
+                                        .background(Color.primary.opacity(0.08), in: Capsule())
+                                }
+                            }
+                        }
+
+                        Button("Open in Viewer") { viewModel.openLibraryLUTInViewer(lut) }
+                            .buttonStyle(.borderedProminent)
+                        Button(viewModel.isStarred(lut) ? "Unstar" : "Star") {
+                            viewModel.toggleStarred(lut)
+                        }
+                        Menu("Add to Collection") {
+                            ForEach(viewModel.catalog.collections) { collection in
+                                Button(collection.name) {
+                                    viewModel.catalog.setMembership(
+                                        true, collectionID: collection.id, recordIDs: [lut.lutID]
+                                    )
+                                }
+                            }
+                        }
+                        .disabled(viewModel.catalog.collections.isEmpty)
+                    }
+                    .padding(18)
+                }
+                .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
             }
-            .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
         }
         .task(id: RenderKey(
             lutID: lut.lutID,
@@ -390,6 +387,28 @@ private struct LUTLibraryDetailView: View {
         .onDisappear {
             viewModel.setLUTDetailFocused(false)
         }
+    }
+
+    private var detailNavigation: some View {
+        HStack(spacing: 10) {
+            Button(action: onBack) {
+                Label(backLabel, systemImage: "chevron.left")
+                    .font(.headline)
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut(.cancelAction)
+            .help("\(backLabel) (Esc)")
+            .accessibilityFocused(accessibilityFocus, equals: .detailBack)
+
+            Spacer()
+
+            Text("LUT Detail")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 42)
+        .background(.bar)
     }
 
     private var comparison: some View {
