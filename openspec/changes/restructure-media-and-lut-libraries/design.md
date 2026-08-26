@@ -243,3 +243,17 @@ Temporary-original state is explicitly cleared when its owning Workspace/detail 
 None. Product-level decisions raised during the requested grilling session are resolved and recorded in `source-requirements.md`.
 
 Current explicit assumptions: LUT Library is local-only; Collections are manual and flat; Columns means Finder-style hierarchical columns; video playback is future work.
+
+## Complete measured taxonomy and local similarity
+
+The first tagger only emitted outlier traits. A colour LUT with ordinary saturation and contrast could therefore retain only its hidden `input:` machine tag and appear untagged in Gallery and Manager. The measured vocabulary now has complete, mutually exclusive baseline axes:
+
+- colour mode: `彩色` or `黑白`;
+- colour saturation: `低飽和`, `標準飽和`, or `高飽和` for non-monochrome LUTs;
+- contrast: `低對比`, `標準對比`, or `高對比`.
+
+Optional measured traits such as `暖調`, `冷調`, `分離調色`, `霧面`, `高光收斂`, and skin behaviour remain additive. The input-space tag remains available for filtering but is not a visible card chip. A tagger-version bump remeasures existing content records while preserving record-level user Tags.
+
+Import similarity is a post-import review, not an automatic filing system. It compares the new LUT's persisted perceptual metrics with pre-existing local LUTs only when both declare the same input space and colour mode. Distance normalises contrast, saturation, endpoints, neutral chroma/hue, split angle, and skin response by perceptually useful ranges; circular hue differences are weighted down when neutral chroma is too weak for hue to be meaningful. The UI presents at most the three closest results above a documented confidence floor and explains shared measured traits. Exact fingerprints remain the import deduplicator's responsibility and never appear as recommendations.
+
+This v1 intentionally does not use filenames, vendors, folders, typed Tags, remote catalogues, or learned embeddings. Recommendations are read-only: the user may inspect them, but import does not mutate names, Tags, Collections, Stars, or physical location from a match.

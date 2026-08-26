@@ -144,6 +144,10 @@ final class LUTLibrary: ObservableObject {
         var imported: Int
         var duplicates: Int
         var failed: Int
+        /// Exact managed destinations written by this import. This is an
+        /// ephemeral hand-off to the post-import review, not persisted import
+        /// history or a second source of LUT identity.
+        var importedURLs: [URL] = []
     }
 
     /// Copy LUTs into the app's own library.
@@ -249,9 +253,11 @@ final class LUTLibrary: ObservableObject {
         }
         do {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            try data.write(to: uniqueURL(in: folder, named: source.lastPathComponent), options: .atomic)
+            let destination = uniqueURL(in: folder, named: source.lastPathComponent)
+            try data.write(to: destination, options: .atomic)
             existing.insert(hash)
             result.imported += 1
+            result.importedURLs.append(destination.standardizedFileURL)
         } catch {
             result.failed += 1
         }

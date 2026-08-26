@@ -39,6 +39,13 @@ public struct ContentView: View {
             ) {
                 RecipeExtractorSheet(coordinator: viewModel.derive)
             }
+            .sheet(item: $viewModel.lutImportReview) { review in
+                LUTImportReviewView(
+                    review: review,
+                    onInspect: viewModel.inspectLUTFromImportReview,
+                    onDismiss: { viewModel.lutImportReview = nil }
+                )
+            }
             .modifier(KeyboardShortcuts(viewModel: viewModel))
             .modifier(MenuCommandReceivers(viewModel: viewModel))
             .alert(

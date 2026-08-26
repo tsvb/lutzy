@@ -72,3 +72,5 @@
 - [x] 8.6 Run debug/release builds, `lutcheck`, strict OpenSpec validation, running-app interface inspection, and fresh sub-agent review
 - [x] 8.7 Add derived-save tests for new locators, known-locator overwrite with metadata retention/cache invalidation, outside-root relaunch resolution, and catalog-persistence failure without a dangling document reference
 - [x] 8.8 Audit the supplied real LUT corpus, reject unsupported `.cube` imports before copying, and validate the running Gallery and Manager with a curated 400+ LUT hierarchy
+- [x] 8.9 Add complete visible measured-tag buckets, versioned remeasurement, and preservation checks for user-authored Tags
+- [x] 8.10 Add same-input-space post-import similarity review with confidence floor, explanations, exact-duplicate exclusion, and no metadata side effects

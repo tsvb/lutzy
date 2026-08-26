@@ -7,10 +7,9 @@ import Foundation
 /// would type is measurable, and measuring it means a hundred files get
 /// described consistently instead of according to whoever named them.
 ///
-/// The maths here mirrors `lutcraft.tags` step for step, on probes exported
-/// from it (`LUTProbes`), so the app and the offline tools agree about what a
-/// file is. `lutcheck` compares the tags this produces against lutcraft's own
-/// for every LUT on the machine.
+/// The measurements and optional traits mirror `lutcraft.tags` step for step,
+/// on probes exported from it (`LUTProbes`). The Library adds complete baseline
+/// classes on top so middle-range LUTs do not appear untagged.
 struct LUTMetrics: Codable, Equatable, Sendable {
     var contrast: Double
     var saturation: Double
@@ -126,6 +125,28 @@ enum LUTProfiler {
         return tags.sorted()
     }
 
+    /// The tags used by LUTzy's Library.
+    ///
+    /// `autoTags` deliberately retains the offline tagger's sparse outlier
+    /// vocabulary. A Library needs a complete classification as well: a LUT
+    /// with ordinary colour and contrast is still a colour LUT with a useful
+    /// saturation and contrast class, not an item with no visible metadata.
+    static func completeTags(_ m: LUTMetrics, inputSpace: LUTInputSpace) -> [String] {
+        var tags = Set(autoTags(m, inputSpace: inputSpace))
+        if m.monoSpread < 1e-6 {
+            tags.insert("黑白")
+        } else {
+            tags.insert("彩色")
+            if m.saturation > 0.85 && m.saturation < 1.15 {
+                tags.insert("標準飽和")
+            }
+        }
+        if m.contrast > 0.9 && m.contrast < 1.15 {
+            tags.insert("標準對比")
+        }
+        return tags.sorted()
+    }
+
     // MARK: - Small numerics
 
     /// OKLab of sRGB **code values** — the LUT's output is a finished picture,
@@ -175,5 +196,84 @@ enum LUTProfiler {
     private static func round(_ value: Double, _ places: Int) -> Double {
         let factor = pow(10.0, Double(places))
         return (value * factor).rounded() / factor
+    }
+}
+
+/// A local, explainable similarity measure over the same perceptual metrics
+/// that drive system Tags. It intentionally does not look at filenames,
+/// folders, vendors, or user-authored metadata.
+enum LUTSimilarity {
+    /// Below this value the UI says there is no clear match. A nearest
+    /// neighbour always exists in a non-empty Library; that does not make it a
+    /// useful recommendation.
+    static let confidenceFloor = 0.62
+
+    static func score(
+        _ lhs: LUTMetrics,
+        inputSpace lhsSpace: LUTInputSpace,
+        against rhs: LUTMetrics,
+        inputSpace rhsSpace: LUTInputSpace
+    ) -> Double? {
+        guard lhsSpace == rhsSpace else { return nil }
+        let lhsMono = lhs.monoSpread < 1e-6
+        let rhsMono = rhs.monoSpread < 1e-6
+        guard lhsMono == rhsMono else { return nil }
+
+        var weightedSquares = 0.0
+        var totalWeight = 0.0
+        func add(_ difference: Double, scale: Double, weight: Double) {
+            let normalised = min(abs(difference) / scale, 3.0)
+            weightedSquares += normalised * normalised * weight
+            totalWeight += weight
+        }
+
+        add(lhs.contrast - rhs.contrast, scale: 0.35, weight: 1.3)
+        add(lhs.blackLevel - rhs.blackLevel, scale: 0.12, weight: 0.8)
+        add(lhs.whiteLevel - rhs.whiteLevel, scale: 0.15, weight: 0.8)
+
+        if lhsMono == false {
+            add(lhs.saturation - rhs.saturation, scale: 0.5, weight: 1.2)
+            add(lhs.skinRatio - rhs.skinRatio, scale: 0.5, weight: 0.65)
+            add(lhs.shadowChroma - rhs.shadowChroma, scale: 0.04, weight: 0.55)
+            add(lhs.highlightChroma - rhs.highlightChroma, scale: 0.04, weight: 0.55)
+            add(lhs.splitAngle - rhs.splitAngle, scale: 90, weight: 0.35)
+
+            // Hue on an almost-neutral grey is numerical noise. Weight the
+            // circular hue distance by how visible that neutral tint is.
+            let shadowStrength = min(max(lhs.shadowChroma, rhs.shadowChroma) / 0.03, 1)
+            let highlightStrength = min(max(lhs.highlightChroma, rhs.highlightChroma) / 0.03, 1)
+            add(circularHueDistance(lhs.shadowHue, rhs.shadowHue), scale: 180, weight: 0.35 * shadowStrength)
+            add(circularHueDistance(lhs.highlightHue, rhs.highlightHue), scale: 180, weight: 0.35 * highlightStrength)
+        }
+
+        guard totalWeight > 0 else { return nil }
+        let distance = sqrt(weightedSquares / totalWeight)
+        return min(max(exp(-0.75 * distance), 0), 1)
+    }
+
+    /// Short, stable reasons shown under a recommendation. These are measured
+    /// traits only; matching a user's personal Tag would imply evidence the
+    /// colour transform does not provide.
+    static func sharedTraits(_ lhs: [String], _ rhs: [String], limit: Int = 3) -> [String] {
+        let hidden: Set<String> = ["彩色"]
+        let common = Set(lhs).intersection(rhs).filter {
+            $0.hasPrefix("input:") == false && hidden.contains($0) == false
+        }
+        let priority = [
+            "黑白", "低飽和", "標準飽和", "高飽和",
+            "低對比", "標準對比", "高對比",
+            "暖調", "冷調", "分離調色", "霧面", "高光收斂",
+            "膚色收斂", "膚色濃", "接近去彩",
+        ]
+        return Array(common.sorted {
+            let left = priority.firstIndex(of: $0) ?? priority.count
+            let right = priority.firstIndex(of: $1) ?? priority.count
+            return left == right ? $0 < $1 : left < right
+        }.prefix(max(limit, 0)))
+    }
+
+    private static func circularHueDistance(_ lhs: Double, _ rhs: Double) -> Double {
+        let raw = abs(lhs - rhs).truncatingRemainder(dividingBy: 360)
+        return min(raw, 360 - raw)
     }
 }

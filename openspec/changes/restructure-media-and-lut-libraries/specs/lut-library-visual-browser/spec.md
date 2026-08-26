@@ -186,3 +186,41 @@ LUT Library Gallery and detail previews SHALL use the same production render pip
 #### Scenario: V-Log sample preview
 - **WHEN** a sample and LUT require V-Log source handling
 - **THEN** LUT Library resolves and applies the source space through the same path used by Viewer rather than a separate thumbnail transform
+
+### Requirement: Complete visible measured tags
+Every renderable LUT SHALL receive a visible measured colour-mode tag and contrast-class tag, and every non-monochrome LUT SHALL also receive exactly one measured saturation-class tag. Remeasurement SHALL preserve all user-authored Tags.
+
+#### Scenario: Measure a middle-range colour LUT
+- **WHEN** a colour LUT falls between the low and high saturation and contrast thresholds
+- **THEN** it receives `彩色`, `標準飽和`, and `標準對比` rather than appearing untagged
+
+#### Scenario: Measure a monochrome LUT
+- **WHEN** a LUT's RGB channel spread meets the monochrome threshold
+- **THEN** it receives `黑白` and exactly one contrast-class tag without a misleading saturation-class tag
+
+#### Scenario: Remeasure an existing library
+- **WHEN** the complete taxonomy replaces an older measured-tag version
+- **THEN** every existing LUT is remeasured and its user-authored Tags remain unchanged
+
+### Requirement: Local post-import similarity review
+After importing one or more new LUTs, the application SHALL offer a local review that lists up to three sufficiently similar pre-existing LUTs per imported LUT using measured transform behaviour rather than names or locations.
+
+#### Scenario: Find a strong same-space match
+- **WHEN** a newly imported LUT has a pre-existing LUT with sufficiently close perceptual metrics, the same declared input space, and the same colour mode
+- **THEN** the review identifies that LUT, shows a bounded similarity score, and explains shared measured traits
+
+#### Scenario: Do not force a weak match
+- **WHEN** no pre-existing same-space LUT meets the confidence floor
+- **THEN** the review states that no clear similar LUT was found instead of presenting an arbitrary nearest neighbour as a recommendation
+
+#### Scenario: Keep V-Log and Display separate
+- **WHEN** a V-Log LUT resembles a Display LUT numerically under their different probe references
+- **THEN** the Display LUT is excluded from that V-Log LUT's recommendations
+
+#### Scenario: Import an exact duplicate
+- **WHEN** import detects an identical content fingerprint
+- **THEN** the file remains in the duplicate count and does not appear as a similarity recommendation
+
+#### Scenario: Review without metadata mutation
+- **WHEN** similarity recommendations are generated or dismissed
+- **THEN** LUT filenames, physical folders, origin, user Tags, Collections, and Starred state remain unchanged

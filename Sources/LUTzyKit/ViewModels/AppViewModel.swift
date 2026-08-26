@@ -267,6 +267,9 @@ final class AppViewModel: ObservableObject {
     /// while comparing). `nil` until computed / when no image is loaded.
     @Published var histogram: HistogramData?
     private var histogramTask: Task<Void, Never>?
+    /// The current content-metric pass. Import review awaits the scan-owned
+    /// pass instead of launching a second full-library measurement.
+    private var tagIndexTask: Task<Void, Never>?
 
     @Published var isLoading: Bool = false
     @Published var statusMessage: String = "Open an image to get started"
@@ -274,6 +277,10 @@ final class AppViewModel: ObservableObject {
     /// Non-nil when a hard failure should be surfaced as a dismissible alert.
     /// Bound to an `.alert` in ContentView; cleared when the user dismisses it.
     @Published var errorMessage: String?
+
+    /// Read-only recommendations produced after a successful LUT import.
+    /// Dismissing this review changes no LUT metadata or organisation.
+    @Published var lutImportReview: LUTImportReview?
 
     @Published var isPhotosPickerPresented: Bool = false
 
@@ -455,7 +462,8 @@ final class AppViewModel: ObservableObject {
             Task { await engine.invalidateLUTCache() }
             // Measure whatever the scan found that has not been measured
             // before. Typed tags are never disturbed by this — see LUTTagStore.
-            Task { await self.tags.index(self.library.allLUTs) }
+            let scannedLUTs = self.library.allLUTs
+            self.tagIndexTask = Task { await self.tags.index(scannedLUTs) }
         }
 
         export.onStatus = { [weak self] in self?.statusMessage = $0 }
@@ -1644,8 +1652,89 @@ final class AppViewModel: ObservableObject {
         statusMessage = "Importing LUTs…"
         Task {
             let result = await library.importLUTs(from: urls)
+            await library.scanCompletion()
+            let importedPaths = Set(result.importedURLs.map {
+                $0.standardizedFileURL.resolvingSymlinksInPath().path
+            })
+            let imported = library.allLUTs.filter {
+                importedPaths.contains($0.url.standardizedFileURL.resolvingSymlinksInPath().path)
+            }
+
+            // The scan owns one full-library index pass. Await that exact task
+            // rather than racing it with a duplicate measurement pass.
+            await tagIndexTask?.value
             statusMessage = Self.importSummary(result)
+            if imported.isEmpty == false {
+                lutImportReview = makeImportReview(
+                    imported: imported,
+                    excludingPaths: importedPaths,
+                    result: result
+                )
+            }
         }
+    }
+
+    private func makeImportReview(
+        imported: [CubeLUT],
+        excludingPaths: Set<String>,
+        result: LUTLibrary.ImportResult
+    ) -> LUTImportReview {
+        let existing = library.allLUTs.filter {
+            excludingPaths.contains($0.url.standardizedFileURL.resolvingSymlinksInPath().path) == false
+        }
+        let existingCandidates = existing.compactMap { lut -> LUTSimilarityCandidate? in
+            guard let metrics = tags.metrics(for: lut) else { return nil }
+            return LUTSimilarityCandidate(
+                id: lut.lutID,
+                name: catalog.effectiveName(for: lut),
+                fingerprint: lut.contentHash,
+                inputSpace: lut.inputSpace,
+                metrics: metrics,
+                measuredTags: tags.measuredTags(for: lut)
+            )
+        }
+        let recommendations = imported.sorted {
+            catalog.effectiveName(for: $0).localizedStandardCompare(catalog.effectiveName(for: $1)) == .orderedAscending
+        }.map { candidate in
+            let candidateMetrics = tags.metrics(for: candidate)
+            let candidateTags = tags.measuredTags(for: candidate)
+            let similarityCandidate = candidateMetrics.map {
+                LUTSimilarityCandidate(
+                    id: candidate.lutID,
+                    name: catalog.effectiveName(for: candidate),
+                    fingerprint: candidate.contentHash,
+                    inputSpace: candidate.inputSpace,
+                    metrics: $0,
+                    measuredTags: candidateTags
+                )
+            }
+            let matches = similarityCandidate.map {
+                LUTImportRecommender.matches(for: $0, among: existingCandidates)
+            } ?? []
+
+            return LUTImportRecommendation(
+                id: candidate.lutID,
+                name: catalog.effectiveName(for: candidate),
+                inputSpace: candidate.inputSpace,
+                tags: candidateTags.filter { $0.hasPrefix("input:") == false },
+                matches: matches
+            )
+        }
+        return LUTImportReview(
+            imported: result.imported,
+            duplicates: result.duplicates,
+            failed: result.failed,
+            comparedAgainst: existing.count,
+            recommendations: recommendations
+        )
+    }
+
+    func inspectLUTFromImportReview(_ id: LUTID) {
+        guard library.allLUTs.first(matching: id) != nil else { return }
+        libraryLUTSource = .all
+        selectedLibraryLUTID = id
+        section = .lutLibrary
+        lutImportReview = nil
     }
 
     /// Say what happened, including the nothing-happened cases — an import that

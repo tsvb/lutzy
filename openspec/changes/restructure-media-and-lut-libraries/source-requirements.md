@@ -185,6 +185,15 @@ The supplied local corpus is acceptance data, not a request to mutate or redistr
 
 The corpus mixes renderable 3D LUTs with 1D shapers, archived revisions, SD-card short-name aliases, generated test fixtures, and unclassified community files. Only supported, parseable 3D `.cube` files may be reported as imported. Unsupported or malformed `.cube` files are reported as failures instead of being copied and disappearing on the following scan.
 
+### 2026-08-26 — Complete measured tags and import similarity
+
+Every renderable LUT must have useful visible system tags after measurement. The existing optional traits remain, while colour mode, saturation class, and contrast class form complete mutually exclusive buckets so a neutral or middle-range LUT is not presented as untagged. User-authored Tags remain separate and are never overwritten by remeasurement.
+
+After a successful local import, the application may recommend existing LUTs whose measured transform behaviour is similar. Similarity is local-only, compares LUTs in the same declared input space, ignores filenames and folders, excludes exact duplicates already handled by import, and never automatically merges, moves, tags, or adds Collection membership. Low-confidence comparisons are reported honestly instead of forcing a match.
+
+> 1. 不是所有都有標籤 先補上  
+> 2. 匯入lut的時候 是不是可以有類似推薦或是匹配的系統 說這跟哪一個比較像
+
 ## Implementation contracts added after independent gate review
 
 These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.

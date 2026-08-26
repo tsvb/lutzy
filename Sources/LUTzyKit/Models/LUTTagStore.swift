@@ -41,7 +41,7 @@ final class LUTTagStore: ObservableObject {
 
     /// Bump when `LUTProfiler`'s metrics or thresholds change. Every entry below
     /// this is re-measured on the next scan; typed tags are unaffected.
-    static let taggerVersion = 1
+    static let taggerVersion = 2
 
     /// Everything known, by content hash.
     @Published private(set) var entries: [String: Entry] = [:]
@@ -192,7 +192,7 @@ final class LUTTagStore: ObservableObject {
             return (lut.contentHash, lut.name,
                     lut.inputSpace == .vlog ? "vlog" : "display",
                     metrics,
-                    LUTProfiler.autoTags(metrics, inputSpace: lut.inputSpace))
+                    LUTProfiler.completeTags(metrics, inputSpace: lut.inputSpace))
         }
     }
 

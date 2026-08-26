@@ -392,7 +392,7 @@ if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
     let store = LUTTagStore(fileURL: storeURL)
     store.indexNow([lut])
     let measured = store.tags(for: lut)
-    let measuredOK = measured.isEmpty == false && measured == LUTProfiler.autoTags(LUTProfiler.measure(lut), inputSpace: lut.inputSpace)
+    let measuredOK = measured.isEmpty == false && measured == LUTProfiler.completeTags(LUTProfiler.measure(lut), inputSpace: lut.inputSpace)
     print("store measured on index -> \(measured) -> \(measuredOK ? "PASS" : "FAIL")")
 
     store.addTag("日系", to: lut)
@@ -432,6 +432,133 @@ if let lut = try? CubeLUT(url: URL(fileURLWithPath: vlogLUT)) {
     print("tag store -> \(storeOK ? "PASS" : "FAIL")")
 } else {
     print("tag store -> SKIP (no V-Log LUT on this machine)")
+}
+
+
+// --- complete tags and similarity -----------------------------------------
+// Sparse outlier tags are useful, but ordinary LUTs must not appear untagged.
+// Similarity also has two hard truth boundaries: input spaces and colour mode.
+let middleMetrics = LUTMetrics(
+    contrast: 1.0, saturation: 1.0, monoSpread: 0.1,
+    blackLevel: 0.0, whiteLevel: 1.0,
+    shadowChroma: 0.0, highlightChroma: 0.0,
+    shadowHue: 0.0, highlightHue: 0.0, splitAngle: 0.0,
+    skinRatio: 1.0
+)
+let middleTags = LUTProfiler.completeTags(middleMetrics, inputSpace: .display)
+let saturationClasses = Set(["低飽和", "標準飽和", "高飽和"])
+let contrastClasses = Set(["低對比", "標準對比", "高對比"])
+let completeColourOK = middleTags.contains("彩色")
+    && Set(middleTags).intersection(saturationClasses) == ["標準飽和"]
+    && Set(middleTags).intersection(contrastClasses) == ["標準對比"]
+
+var monoMetrics = middleMetrics
+monoMetrics.monoSpread = 0
+let monoTags = LUTProfiler.completeTags(monoMetrics, inputSpace: .display)
+let completeMonoOK = monoTags.contains("黑白")
+    && Set(monoTags).intersection(saturationClasses).isEmpty
+    && Set(monoTags).intersection(contrastClasses).count == 1
+
+let exactSimilarity = LUTSimilarity.score(
+    middleMetrics, inputSpace: .display,
+    against: middleMetrics, inputSpace: .display
+)
+let crossSpaceSimilarity = LUTSimilarity.score(
+    middleMetrics, inputSpace: .display,
+    against: middleMetrics, inputSpace: .vlog
+)
+let crossModeSimilarity = LUTSimilarity.score(
+    middleMetrics, inputSpace: .display,
+    against: monoMetrics, inputSpace: .display
+)
+var distantMetrics = middleMetrics
+distantMetrics.contrast = 2.2
+distantMetrics.saturation = 2.4
+distantMetrics.blackLevel = 0.4
+distantMetrics.whiteLevel = 0.5
+distantMetrics.skinRatio = 2.5
+let distantSimilarity = LUTSimilarity.score(
+    middleMetrics, inputSpace: .display,
+    against: distantMetrics, inputSpace: .display
+)
+let similarityOK = exactSimilarity == 1
+    && crossSpaceSimilarity == nil
+    && crossModeSimilarity == nil
+    && (distantSimilarity ?? 1) < LUTSimilarity.confidenceFloor
+let importedCandidate = LUTSimilarityCandidate(
+    id: LUTID(raw: "record://imported"), name: "Imported", fingerprint: "new",
+    inputSpace: .display, metrics: middleMetrics, measuredTags: middleTags
+)
+let closeCandidates = ["Delta", "Bravo", "Charlie", "Alpha"].enumerated().map { index, name in
+    LUTSimilarityCandidate(
+        id: LUTID(raw: "record://\(index)"), name: name, fingerprint: "existing-\(index)",
+        inputSpace: .display, metrics: middleMetrics, measuredTags: middleTags
+    )
+}
+let excludedExact = LUTSimilarityCandidate(
+    id: LUTID(raw: "record://exact"), name: "Exact", fingerprint: "new",
+    inputSpace: .display, metrics: middleMetrics, measuredTags: middleTags
+)
+let excludedSpace = LUTSimilarityCandidate(
+    id: LUTID(raw: "record://vlog"), name: "V-Log", fingerprint: "vlog",
+    inputSpace: .vlog, metrics: middleMetrics,
+    measuredTags: LUTProfiler.completeTags(middleMetrics, inputSpace: .vlog)
+)
+let ranked = LUTImportRecommender.matches(
+    for: importedCandidate,
+    among: closeCandidates + [excludedExact, excludedSpace]
+)
+let recommendationOK = ranked.map(\.name) == ["Alpha", "Bravo", "Charlie"]
+    && ranked.allSatisfy { $0.similarity == 1 }
+let completeTagsOK = completeColourOK && completeMonoOK && similarityOK && recommendationOK
+print("complete visible tags -> colour \(middleTags), mono \(monoTags) -> \(completeColourOK && completeMonoOK ? "PASS" : "FAIL")")
+print("similarity respects confidence/input/mode -> \(similarityOK ? "PASS" : "FAIL")")
+print("import recommendation excludes exact/cross-space and limits to three -> \(recommendationOK ? "PASS" : "FAIL")")
+
+// Optional acceptance pass over a real managed Library. CI has no personal
+// corpus, so the root is explicit rather than hard-coded; local acceptance can
+// prove every actual LUT receives the complete visible taxonomy.
+var corpusTagsOK = true
+if let auditRoot = ProcessInfo.processInfo.environment["LUTZY_TAG_AUDIT_ROOT"] {
+    let rootURL = URL(fileURLWithPath: auditRoot)
+    let walker = FileManager.default.enumerator(at: rootURL, includingPropertiesForKeys: nil)
+    var entries: [(name: String, hash: String, space: LUTInputSpace, metrics: LUTMetrics)] = []
+    var parseFailures = 0
+    var incomplete = 0
+    while let url = walker?.nextObject() as? URL {
+        guard url.pathExtension.lowercased() == "cube" else { continue }
+        guard let lut = try? CubeLUT(url: url) else {
+            parseFailures += 1
+            continue
+        }
+        let metrics = LUTProfiler.measure(lut)
+        let visible = Set(LUTProfiler.completeTags(metrics, inputSpace: lut.inputSpace)
+            .filter { $0.hasPrefix("input:") == false })
+        let modeCount = visible.intersection(["彩色", "黑白"]).count
+        let contrastCount = visible.intersection(contrastClasses).count
+        let saturationCount = visible.intersection(saturationClasses).count
+        let wantsSaturation = metrics.monoSpread >= 1e-6
+        if visible.isEmpty || modeCount != 1 || contrastCount != 1
+            || saturationCount != (wantsSaturation ? 1 : 0) {
+            incomplete += 1
+        }
+        entries.append((lut.name, lut.contentHash, lut.inputSpace, metrics))
+    }
+
+    var recommended = 0
+    for (index, item) in entries.enumerated() {
+        let hasMatch = entries.enumerated().contains { otherIndex, other in
+            guard index != otherIndex, item.hash != other.hash else { return false }
+            return (LUTSimilarity.score(
+                item.metrics, inputSpace: item.space,
+                against: other.metrics, inputSpace: other.space
+            ) ?? 0) >= LUTSimilarity.confidenceFloor
+        }
+        if hasMatch { recommended += 1 }
+    }
+    corpusTagsOK = entries.isEmpty == false && parseFailures == 0 && incomplete == 0
+    print("real Library complete tags -> \(entries.count) measured, \(incomplete) incomplete, \(parseFailures) unreadable -> \(corpusTagsOK ? "PASS" : "FAIL")")
+    print("real Library similarity coverage -> \(recommended)/\(entries.count) have a clear existing match (informational)")
 }
 
 
@@ -513,7 +640,9 @@ do {
     let first = LUTLibrary.copyIn([source], to: library)
     let landed = library.appendingPathComponent("fuji")
     let names = (try? FileManager.default.contentsOfDirectory(atPath: landed.path))?.sorted() ?? []
-    let folderOK = first == LUTLibrary.ImportResult(imported: 2, duplicates: 0, failed: 0)
+    let folderOK = first.imported == 2 && first.duplicates == 0 && first.failed == 0
+        && first.importedURLs.count == 2
+        && first.importedURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
         && names == ["a.cube", "b.cube"]
     print("import a folder -> \(first) into \(landed.lastPathComponent)/\(names) -> \(folderOK ? "PASS" : "FAIL")")
 
@@ -1494,4 +1623,4 @@ print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 let durableLibraryOK = await runDurableLibraryChecks()
 
-exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && folderHierarchyOK && deepFolderOK && durableLibraryOK ? 0 : 1)
+exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && completeTagsOK && corpusTagsOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && folderHierarchyOK && deepFolderOK && durableLibraryOK ? 0 : 1)
