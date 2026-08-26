@@ -184,6 +184,12 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         guard lutSize > 0 else {
             throw LUTError.invalidFormat("LUT_3D_SIZE not found")
         }
+        // CIColorCube only accepts dimensions 2...128. Reject unsupported or
+        // hostile headers before multiplying so malformed input cannot be
+        // reported as renderable or trigger an integer-overflow trap.
+        guard (2...128).contains(lutSize) else {
+            throw LUTError.invalidFormat("Unsupported LUT_3D_SIZE \(lutSize); expected 2...128")
+        }
         let expected = lutSize * lutSize * lutSize
         guard rows.count == expected else {
             throw LUTError.invalidFormat("Expected \(expected) entries, got \(rows.count)")

@@ -566,12 +566,23 @@ do {
     // import reports success and the next library scan makes them disappear.
     let oneD = root.appendingPathComponent("shaper.cube")
     let malformed = root.appendingPathComponent("malformed.cube")
+    let tooSmall = root.appendingPathComponent("size-one.cube")
+    let tooLarge = root.appendingPathComponent("size-129.cube")
+    let overflow = root.appendingPathComponent("size-overflow.cube")
     try? "LUT_1D_SIZE 2\n0 0 0\n1 1 1\n".write(to: oneD, atomically: true, encoding: .utf8)
     try? "LUT_3D_SIZE 2\n0 0 0\n".write(to: malformed, atomically: true, encoding: .utf8)
-    let rejected = LUTLibrary.copyIn([oneD, malformed], to: library)
-    let rejectedOK = rejected == LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 2)
-        && FileManager.default.fileExists(atPath: library.appendingPathComponent("shaper.cube").path) == false
-        && FileManager.default.fileExists(atPath: library.appendingPathComponent("malformed.cube").path) == false
+    try? "LUT_3D_SIZE 1\n0 0 0\n".write(to: tooSmall, atomically: true, encoding: .utf8)
+    try? "LUT_3D_SIZE 129\n".write(to: tooLarge, atomically: true, encoding: .utf8)
+    try? "LUT_3D_SIZE 3037000500\n".write(to: overflow, atomically: true, encoding: .utf8)
+    let rejected = LUTLibrary.copyIn(
+        [oneD, malformed, tooSmall, tooLarge, overflow], to: library
+    )
+    let rejectedOK = rejected == LUTLibrary.ImportResult(imported: 0, duplicates: 0, failed: 5)
+        && [oneD, malformed, tooSmall, tooLarge, overflow].allSatisfy {
+            FileManager.default.fileExists(
+                atPath: library.appendingPathComponent($0.lastPathComponent).path
+            ) == false
+        }
     print("import rejects unreadable cubes -> \(rejected) -> \(rejectedOK ? "PASS" : "FAIL")")
 
     // And the summary says so, including the case where nothing happened.

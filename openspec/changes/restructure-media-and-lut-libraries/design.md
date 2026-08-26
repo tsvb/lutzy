@@ -184,7 +184,7 @@ Generated aliases and historical material are not separate visual records: LUTcr
 
 Folder hierarchy answers “where did this LUT come from and what input family does it belong to?” Tags and Collections answer cross-folder questions such as low saturation, monochrome, portrait, or favourites. This keeps physical moves meaningful and avoids encoding subjective style in the filesystem.
 
-Import validates each candidate through the production 3D LUT parser before copying. A `.cube` extension alone is insufficient: 1D shapers and malformed files increment the failed count and never enter the managed folder. Content-identical supported 3D LUTs retain the existing duplicate-by-fingerprint behaviour.
+Import validates each candidate through the production 3D LUT parser before copying. A `.cube` extension alone is insufficient: 1D shapers, malformed files, and 3D dimensions outside Core Image's supported 2...128 range increment the failed count and never enter the managed folder. The dimension is range-checked before cubing it, so a hostile size header cannot trigger integer overflow. Content-identical supported 3D LUTs retain the existing duplicate-by-fingerprint behaviour.
 
 ### Preserve Manager table work and add a separate visual Library path
 

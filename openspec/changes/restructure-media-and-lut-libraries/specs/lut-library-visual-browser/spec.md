@@ -18,6 +18,10 @@ Local LUT import SHALL copy and report as imported only `.cube` files that the p
 - **WHEN** the user imports a folder containing valid 3D LUTs, 1D shapers, and malformed `.cube` files
 - **THEN** valid 3D LUTs are imported, unsupported files contribute to the failed count, and the next scan shows every item reported as imported
 
+#### Scenario: Unsupported or hostile 3D size header
+- **WHEN** a `.cube` declares a 3D size outside the renderer's supported 2...128 range, including a value large enough to overflow unchecked cubing
+- **THEN** import reports the file as failed without copying it or terminating the process
+
 #### Scenario: Re-import valid duplicate
 - **WHEN** a valid 3D LUT has the same content fingerprint as an existing managed LUT
 - **THEN** it is reported as a duplicate and does not create another physical file or record
