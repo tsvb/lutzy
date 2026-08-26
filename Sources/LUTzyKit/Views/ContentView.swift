@@ -9,6 +9,7 @@ import SwiftUI
 public struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
     @State private var photosSelection: [PhotosPickerItem] = []
+    @State private var hoveredWorkspaceSection: AppSection?
 
     public init() {}
 
@@ -81,15 +82,43 @@ public struct ContentView: View {
     private var mainContent: some View {
         // Three columns: Workspace, local source navigation, and the active job.
         NavigationSplitView {
-            NavigationSidebar(viewModel: viewModel)
+            NavigationSidebar(
+                viewModel: viewModel,
+                hoveredSection: $hoveredWorkspaceSection
+            )
         } content: {
             libraryColumn
         } detail: {
             sectionContent
         }
+        .overlay(alignment: .topLeading) {
+            workspaceHoverLabel
+        }
         .inspector(isPresented: $viewModel.isInspectorPresented) {
             InfoInspectorView(viewModel: viewModel)
                 .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
+        }
+    }
+
+    @ViewBuilder
+    private var workspaceHoverLabel: some View {
+        if let section = hoveredWorkspaceSection,
+           let index = AppSection.allCases.firstIndex(of: section) {
+            Text(section.label)
+                .font(.callout.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .fixedSize()
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.24), radius: 8, y: 3)
+                .offset(x: 82, y: 21 + CGFloat(index) * 58)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                .transition(.opacity.combined(with: .move(edge: .leading)))
         }
     }
 

@@ -24,6 +24,7 @@
 - [x] 2.3 Make LUT Manager enter at All LUTs and restore Gallery context only inside LUT Library
 - [x] 2.4 Route Viewer and LUT-detail shortcuts by Workspace/focus and clear temporary-original state when its owner disappears
 - [x] 2.5 Present Workspace as a compact large-icon rail with hover names, selected state, and keyboard/assistive-technology labels
+- [x] 2.6 Keep hover labels non-interactive so every Workspace icon activates on the first click
 
 ## 3. Media Library
 

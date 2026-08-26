@@ -54,7 +54,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable, Codable
 /// Manager highlight.
 struct NavigationSidebar: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var hoveredSection: AppSection?
+    @Binding var hoveredSection: AppSection?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -63,6 +63,7 @@ struct NavigationSidebar: View {
                 let isHovered = hoveredSection == section
 
                 Button {
+                    hoveredSection = nil
                     viewModel.section = section
                 } label: {
                     Image(systemName: section.symbol)
@@ -85,17 +86,6 @@ struct NavigationSidebar: View {
                 }
                 .buttonStyle(.plain)
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .popover(
-                    isPresented: hoverPresentation(for: section),
-                    attachmentAnchor: .rect(.bounds),
-                    arrowEdge: .leading
-                ) {
-                    Text(section.label)
-                        .font(.callout.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .fixedSize()
-                }
                 .accessibilityLabel(Text(section.label))
                 .accessibilityValue(Text(isSelected ? "Selected" : ""))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -113,16 +103,5 @@ struct NavigationSidebar: View {
         .animation(.easeOut(duration: 0.12), value: viewModel.section)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Workspace")
-    }
-
-    private func hoverPresentation(for section: AppSection) -> Binding<Bool> {
-        Binding(
-            get: { hoveredSection == section },
-            set: { presented in
-                if presented == false, hoveredSection == section {
-                    hoveredSection = nil
-                }
-            }
-        )
     }
 }

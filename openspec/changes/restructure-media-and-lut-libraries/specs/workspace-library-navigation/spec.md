@@ -11,6 +11,10 @@ The application SHALL expose Viewer, Media Library, LUT Library, LUT Manager, an
 - **WHEN** a keyboard or assistive-technology user moves through the Workspace destinations
 - **THEN** every icon is an operable control with its full destination name and selected state
 
+#### Scenario: Activate a destination while its hover name is visible
+- **WHEN** the user single-clicks a Workspace icon after its hover label appears
+- **THEN** that first click immediately activates the destination because the hover label does not receive pointer events or create a separate interaction surface
+
 #### Scenario: Select a local source
 - **WHEN** the user selects media, a LUT folder, a collection, or Starred within a Workspace destination
 - **THEN** the active Workspace row remains selected

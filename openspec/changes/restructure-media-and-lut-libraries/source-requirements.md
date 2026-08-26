@@ -169,6 +169,7 @@ Workspace contains Viewer, Media Library, LUT Library, LUT Manager, and LUT Edit
 ### 2026-08-26 — Compact icon Workspace rail
 
 The outermost Workspace navigation uses large icons instead of permanently visible text rows. Hover exposes each destination name, the active destination remains visually clear, and keyboard or assistive-technology users retain an explicit accessible name.
+The hover label is non-interactive and must never consume or delay the icon button's single-click activation.
 
 ### 2026-08-26 — One shared Gallery sample
 
