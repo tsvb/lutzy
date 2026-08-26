@@ -34,6 +34,17 @@ The Inspector SHALL display existing tags as individually removable chips and SH
 - **WHEN** the user enters a valid new tag in the Inspector
 - **THEN** the tag is persisted once, appears as a chip, and does not create a duplicate value
 
+### Requirement: Visible Brand column
+LUT Manager's table SHALL expose the dedicated Brand / Source metadata as a `Brand` column alongside Folder and Input so users can audit classification without opening each row's Inspector.
+
+#### Scenario: Display Brand values
+- **WHEN** a LUT's persisted Brand / Source is a named vendor, Custom, or Unknown
+- **THEN** its Manager row displays the vendor name, `Custom`, or `Unknown` respectively and does not infer a value from the filename, physical folder, or Tags
+
+#### Scenario: Edit Brand from the Inspector
+- **WHEN** the user changes a selected LUT's Brand / Source in the Inspector
+- **THEN** the Brand column and LUT Library Brand grouping update from the same persisted record metadata
+
 ### Requirement: Single-selection metadata editing
 For one selected LUT, the Inspector SHALL allow editing of a record-level display-name override, origin, typed tags, Collection membership, physical folder, and Starred state.
 

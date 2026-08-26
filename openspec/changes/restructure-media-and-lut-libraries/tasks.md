@@ -60,6 +60,7 @@
 - [x] 6.4 Replace the add-only Tag sheet with visible tag chips, direct add/remove, and common/mixed multi-selection states
 - [x] 6.5 Keep Manager mutations metadata-only, leave filenames unchanged for display-name edits, and route transform-changing actions to LUT Editor
 - [x] 6.6 List all visible Tags in the Inspector, persist per-record measured-Tag exclusions, relabel Name and Brand/Source, and remove the duplicate bottom action row while retaining batch Move/Remove in the Inspector
+- [x] 6.7 Add a Manager `Brand` table column backed only by persisted Brand / Source metadata, with explicit Custom and Unknown values
 
 ## 7. LUT Library and sample detail
 

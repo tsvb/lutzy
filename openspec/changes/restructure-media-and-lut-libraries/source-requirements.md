@@ -62,6 +62,7 @@ This file preserves the user's original intent and the evolution of decisions be
 21. Activating a shelf opens a complete Grid like the second reference. Activating a LUT from either level opens the existing fixed-sample Before/After detail like the third reference.
 22. LUT detail exposes Back in a persistent full-width navigation header, names the originating facet or shelf, and supports Escape. Back navigation restores the originating level: detail to its Grid or discovery home, and Grid to discovery home. It also restores the originating selection and keyboard/assistive-technology focus target.
 23. When a discovery facet has no shelves in the active source, its header stays at the top and the empty state fills the remaining content area without retaining blank carousel space above it.
+24. LUT Manager's table directly shows a `Brand` column backed by the same persisted Brand / Source metadata used by the Inspector and LUT Library Brand grouping. Unknown remains explicit and no value is inferred from folder, filename, or Tags.
 
 ### Colour consistency
 
@@ -223,6 +224,17 @@ The Manager Inspector lists every visible Tag beside the selected LUT and provid
 > 還有disaply Name應該就是Name吧？
 >
 > 還有底下那行star, tag,move, remove 是不是跟右手邊重疊 那就免了吧？
+
+### 2026-08-27 — Manager Brand column
+
+The Manager table adds `Brand` between Folder and Input. It displays the persisted Brand / Source value already used by the Inspector and LUT Library discovery, making Unknown records visible for later curation without conflating Brand with Folder or Tag.
+
+Reference screenshots:
+
+- `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-21edd0ee-97a5-45f7-a709-c29522887b14.png`
+- `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-88c35db3-4eda-4a0a-b0d6-49c8687fa582.png`
+
+> 看一下要不要直接增加brand欄位?
 
 ### 2026-08-27 — Resizable Viewer sidebar and video-ready Media
 

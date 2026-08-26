@@ -132,6 +132,16 @@ func runDurableLibraryChecks() async -> Bool {
             && ProjectStore(root: recoveryProjectRoot).current?.session.selectedLUT == recoveredID?.raw
         print("derived session adoption -> \(recoveredSessionOK ? "PASS" : "FAIL")")
 
+        // Manager exposes the dedicated persisted Brand / Source namespace as a table column.
+        // Unknown and Custom remain explicit values; a vendor uses its actual authored name.
+        let managerBrandDefaultsOK = recoveryViewModel.managerBrandLabel(for: durableFirst) == "Custom"
+            && recoveryViewModel.managerBrandLabel(for: second.withRecordID(secondID)) == "Unknown"
+        recoveryViewModel.catalog.setOrigin(.vendor("Panasonic"), for: [firstID])
+        let managerVendorBrandOK = recoveryViewModel.managerBrandLabel(for: durableFirst) == "Panasonic"
+        recoveryViewModel.catalog.setOrigin(.custom, for: [firstID])
+        let managerBrandColumnOK = managerBrandDefaultsOK && managerVendorBrandOK
+        print("Manager Brand column uses persisted Brand / Source -> \(managerBrandColumnOK ? "PASS" : "FAIL")")
+
         let brandShelves = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
         let tagShelves = recoveryViewModel.libraryDiscoveryShelves(for: .tag)
         let collectionShelves = recoveryViewModel.libraryDiscoveryShelves(for: .collectionAndStar)
@@ -314,7 +324,7 @@ func runDurableLibraryChecks() async -> Bool {
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
         return catalogOK && mixedSelectionTagOK && visibleTagEditingOK && recoveryOK
             && recoveredSessionOK && discoveryOK && focusRecoveryOK
-            && previewCacheOK && legacyMigrationOK && mediaOK
+            && managerBrandColumnOK && previewCacheOK && legacyMigrationOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")
         return false

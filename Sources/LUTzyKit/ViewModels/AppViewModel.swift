@@ -1358,6 +1358,12 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    /// The Manager's user-facing Brand column. This is deliberately the catalog's persisted
+    /// Brand / Source value — never an inference from the physical folder, filename, or Tags.
+    func managerBrandLabel(for lut: CubeLUT) -> String {
+        catalog.origin(for: lut).label
+    }
+
     /// Star or unstar a whole selection.
     ///
     /// One decision for the group rather than a per-LUT toggle: toggling nine

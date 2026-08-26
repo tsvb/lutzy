@@ -139,6 +139,14 @@ struct LibraryManagerView: View {
                 }
                 .width(min: 80, ideal: 110)
 
+                TableColumn("Brand") { row in
+                    Text(viewModel.managerBrandLabel(for: row.lut))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .width(min: 80, ideal: 110)
+
                 TableColumn("Input") { row in
                     Text(row.lut.inputSpace == .vlog ? "V-Log" : "Display")
                         .font(.caption)
