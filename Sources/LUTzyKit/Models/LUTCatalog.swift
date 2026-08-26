@@ -115,6 +115,7 @@ final class LUTCatalog: ObservableObject {
         let durableID = resolvedRecordID(for: id)
         guard var record = records[durableID] else { return nil }
         var url = record.url
+        var scopeURL: URL?
         var didAccessSecurityScope = false
 
         if let bookmark = record.bookmark {
@@ -125,6 +126,7 @@ final class LUTCatalog: ObservableObject {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             ) {
+                scopeURL = resolved
                 url = record.bookmarkRelativePath.map {
                     resolved.appendingPathComponent($0)
                 } ?? resolved
@@ -140,7 +142,7 @@ final class LUTCatalog: ObservableObject {
             }
         }
         defer {
-            if didAccessSecurityScope { url.stopAccessingSecurityScopedResource() }
+            if didAccessSecurityScope { scopeURL?.stopAccessingSecurityScopedResource() }
         }
 
         guard FileManager.default.fileExists(atPath: url.path),
