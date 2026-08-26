@@ -40,6 +40,7 @@
 - [x] 4.3 Remove the Viewer Images/Back toggle, `viewerSurface == .images` route, and obsolete List/Gallery preference
 - [x] 4.4 Keep the existing comparison region and LUT gallery mounted while media or LUT source changes
 - [x] 4.5 Make the Viewer Media/LUT divider draggable with usable minimum pane heights and keep video records visibly browseable without claiming playback
+- [x] 4.6 Remove the duplicate inline media filmstrip so Viewer detail contains only comparison/preview above and LUT Gallery below
 
 ## 5. LUT sources and Collections
 

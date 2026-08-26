@@ -946,6 +946,9 @@ let navigationOwnershipOK = AppSection.allCases == [.viewer, .mediaLibrary, .lut
     && formerImagesSection == .mediaLibrary
 print("sidebar has five stable modes; Media Library presents Grid/List -> \(navigationOwnershipOK ? "PASS" : "FAIL")")
 
+let viewerCompositionOK = ViewerDetailRegion.allCases == [.comparison, .lutGallery]
+print("Viewer detail contains only comparison and LUT Gallery -> \(viewerCompositionOK ? "PASS" : "FAIL")")
+
 let folderTree = LUTFolderHierarchy.tree(from: [
     "Sony": 2,
     "Sony/VENICE": 3,
@@ -1668,4 +1671,4 @@ print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
 let durableLibraryOK = await runDurableLibraryChecks()
 
-exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && completeTagsOK && corpusTagsOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && folderHierarchyOK && deepFolderOK && durableLibraryOK ? 0 : 1)
+exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && completeTagsOK && corpusTagsOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && navigationOwnershipOK && viewerCompositionOK && folderHierarchyOK && deepFolderOK && durableLibraryOK ? 0 : 1)

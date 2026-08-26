@@ -2,6 +2,15 @@ import AppKit
 import PhotosUI
 import SwiftUI
 
+/// The Viewer detail has exactly two durable spatial regions. Media browsing
+/// belongs to the secondary sidebar, not between the workbench and LUT Gallery.
+enum ViewerDetailRegion: String, CaseIterable, Identifiable, Sendable {
+    case comparison
+    case lutGallery
+
+    var id: String { rawValue }
+}
+
 /// Main window layout: sidebar + preview + toolbar.
 ///
 /// One of two entry points LUTzyKit exposes to the executable (the other is
@@ -161,27 +170,20 @@ public struct ContentView: View {
     private var viewerContent: some View {
         VStack(spacing: 0) {
             VSplitView {
-                VStack(spacing: 0) {
-                    PreviewView(viewModel: viewModel)
-
-                    if viewModel.collection.isActive {
-                        Divider()
-                        FilmstripView(collection: viewModel.collection) { index in
-                            viewModel.selectCollectionImage(at: index)
-                        }
-                        .frame(height: 86)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                ForEach(ViewerDetailRegion.allCases) { region in
+                    switch region {
+                    case .comparison:
+                        PreviewView(viewModel: viewModel)
+                            .frame(minHeight: 260, idealHeight: 440)
+                    case .lutGallery:
+                        LUTPreviewGalleryView(viewModel: viewModel)
+                            .frame(minHeight: 210, idealHeight: 320)
                     }
                 }
-                .frame(minHeight: 260, idealHeight: 440)
-
-                LUTPreviewGalleryView(viewModel: viewModel)
-                    .frame(minHeight: 210, idealHeight: 320)
             }
 
             StatusBar(viewModel: viewModel)
         }
-        .animation(.easeInOut(duration: 0.25), value: viewModel.collection.isActive)
     }
 
     @ViewBuilder

@@ -45,6 +45,10 @@ Viewer SHALL place a Media chooser at the top of its secondary column and SHALL 
 ### Requirement: Stable Viewer workbench
 Viewer SHALL keep its existing comparison or preview region above its LUT gallery and SHALL NOT replace the workbench with a whole-surface image List or Gallery.
 
+#### Scenario: Inspect the Viewer detail composition
+- **WHEN** Viewer is active with one or more imported media records
+- **THEN** its detail contains the comparison or preview region directly above the LUT Gallery, without an inline media thumbnail strip between them
+
 #### Scenario: Change active media
 - **WHEN** the user changes the active image from Viewer's secondary column
 - **THEN** the comparison region and LUT gallery remain in their existing spatial regions and update their content in place

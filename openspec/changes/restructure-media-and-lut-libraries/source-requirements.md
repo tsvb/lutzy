@@ -231,6 +231,12 @@ The divider between Viewer's upper Media chooser and lower LUT source browser is
 > 這邊中間上下lut跟media的bar可不可以調整區間
 > 另外media可能未來會需要支援...video?
 
+### 2026-08-27 — Remove duplicate Viewer media filmstrip
+
+The horizontal media thumbnail strip between Viewer's comparison region and LUT Gallery is removed. Media selection already lives in the left Media section; the right detail keeps only comparison/preview above and LUT Gallery below.
+
+> 怎麼這邊中間還是有這塊？ 不是說要拿掉了？
+
 ## Implementation contracts added after independent gate review
 
 These are engineering contracts derived from the confirmed product requirements and current repository risks. They do not broaden product scope.
@@ -287,6 +293,8 @@ The following files are non-normative references. Their recorded purpose is limi
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-40b37c6f-a2d9-4b28-b150-6f70fae57b69.png` | Fixed-sample LUT detail reached after activating one LUT; styling remains non-normative |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-de81a0d6-d025-4db0-8d9c-0208a953c3c2.png` | Manager Inspector terminology, visible Tag editing, and removal of the duplicated bottom action row |
 | `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-566f9aef-cb80-44df-aec3-6b84b70738ec.png` | Viewer secondary-column Media/LUT divider that should become vertically resizable |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-25255502-a2a8-4962-8353-96da9d955af4.png` | Duplicate inline Viewer media filmstrip that must be removed |
+| `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-b9c8e67a-a6d3-418d-aef7-a2e8179b5d3c.png` | Close crop of the duplicate strip between comparison and LUT Gallery |
 
 ## OpenSpec record map
 
