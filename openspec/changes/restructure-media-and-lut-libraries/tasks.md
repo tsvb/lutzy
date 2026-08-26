@@ -69,5 +69,5 @@
 - [x] 8.3 Add focused tests for Workspace/source isolation, Collection safety, display-name fallback, Inspector mixed state, tag priority, and keyboard ownership/cleanup
 - [x] 8.4 Add pixel/RGB parity checks between Viewer and LUT Library using the exact neutral Library request for display-space and V-Log LUTs
 - [x] 8.5 Verify lazy rendering cancellation, stable placeholders, VoiceOver labels, narrow-window behaviour, and no hidden shortcut mutations
-- [ ] 8.6 Run debug/release builds, `lutcheck`, strict OpenSpec validation, running-app interface inspection, and fresh sub-agent review
+- [x] 8.6 Run debug/release builds, `lutcheck`, strict OpenSpec validation, running-app interface inspection, and fresh sub-agent review
 - [x] 8.7 Add derived-save tests for new locators, known-locator overwrite with metadata retention/cache invalidation, outside-root relaunch resolution, and catalog-persistence failure without a dangling document reference
