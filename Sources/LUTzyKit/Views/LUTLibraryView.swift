@@ -35,6 +35,7 @@ private struct LUTLibraryDetailView: View {
 
     @State private var rendered: LUTLibraryRenderPair?
     @State private var split = 0.5
+    @FocusState private var comparisonFocused: Bool
 
     private struct RenderKey: Hashable {
         let lutID: LUTID
@@ -47,6 +48,11 @@ private struct LUTLibraryDetailView: View {
             VStack(spacing: 0) {
                 comparison
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .focusable()
+                    .focused($comparisonFocused)
+                    .onChange(of: comparisonFocused) { _, focused in
+                        viewModel.setLUTDetailFocused(focused)
+                    }
                 Divider()
                 sampleStrip
             }
@@ -57,6 +63,7 @@ private struct LUTLibraryDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Button {
+                        viewModel.setLUTDetailFocused(false)
                         viewModel.selectedLibraryLUTID = nil
                     } label: {
                         Label("Back to Gallery", systemImage: "chevron.left")
@@ -119,6 +126,12 @@ private struct LUTLibraryDetailView: View {
                 maxSize: CGSize(width: 1400, height: 900)
             )
         }
+        .onAppear {
+            Task { @MainActor in comparisonFocused = true }
+        }
+        .onDisappear {
+            viewModel.setLUTDetailFocused(false)
+        }
     }
 
     private var comparison: some View {
@@ -156,6 +169,7 @@ private struct LUTLibraryDetailView: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0).onChanged { value in
+                    comparisonFocused = true
                     split = min(max(value.location.x / max(geo.size.width, 1), 0), 1)
                 }
             )

@@ -40,7 +40,8 @@ struct Project: Codable, Identifiable, Equatable, Sendable {
     struct Session: Codable, Equatable, Sendable {
         var section: AppSection = .viewer
         var layout: ComparisonLayout = .split
-        /// File paths, matching `LUTID`'s own representation.
+        /// Durable catalog record identity. Legacy file-path values remain
+        /// readable so sessions from before the catalog migration still open.
         var selectedLUT: String?
         var cellLUTs: [String?] = []
         /// The image's file name within the project, not a path: the project

@@ -32,6 +32,91 @@ final class AppViewModelTests: TempDirectoryTestCase {
         XCTAssertFalse(viewModel.isShowingOriginal)
     }
 
+    func testCreatingCollectionFromManagerSelectionCapturesExactlyThoseRecords() throws {
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("collection-catalog.json"))
+        let firstURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "First.cube", in: tempDirectory
+        )
+        let secondURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 3), named: "Second.cube", in: tempDirectory
+        )
+        let first = try XCTUnwrap(catalog.adoptSavedLUT(try CubeLUT(url: firstURL)))
+        let second = try XCTUnwrap(catalog.adoptSavedLUT(try CubeLUT(url: secondURL)))
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(), library: LUTLibrary(catalog: catalog)
+        )
+
+        let collection = try XCTUnwrap(viewModel.createCollection(named: "Low Saturation", from: [first]))
+
+        XCTAssertEqual(catalog.members(of: collection.id), Set([first]))
+        XCTAssertFalse(catalog.members(of: collection.id).contains(second))
+        XCTAssertNil(viewModel.createCollection(named: "Empty", from: []))
+    }
+
+    func testLibrarySpaceRequiresFocusedDetailAndClearsWhenFocusLeaves() async throws {
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("focus-catalog.json"))
+        let library = LUTLibrary(catalog: catalog)
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(), library: library
+        )
+        viewModel.section = .lutLibrary
+
+        viewModel.showOriginal(true)
+        XCTAssertFalse(viewModel.isShowingLibraryOriginal, "Gallery must not own Space")
+
+        try Fixtures.writeCube(Fixtures.identityCubeText(size: 2), named: "Detail.cube", in: tempDirectory)
+        library.scan(tempDirectory)
+        while library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
+        viewModel.selectLibraryLUT(try XCTUnwrap(library.allLUTs.first))
+        viewModel.setLUTDetailFocused(true)
+        viewModel.showOriginal(true)
+        XCTAssertTrue(viewModel.isShowingLibraryOriginal)
+
+        viewModel.setLUTDetailFocused(false)
+        XCTAssertFalse(viewModel.isShowingLibraryOriginal)
+        viewModel.showOriginal(true)
+        XCTAssertFalse(viewModel.isShowingLibraryOriginal)
+    }
+
+    func testExternalCatalogLUTRestoresFromSavedSessionAfterRelaunch() async throws {
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("session-catalog.json"))
+        let scanRoot = tempDirectory.appendingPathComponent("scanned", isDirectory: true)
+        let outside = tempDirectory.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: scanRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let externalURL = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "External.cube", in: outside
+        )
+        let externalID = try XCTUnwrap(catalog.adoptSavedLUT(try CubeLUT(url: externalURL)))
+        let library = LUTLibrary(catalog: catalog)
+        library.setFolder(scanRoot)
+
+        let projects = ProjectStore(root: tempDirectory.appendingPathComponent("Projects"))
+        _ = projects.create(named: "Restore")
+        var session = Project.Session()
+        session.selectedLUT = externalID.raw
+        projects.updateSession(session)
+        let viewModel = AppViewModel(
+            engine: FakeRenderEngine(),
+            projects: projects,
+            tags: LUTTagStore(fileURL: tempDirectory.appendingPathComponent("session-tags.json")),
+            media: MediaLibrary(
+                root: tempDirectory.appendingPathComponent("Media"),
+                manifestURL: tempDirectory.appendingPathComponent("session-media.json")
+            ),
+            library: library
+        )
+
+        let deadline = Date().addingTimeInterval(5)
+        while viewModel.document.lut.lutID != externalID {
+            if Date() > deadline { return XCTFail("external LUT session never restored") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(viewModel.selectedLUT?.url.standardizedFileURL, externalURL.standardizedFileURL)
+        XCTAssertNil(library.allLUTs.first(where: { $0.url.standardizedFileURL == externalURL.standardizedFileURL }))
+    }
+
     func testExportStatusReachesTheStatusBar() {
         let viewModel = AppViewModel()
         viewModel.export.onStatus?("Exported: photo.jpg")
@@ -174,7 +259,7 @@ final class AppViewModelTests: TempDirectoryTestCase {
         let saved = try Fixtures.writeCube(
             Fixtures.identityCubeText(size: 2), named: "Derived.cube", in: tempDirectory
         )
-        viewModel.derive.onSaved?(saved)
+        _ = viewModel.derive.onSaved?(saved)
 
         while viewModel.library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertEqual(viewModel.library.allLUTs.map(\.name), ["Derived"],
@@ -212,8 +297,7 @@ final class AppViewModelTests: TempDirectoryTestCase {
         XCTAssertTrue(try XCTUnwrap(viewModel.document.lut.lutID).isDerived)
 
         let destination = tempDirectory.appendingPathComponent("Keeper.cube")
-        try viewModel.derive.performSave(to: destination)
-        viewModel.derive.onSaved?(destination)
+        XCTAssertTrue(try viewModel.derive.save(to: destination))
 
         let durableID = try XCTUnwrap(viewModel.document.lut.lutID)
         XCTAssertFalse(durableID.isDerived,
@@ -240,8 +324,7 @@ final class AppViewModelTests: TempDirectoryTestCase {
 
         _ = try deriveAndSelect(on: viewModel)
         let destination = elsewhere.appendingPathComponent("Outside.cube")
-        try viewModel.derive.performSave(to: destination)
-        viewModel.derive.onSaved?(destination)
+        XCTAssertTrue(try viewModel.derive.save(to: destination))
         while viewModel.library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
 
         XCTAssertNil(viewModel.library.allLUTs.first(where: {
@@ -257,19 +340,23 @@ final class AppViewModelTests: TempDirectoryTestCase {
     /// Catalog persistence is part of adopting a save. If it fails, the file
     /// may exist, but the document must keep the resolvable in-memory derive
     /// instead of publishing a durable ID that a relaunch cannot recover.
-    func testCatalogPersistenceFailureDoesNotPublishDanglingDocumentReference() throws {
+    func testCatalogPersistenceFailureDoesNotPublishDanglingDocumentReference() async throws {
         let unwritableManifest = tempDirectory.appendingPathComponent("catalog-is-a-directory")
         try FileManager.default.createDirectory(at: unwritableManifest, withIntermediateDirectories: true)
         let catalog = LUTCatalog(fileURL: unwritableManifest)
+        let scanRoot = tempDirectory.appendingPathComponent("empty-scan-root", isDirectory: true)
+        try FileManager.default.createDirectory(at: scanRoot, withIntermediateDirectories: true)
+        let library = LUTLibrary(catalog: catalog)
+        library.setFolder(scanRoot)
         let viewModel = AppViewModel(
             engine: FakeRenderEngine(),
-            library: LUTLibrary(catalog: catalog)
+            library: library
         )
+        while library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
         let (derived, _) = try deriveAndSelect(on: viewModel)
-        let destination = tempDirectory.appendingPathComponent("Saved-but-unregistered.cube")
+        let destination = scanRoot.appendingPathComponent("Saved-but-unregistered.cube")
 
-        try viewModel.derive.performSave(to: destination)
-        viewModel.derive.onSaved?(destination)
+        XCTAssertFalse(try viewModel.derive.save(to: destination))
 
         XCTAssertEqual(viewModel.document.lut.lutID, derived.lutID)
         XCTAssertTrue(viewModel.document.lut.lutID?.isDerived == true)
@@ -301,8 +388,7 @@ final class AppViewModelTests: TempDirectoryTestCase {
 
         _ = try deriveAndSelect(on: viewModel)
         let destination = tempDirectory.appendingPathComponent("Keeper.cube")
-        try viewModel.derive.performSave(to: destination)
-        viewModel.derive.onSaved?(destination)
+        XCTAssertTrue(try viewModel.derive.save(to: destination))
 
         let savedID = try XCTUnwrap(viewModel.document.lut.lutID)
         let deadline = Date().addingTimeInterval(5)
@@ -352,8 +438,7 @@ final class AppViewModelTests: TempDirectoryTestCase {
         viewModel.selectLUT(fromLibrary)
 
         let destination = tempDirectory.appendingPathComponent("Keeper.cube")
-        try viewModel.derive.performSave(to: destination)
-        viewModel.derive.onSaved?(destination)
+        XCTAssertTrue(try viewModel.derive.save(to: destination))
 
         XCTAssertEqual(viewModel.document.lut.lutID, fromLibrary.lutID,
                        "saving the derive must not steal the selection from the LUT on screen")

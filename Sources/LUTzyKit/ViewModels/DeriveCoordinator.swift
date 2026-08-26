@@ -29,8 +29,12 @@ final class DeriveCoordinator: ObservableObject {
     var onDerived: ((CubeLUT) -> Void)?
     /// Where the Save panel should open, and what to re-scan afterwards.
     var libraryFolder: (() -> URL?)?
-    /// Called after a successful save so the sidebar picks the new file up.
-    var onSaved: ((URL) -> Void)?
+    /// Bracket the atomic file write with durable catalog recovery/adoption.
+    /// Returning false prevents a write or reports that registration did not
+    /// complete, so "Saved" is never published ahead of the catalog.
+    var onWillSave: ((URL) -> Bool)?
+    var onSaved: ((URL) -> Bool)?
+    var onSaveFailed: ((URL) -> Void)?
 
     /// The in-memory cube serialized to a temp .cube, so saving later is a
     /// single `FileManager.copy`. Cleared when a new derive starts.
@@ -177,23 +181,36 @@ final class DeriveCoordinator: ObservableObject {
         guard panel.runModal() == .OK, let destination = panel.url else { return }
 
         do {
-            try performSave(to: destination)
-            onStatus?("Saved: \(destination.lastPathComponent)")
-            onSaved?(destination)
+            if try save(to: destination) {
+                onStatus?("Saved: \(destination.lastPathComponent)")
+            }
         } catch {
             onError?("Save failed: \(error.localizedDescription)")
         }
     }
 
-    /// Copy the scratch cube to `destination`, replacing anything already
-    /// there. Panel-free, so tests can drive it directly.
+    /// Complete the save contract: persist recovery intent, atomically write
+    /// the file, then publish success only if catalog adoption also succeeds.
+    @discardableResult
+    func save(to destination: URL) throws -> Bool {
+        if let onWillSave, onWillSave(destination) == false { return false }
+        do {
+            try performSave(to: destination)
+        } catch {
+            onSaveFailed?(destination)
+            throw error
+        }
+        return onSaved?(destination) ?? true
+    }
+
+    /// Atomically replace `destination` with the scratch bytes. `Data.write`
+    /// stages a sibling temporary file and renames it into place, avoiding the
+    /// delete-then-copy gap that could lose a known LUT on interruption.
+    /// Panel-free, so tests can drive it directly.
     func performSave(to destination: URL) throws {
         guard let scratch = scratchURL else { throw SaveError.nothingToSave }
-        let fm = FileManager.default
-        if fm.fileExists(atPath: destination.path) {
-            try fm.removeItem(at: destination)
-        }
-        try fm.copyItem(at: scratch, to: destination)
+        let data = try Data(contentsOf: scratch)
+        try data.write(to: destination, options: .atomic)
     }
 
     enum SaveError: LocalizedError {

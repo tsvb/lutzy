@@ -49,6 +49,7 @@ struct LibraryManagerView: View {
     @State private var displayName = ""
     @State private var originChoice: OriginChoice = .unknown
     @State private var vendorName = ""
+    @State private var inspectorFolder = ""
 
     private enum OriginChoice: String, CaseIterable {
         case mixed, unknown, vendor, custom
@@ -65,9 +66,8 @@ struct LibraryManagerView: View {
     private var rows: [LibraryRow] { viewModel.visibleLUTs }
 
     /// The selected LUTs, in the order the table shows them.
-    private var selected: [CubeLUT] {
-        rows.map(\.lut).filter { selection.contains($0.lutID) }
-    }
+    private var selectedRows: [LibraryRow] { rows.filter { selection.contains($0.id) } }
+    private var selected: [CubeLUT] { selectedRows.map(\.lut) }
 
     private var selectedIDs: Set<LUTID> { Set(selected.map(\.lutID)) }
 
@@ -96,7 +96,14 @@ struct LibraryManagerView: View {
                     .frame(minWidth: 260, idealWidth: 310, maxWidth: 390)
             }
         }
-        .onChange(of: selection) { _, _ in refreshInspectorDrafts() }
+        .onAppear { viewModel.managerSelection = selection }
+        .onChange(of: selection) { _, value in
+            viewModel.managerSelection = value
+            refreshInspectorDrafts()
+        }
+        .onChange(of: Set(rows.map(\.id))) { _, visibleIDs in
+            selection.formIntersection(visibleIDs)
+        }
     }
 
     private var lutTable: some View {
@@ -201,6 +208,8 @@ struct LibraryManagerView: View {
                     tagsSection
                     Divider()
                     collectionsSection
+                    Divider()
+                    folderSection
                     Divider()
                     starredSection
                     Text("Transform and colour changes belong in LUT Editor.")
@@ -338,6 +347,34 @@ struct LibraryManagerView: View {
         }
     }
 
+    private var folderSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Physical Folder").font(.subheadline.weight(.semibold))
+            if selection.count == 1 {
+                Picker("Folder", selection: $inspectorFolder) {
+                    Text("Top Level").tag("")
+                    ForEach(viewModel.library.categoryNames, id: \.self) { folder in
+                        Text(folder).tag(folder)
+                    }
+                }
+                .labelsHidden()
+                .onChange(of: inspectorFolder) { oldFolder, newFolder in
+                    guard let lut = selected.first,
+                          newFolder != selectedRows.first?.category
+                    else { return }
+                    if viewModel.moveLUT(lut, toCategory: newFolder) == false {
+                        inspectorFolder = oldFolder
+                    }
+                }
+                Text(inspectorFolder.isEmpty ? "Library root" : inspectorFolder)
+                    .font(.caption2).foregroundStyle(.tertiary)
+            } else {
+                Text("Select one LUT to change its physical folder. Use Move for batch changes.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var commonTypedTags: [String] {
         selectionState.commonTags
     }
@@ -348,10 +385,11 @@ struct LibraryManagerView: View {
 
     private func refreshInspectorDrafts() {
         guard let first = selected.first else {
-            displayName = ""; originChoice = .unknown; vendorName = ""; return
+            displayName = ""; originChoice = .unknown; vendorName = ""; inspectorFolder = ""; return
         }
         displayName = selected.count == 1
             ? (viewModel.catalog.record(for: first)?.displayNameOverride ?? "") : ""
+        inspectorFolder = selected.count == 1 ? (selectedRows.first?.category ?? "") : ""
         guard let origin = selectionState.commonOrigin else {
             originChoice = .mixed; vendorName = ""; return
         }

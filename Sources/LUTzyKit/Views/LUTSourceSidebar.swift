@@ -44,7 +44,10 @@ struct LUTSourceSidebar: View {
                         Image(systemName: "plus")
                     }
                     .buttonStyle(.borderless)
-                    .help("New Collection")
+                    .disabled(viewModel.managerSelection.isEmpty)
+                    .help(viewModel.managerSelection.isEmpty
+                          ? "Select one or more LUTs to create a Collection"
+                          : "New Collection from Selection")
                 }
             }
             .padding(.horizontal, 12)
@@ -55,6 +58,8 @@ struct LUTSourceSidebar: View {
         .sheet(isPresented: $isCreatingCollection) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("New Collection").font(.headline)
+                Text("Includes \(viewModel.managerSelection.count) selected LUT\(viewModel.managerSelection.count == 1 ? "" : "s").")
+                    .font(.caption).foregroundStyle(.secondary)
                 TextField("Collection name", text: $collectionName)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(createCollection)
@@ -72,7 +77,9 @@ struct LUTSourceSidebar: View {
     }
 
     private func createCollection() {
-        guard let item = viewModel.catalog.createCollection(named: collectionName) else { return }
+        guard let item = viewModel.createCollection(
+            named: collectionName, from: viewModel.managerSelection
+        ) else { return }
         viewModel.setLUTSource(.collection(item.id), for: context)
         isCreatingCollection = false
     }

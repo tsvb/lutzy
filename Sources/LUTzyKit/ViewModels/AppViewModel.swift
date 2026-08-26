@@ -129,9 +129,9 @@ final class AppViewModel: ObservableObject {
     /// single `scratchLUT` slot that stood here.
     private var derivedRegistry = DerivedLUTRegistry()
 
-    /// **Shim.** The document stores a `LUTID`; views still want the LUT. Resolution is deliberately
-    /// a fresh lookup rather than a cached object — `LUTID` is a file path precisely so a rescan
-    /// cannot break it (§4.3).
+    /// **Shim.** The document stores a durable `LUTID`; views still want the LUT. Resolution is a
+    /// fresh registry/scan/catalog lookup so rescans and external saved LUTs resolve through the
+    /// same identity contract.
     var selectedLUT: CubeLUT? { resolvedLUT(document.lut.lutID) }
 
     /// **Shim.** Reads through to the document so the toolbar slider keeps working unchanged.
@@ -308,12 +308,14 @@ final class AppViewModel: ObservableObject {
     @Published var viewerLUTSource: LUTSource = .all
     @Published var libraryLUTSource: LUTSource = .all
     @Published var managerLUTSource: LUTSource = .all
+    @Published var managerSelection: Set<LUTRecordID> = []
     @Published var selectedMediaFolder: String?
     @Published var selectedLibraryLUTID: LUTRecordID?
     @Published var selectedLibrarySampleID: String = LUTLibrarySample.all[0].id {
         didSet { lutGalleryRevision &+= 1 }
     }
     @Published var isShowingLibraryOriginal = false
+    @Published private(set) var isLUTDetailFocused = false
 
     var librarySamples: [LUTLibrarySample] { LUTLibrarySample.all }
     var selectedLibrarySample: LUTLibrarySample {
@@ -341,7 +343,9 @@ final class AppViewModel: ObservableObject {
                 isShowingOriginal = false
                 schedulePreview(refreshGallery: false)
             }
-            if oldValue == .lutLibrary && section != .lutLibrary { isShowingLibraryOriginal = false }
+            if oldValue == .lutLibrary && section != .lutLibrary {
+                setLUTDetailFocused(false)
+            }
             scheduleSessionSave()
         }
     }
@@ -464,12 +468,26 @@ final class AppViewModel: ObservableObject {
             self.selectLUT(lut)
         }
         derive.libraryFolder = { [weak self] in self?.library.folderURL }
+        derive.onWillSave = { [weak self] destination in
+            guard let self else { return false }
+            let bookmark = try? destination.bookmarkData(
+                options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
+            )
+            guard self.catalog.beginSaveRecovery(for: destination, bookmark: bookmark) else {
+                self.presentError("The LUT could not be prepared for a recoverable save. Check the library location and try again.")
+                return false
+            }
+            return true
+        }
+        derive.onSaveFailed = { [weak self] destination in
+            self?.catalog.cancelSaveRecovery(for: destination)
+        }
         derive.onSaved = { [weak self] destination in
-            guard let self else { return }
-            self.adoptSavedLUT(at: destination)
+            guard let self else { return false }
+            guard self.adoptSavedLUT(at: destination) else { return false }
             // Re-scan so the new entry appears in the sidebar.
-            guard let folder = self.library.folderURL else { return }
-            self.library.scan(folder)
+            if let folder = self.library.folderURL { self.library.scan(folder) }
+            return true
         }
     }
 
@@ -492,22 +510,29 @@ final class AppViewModel: ObservableObject {
     ///
     /// Only the LUT that was *just saved* moves. The user can derive, pick something else from the
     /// sidebar, and then save the derive from the still-open sheet; that must not steal the selection.
-    private func adoptSavedLUT(at destination: URL) {
-        guard let saved = try? CubeLUT(url: destination, category: "Derived") else { return }
+    @discardableResult
+    private func adoptSavedLUT(at destination: URL) -> Bool {
+        guard let saved = try? CubeLUT(url: destination, category: "Derived") else {
+            presentError("The saved LUT could not be read back for registration. Try saving again.")
+            return false
+        }
         let bookmark = try? destination.bookmarkData(
             options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil
         )
         guard let recordID = catalog.adoptSavedLUT(saved, bookmark: bookmark) else {
             presentError("The LUT file was saved, but it could not be registered in the library. Try saving again.")
-            return
+            return false
         }
         let durable = saved.withRecordID(recordID)
         derivedRegistry.register(durable)
+        lutGalleryRevision &+= 1
+        Task { await tags.index([durable]) }
 
-        guard let current = document.lut.lutID, current == derive.derivedLUT?.lutID else { return }
+        guard let current = document.lut.lutID, current == derive.derivedLUT?.lutID else { return true }
         document.lut.lutID = recordID
         Task { await engine.invalidateLUTCache() }
         schedulePreview()
+        return true
     }
 
     /// Replace exact legacy path references only after the catalog knows the
@@ -786,7 +811,7 @@ final class AppViewModel: ObservableObject {
     /// files they were saved to, so a hit there is always the more specific one; for a saved LUT the
     /// library holds an identical value under the same ID, and `CubeLUT` compares by ID, so which
     /// copy wins is not observable.
-    private func resolvedLUT(_ id: LUTID?) -> CubeLUT? {
+    func resolvedLUT(_ id: LUTID?) -> CubeLUT? {
         guard let id else { return nil }
         if let registered = derivedRegistry.lut(for: id) { return registered }
         if let scanned = library.allLUTs.first(matching: id) { return scanned }
@@ -915,6 +940,11 @@ final class AppViewModel: ObservableObject {
         case .manager: managerLUTSource = source
         }
         scheduleSessionSave()
+    }
+
+    @discardableResult
+    func createCollection(named name: String, from recordIDs: Set<LUTRecordID>) -> LUTCollectionRecord? {
+        catalog.createCollection(named: name, containing: recordIDs)
     }
 
     func luts(for source: LUTSource) -> [CubeLUT] {
@@ -1162,11 +1192,14 @@ final class AppViewModel: ObservableObject {
     }
 
     /// Move a LUT into another folder of the app's own library.
-    func moveLUT(_ lut: CubeLUT, toCategory category: String) {
+    @discardableResult
+    func moveLUT(_ lut: CubeLUT, toCategory category: String) -> Bool {
         if library.move(lut, toCategory: category) {
             statusMessage = "Moved \(lut.name) to \(category.isEmpty ? "the top level" : category)"
+            return true
         } else {
             statusMessage = "\(lut.name) is not in the app's library — move it where it lives"
+            return false
         }
     }
 
@@ -1300,6 +1333,7 @@ final class AppViewModel: ObservableObject {
     /// Toggle between original and LUT preview (for Space-hold comparison).
     func showOriginal(_ show: Bool) {
         if section == .lutLibrary {
+            guard isLUTDetailFocused, selectedLibraryLUT != nil else { return }
             isShowingLibraryOriginal = show
             return
         }
@@ -1307,6 +1341,11 @@ final class AppViewModel: ObservableObject {
         guard show != isShowingOriginal else { return }
         isShowingOriginal = show
         schedulePreview(refreshGallery: false)
+    }
+
+    func setLUTDetailFocused(_ focused: Bool) {
+        isLUTDetailFocused = focused
+        if focused == false { isShowingLibraryOriginal = false }
     }
 
     /// The V shortcut. With seven layouts a boolean toggle is no longer the

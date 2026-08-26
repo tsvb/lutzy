@@ -251,7 +251,7 @@ extension AppViewModel {
                 // Only when it resolves. A LUT that has been deleted from the
                 // library should leave the project's record alone rather than
                 // clearing it — the file may come back.
-                guard let lut = library.allLUTs.first(matching: LUTID(raw: raw)) else { return }
+                guard let lut = resolvedLUT(LUTID(raw: raw)) else { return }
                 selectLUT(lut)
             }
         }

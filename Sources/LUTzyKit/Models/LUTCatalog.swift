@@ -55,14 +55,23 @@ final class LUTCatalog: ObservableObject {
         var collections: [LUTCollectionRecord]
     }
 
+    private struct SaveRecovery: Codable {
+        let locator: String
+        let bookmark: Data?
+    }
+
     @Published private(set) var records: [LUTRecordID: LUTRecord] = [:]
     @Published private(set) var collections: [LUTCollectionRecord] = []
 
     private let fileURL: URL
+    private let recoveryURL: URL
 
     init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? Self.defaultURL()
+        let fileURL = fileURL ?? Self.defaultURL()
+        self.fileURL = fileURL
+        self.recoveryURL = fileURL.appendingPathExtension("save-recovery")
         load()
+        recoverPendingSave()
     }
 
     private static func defaultURL() -> URL {
@@ -183,11 +192,42 @@ final class LUTCatalog: ObservableObject {
     func createCollection(named name: String) -> LUTCollectionRecord? {
         let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard cleaned.isEmpty == false else { return nil }
+        let previous = collections
         let now = Date()
         let item = LUTCollectionRecord(id: UUID(), name: cleaned, createdAt: now, updatedAt: now)
         collections.append(item)
         collections.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        persist()
+        guard persistReportingFailure() else {
+            collections = previous
+            return nil
+        }
+        return item
+    }
+
+    /// Create the Manager workflow's required non-empty Collection in one
+    /// catalog write, so interruption cannot leave an empty definition behind.
+    @discardableResult
+    func createCollection(
+        named name: String, containing recordIDs: Set<LUTRecordID>
+    ) -> LUTCollectionRecord? {
+        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleaned.isEmpty == false,
+              recordIDs.isEmpty == false,
+              recordIDs.allSatisfy({ records[$0] != nil })
+        else { return nil }
+
+        let previousCollections = collections
+        let previousRecords = records
+        let now = Date()
+        let item = LUTCollectionRecord(id: UUID(), name: cleaned, createdAt: now, updatedAt: now)
+        collections.append(item)
+        collections.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        for id in recordIDs { records[id]?.collectionIDs.insert(item.id) }
+        guard persistReportingFailure() else {
+            collections = previousCollections
+            records = previousRecords
+            return nil
+        }
         return item
     }
 
@@ -302,6 +342,31 @@ final class LUTCatalog: ObservableObject {
         return true
     }
 
+    /// Persist intent before a derived LUT replaces anything at `destination`.
+    /// If the process stops after the file write but before catalog adoption,
+    /// the marker lets the next launch finish the same adoption deterministically.
+    func beginSaveRecovery(for destination: URL, bookmark: Data? = nil) -> Bool {
+        let marker = SaveRecovery(locator: Self.normalized(destination), bookmark: bookmark)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(marker) else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: recoveryURL.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try data.write(to: recoveryURL, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// A failed file write never needs launch recovery; discard only the marker
+    /// for that exact destination so a different pending save is not erased.
+    func cancelSaveRecovery(for destination: URL) {
+        clearSaveRecovery(matching: Self.normalized(destination))
+    }
+
     /// Adopt a successfully written LUT immediately, including paths outside
     /// the scanned root. Known locators retain record metadata.
     func adoptSavedLUT(_ lut: CubeLUT, bookmark: Data? = nil) -> LUTRecordID? {
@@ -315,6 +380,7 @@ final class LUTCatalog: ObservableObject {
                 if let previous { records[existing] = previous }
                 return nil
             }
+            clearSaveRecovery(matching: locator)
             return existing
         }
 
@@ -327,6 +393,7 @@ final class LUTCatalog: ObservableObject {
             records.removeValue(forKey: id)
             return nil
         }
+        clearSaveRecovery(matching: locator)
         return id
     }
 
@@ -368,6 +435,25 @@ final class LUTCatalog: ObservableObject {
         else { return }
         records = Dictionary(uniqueKeysWithValues: snapshot.records.map { ($0.id, $0) })
         collections = snapshot.collections
+    }
+
+    private func recoverPendingSave() {
+        guard let data = try? Data(contentsOf: recoveryURL),
+              let marker = try? JSONDecoder().decode(SaveRecovery.self, from: data)
+        else { return }
+        let url = URL(fileURLWithPath: marker.locator)
+        guard FileManager.default.fileExists(atPath: url.path),
+              let lut = try? CubeLUT(url: url, category: "Recovered")
+        else { return }
+        _ = adoptSavedLUT(lut, bookmark: marker.bookmark)
+    }
+
+    private func clearSaveRecovery(matching locator: String) {
+        guard let data = try? Data(contentsOf: recoveryURL),
+              let marker = try? JSONDecoder().decode(SaveRecovery.self, from: data),
+              marker.locator == locator
+        else { return }
+        try? FileManager.default.removeItem(at: recoveryURL)
     }
 
     private func persist() { _ = persistReportingFailure() }

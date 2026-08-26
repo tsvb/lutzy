@@ -153,6 +153,42 @@ final class DeriveCoordinatorTests: TempDirectoryTestCase {
         XCTAssertNoThrow(try CubeLUT(url: destination))
     }
 
+    func testSaveBracketsAtomicWriteAndReturnsCatalogAdoptionResult() throws {
+        let coordinator = DeriveCoordinator()
+        _ = try installScratchResult(on: coordinator)
+        let destination = tempDirectory.appendingPathComponent("Transactional.cube")
+        var events: [String] = []
+        coordinator.onWillSave = { url in
+            XCTAssertEqual(url, destination)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+            events.append("marker")
+            return true
+        }
+        coordinator.onSaved = { url in
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+            events.append("adopt")
+            return false
+        }
+
+        let adopted = try coordinator.save(to: destination)
+
+        XCTAssertFalse(adopted)
+        XCTAssertEqual(events, ["marker", "adopt"])
+    }
+
+    func testAtomicWriteFailureCancelsRecoveryMarker() throws {
+        let coordinator = DeriveCoordinator()
+        _ = try installScratchResult(on: coordinator)
+        let destination = tempDirectory.appendingPathComponent("is-a-directory")
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        var cancelled: URL?
+        coordinator.onWillSave = { _ in true }
+        coordinator.onSaveFailed = { cancelled = $0 }
+
+        XCTAssertThrowsError(try coordinator.save(to: destination))
+        XCTAssertEqual(cancelled, destination)
+    }
+
     // MARK: - Error reporting
 
     func testDeriveReportsAFailureThroughOnError() async throws {

@@ -169,6 +169,33 @@ final class LUTCatalogTests: TempDirectoryTestCase {
         XCTAssertEqual(catalog.record(for: id)?.isStarred, true)
     }
 
+    func testPendingDerivedSaveIsRecoveredOnCatalogRelaunch() throws {
+        let manifest = tempDirectory.appendingPathComponent("recovery.json")
+        let destination = tempDirectory.appendingPathComponent("Recovered.cube")
+        let first = LUTCatalog(fileURL: manifest)
+        XCTAssertTrue(first.beginSaveRecovery(for: destination))
+        try Fixtures.identityCubeText(size: 2).write(to: destination, atomically: true, encoding: .utf8)
+
+        let relaunched = LUTCatalog(fileURL: manifest)
+        let id = try XCTUnwrap(relaunched.recordID(for: destination))
+        let resolved = try XCTUnwrap(relaunched.loadLUT(for: id))
+
+        XCTAssertEqual(resolved.url.standardizedFileURL, destination.standardizedFileURL)
+        XCTAssertTrue(id.isRecord)
+    }
+
+    func testFailedFileWriteCanCancelPendingRecovery() throws {
+        let manifest = tempDirectory.appendingPathComponent("cancel-recovery.json")
+        let destination = tempDirectory.appendingPathComponent("Never Saved.cube")
+        let first = LUTCatalog(fileURL: manifest)
+        XCTAssertTrue(first.beginSaveRecovery(for: destination))
+        first.cancelSaveRecovery(for: destination)
+        try Fixtures.identityCubeText(size: 2).write(to: destination, atomically: true, encoding: .utf8)
+
+        let relaunched = LUTCatalog(fileURL: manifest)
+        XCTAssertNil(relaunched.recordID(for: destination))
+    }
+
     func testPersistenceFailureDoesNotPublishNewRecord() throws {
         let file = try Fixtures.writeCube(
             Fixtures.identityCubeText(size: 2), named: "Derived.cube", in: tempDirectory

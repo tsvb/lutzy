@@ -37,6 +37,17 @@ func runDurableLibraryChecks() async -> Bool {
             && relaunchedCatalog.loadLUT(for: firstID)?.lutID == firstID
         print("durable LUT catalog -> \(catalogOK ? "PASS" : "FAIL")")
 
+        let recoveredURL = root.appendingPathComponent("Recovered.cube")
+        let markerOK = relaunchedCatalog.beginSaveRecovery(for: recoveredURL)
+        try cubeText.write(to: recoveredURL, atomically: true, encoding: .utf8)
+        let afterInterruptedSave = LUTCatalog(fileURL: catalogURL)
+        let recoveredID = afterInterruptedSave.recordID(for: recoveredURL)
+        let recoveryOK = markerOK
+            && recoveredID?.isRecord == true
+            && recoveredID.flatMap(afterInterruptedSave.loadLUT(for:))?.url.standardizedFileURL
+                == recoveredURL.standardizedFileURL
+        print("derived save recovery -> \(recoveryOK ? "PASS" : "FAIL")")
+
         let importFolder = root.appendingPathComponent("Shoot/Day 1", isDirectory: true)
         try FileManager.default.createDirectory(at: importFolder, withIntermediateDirectories: true)
         try Data([0x89, 0x50, 0x4e, 0x47, 1]).write(
@@ -57,7 +68,7 @@ func runDurableLibraryChecks() async -> Bool {
             && Set(relaunchedMedia.records.map(\.id)) == mediaIDs
             && relaunchedMedia.records.contains { $0.logicalPath == "Shoot/Day 1/frame.png" }
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
-        return catalogOK && mediaOK
+        return catalogOK && recoveryOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")
         return false

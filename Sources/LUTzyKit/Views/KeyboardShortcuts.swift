@@ -92,7 +92,9 @@ final class KeyMonitor {
         // ↑/↓ cycle LUTs; ←/→ step through the source files.
         switch event.keyCode {
         case 49:  // Space — hold to compare original
-            guard vm.section == .viewer || vm.section == .lutLibrary else { return event }
+            guard vm.section == .viewer
+                    || (vm.section == .lutLibrary && vm.isLUTDetailFocused && vm.selectedLibraryLUT != nil)
+            else { return event }
             vm.showOriginal(isDown)
             return nil
         case 126: // Up arrow — previous LUT
