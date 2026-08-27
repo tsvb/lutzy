@@ -25,10 +25,6 @@ func runDurableLibraryChecks() async -> Bool {
         let materializationCache = LUTMaterializationCache(capacity: 1)
         let cachedFirst = await materializationCache.materialized(first)
         let cachedProbe = await materializationCache.sample([0.5, 0.5, 0.5], from: first)
-        let cachedCount = await materializationCache.count
-        let boundedUICacheOK = cachedFirst?.retainsTableData == true
-            && cachedProbe?.count == 3
-            && cachedCount == 1
         let replacedURL = root.appendingPathComponent("Replaced.cube")
         try cubeText.write(to: replacedURL, atomically: true, encoding: .utf8)
         let replacedAfterScan = try CubeLUT(url: replacedURL)
@@ -40,6 +36,24 @@ func runDurableLibraryChecks() async -> Bool {
         let lazyIdentityOK = replacedAfterScan.contentHash == replacedHash
             && replacedAfterScan.materialized() == nil
             && LUTProfiler.measureIfAvailable(replacedAfterScan) == nil
+        let currentReplacement = try CubeLUT(url: replacedURL)
+        let cancelledMaterialization = Task {
+            await materializationCache.materialized(currentReplacement)
+        }
+        cancelledMaterialization.cancel()
+        let cancelledParseOK = await cancelledMaterialization.value == nil
+        async let rematerializedFirst = materializationCache.materialized(first)
+        async let materializedReplacement = materializationCache.materialized(currentReplacement)
+        let concurrentResults = await (rematerializedFirst, materializedReplacement)
+        let cachedCount = await materializationCache.count
+        let peakParseCount = await materializationCache.peakParseCount
+        let boundedUICacheOK = cachedFirst?.retainsTableData == true
+            && cachedProbe?.count == 3
+            && concurrentResults.0 != nil
+            && concurrentResults.1 != nil
+            && cancelledParseOK
+            && cachedCount == 1
+            && peakParseCount == 1
         guard let firstID = catalog.adoptSavedLUT(first),
               let secondID = catalog.adoptSavedLUT(second),
               firstID != secondID,

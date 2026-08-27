@@ -132,4 +132,9 @@ The library SHALL authenticate current curated file bytes against the sidecar, d
 #### Scenario: Inspector and Editor use a lazy LUT repeatedly
 
 - **WHEN** Inspector draws a response curve or Editor refreshes after slider changes
-- **THEN** the LUT is materialized off the main actor and reused through a bounded cache rather than reparsed from disk in SwiftUI body or on every slider tick
+- **THEN** the LUT is materialized off the main actor with globally bounded parse concurrency and reused through a bounded cache rather than reparsed from disk in SwiftUI body or on every slider tick
+
+#### Scenario: Editor LUT changes during a rescan
+
+- **WHEN** a scan changes the fingerprint, name, location, or Input Profile behind the Editor's durable record
+- **THEN** Editor discards its resident base/stack tables and prepares the latest post-scan records before baking again

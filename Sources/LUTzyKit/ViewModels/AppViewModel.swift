@@ -478,6 +478,12 @@ final class AppViewModel: ObservableObject {
             guard let self else { return }
             self.catalog.migrateLegacyMetadata(for: self.library.allLUTs, from: self.tags)
             self.migrateLegacyLUTReferences()
+            // A locator can keep its durable record ID while its file contents,
+            // name, or Input Profile changes. Re-prepare from the post-scan row
+            // so Editor never keeps baking a stale resident table.
+            if self.section == .editor {
+                self.prepareEditorLUTsAndRefresh()
+            }
             self.lutGalleryRevision &+= 1
             let engine = self.engine
             Task { await engine.invalidateLUTCache() }
@@ -619,18 +625,12 @@ final class AppViewModel: ObservableObject {
     func migrateLegacyLUTReferences() {
         let previousDocumentID = document.lut.lutID
         let previousCells = cellLUTIDs
-        let previousEditorBaseID = editorBaseID
-        let previousEditorStackID = editorStackID
         if let id = document.lut.lutID { document.lut.lutID = library.migratedRecordID(for: id) }
         cellLUTIDs = cellLUTIDs.map { $0.map(library.migratedRecordID(for:)) }
         if let id = editorBaseID { editorBaseID = library.migratedRecordID(for: id) }
         if let id = editorStackID { editorStackID = library.migratedRecordID(for: id) }
         if document.lut.lutID != previousDocumentID || cellLUTIDs != previousCells {
             scheduleMigratedSessionSave()
-        }
-        if section == .editor,
-           editorBaseID != previousEditorBaseID || editorStackID != previousEditorStackID {
-            prepareEditorLUTsAndRefresh()
         }
     }
 

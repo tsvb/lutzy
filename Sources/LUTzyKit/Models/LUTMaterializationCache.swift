@@ -7,7 +7,8 @@ actor LUTMaterializationCache {
     private let capacity: Int
     private var completed: [String: CubeLUT] = [:]
     private var order: [String] = []
-    private var inFlight: [String: Task<CubeLUT?, Never>] = [:]
+    private var activeParses = 0
+    private(set) var peakParseCount = 0
 
     init(capacity: Int = 4) {
         self.capacity = max(capacity, 1)
@@ -16,27 +17,27 @@ actor LUTMaterializationCache {
     func materialized(_ source: CubeLUT) async -> CubeLUT? {
         if source.retainsTableData { return source }
         // Identical tables can legitimately have different catalog identity,
-        // name, or Input Profile. Include those semantics so a cached table
-        // never returns another record's metadata to Editor or Inspector.
-        let key = "\(source.lutID.raw)|\(source.inputSpace.rawValue)|\(source.contentHash)"
+        // name, location, or Input Profile. Include those semantics so a cached
+        // table never returns stale metadata to Editor or Inspector.
+        let key = [
+            source.lutID.raw, source.id, source.name, source.category,
+            source.inputSpace.rawValue, source.contentHash,
+        ].joined(separator: "|")
         if let cached = completed[key] {
             touch(key)
             return cached
         }
 
-        let worker: Task<CubeLUT?, Never>
-        if let existing = inFlight[key] {
-            worker = existing
-        } else {
-            worker = Task.detached(priority: .userInitiated) {
-                source.materialized()
-            }
-            inFlight[key] = worker
-        }
-
-        let result = await worker.value
-        inFlight[key] = nil
-        guard Task.isCancelled == false, let result else { return nil }
+        // Actor isolation serialises all cache misses, globally bounding parse
+        // concurrency to one. The parser runs on this actor's executor—not the
+        // MainActor—and sees caller cancellation while walking file lines.
+        activeParses += 1
+        peakParseCount = max(peakParseCount, activeParses)
+        defer { activeParses -= 1 }
+        guard Task.isCancelled == false,
+              let result = source.materialized(),
+              Task.isCancelled == false
+        else { return nil }
         insert(result, for: key)
         return result
     }
