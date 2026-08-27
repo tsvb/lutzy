@@ -66,6 +66,12 @@ Existing catalog records may predate Brand metadata even when their physical top
 
 Current manifests also carry an optional SHA-256 of the exact CUBE file bytes. For a matching file, discovery authenticates that cheap raw digest, reads only the header, and uses the manifest's normalized transform fingerprint. The float table is reparsed only when a render, profiler, or inspector actually needs it; the renderer's existing eight-entry LRU bounds retained Core Image filters. Old manifests or changed files use the complete parser.
 
+Outside-root catalog loads and newly saved derived LUTs are the deliberate exception: they parse while a security scope or Save panel grant is active and retain that single table, because lazy file access would occur after the sandbox grant closes.
+
+Curated descriptive Tags do not replace objective measured tags or similarity metrics. After discovery publishes, profiling proceeds in small background batches. Completed batches enter the existing persistent tag index; replacing the library cancels both the coordinating task and its current detached parser before beginning the next pass.
+
+A lazy LUT materializes into one immutable table before rendering or profiling. Materialization verifies that the parsed transform fingerprint still matches the scan-time fingerprint; an in-place replacement is rejected until the next scan reconciles its new identity. Profiling reuses that one materialized table for every probe rather than reparsing the source for each metric. Star and typed-Tag actions create an explicitly unmeasured placeholder instead of parsing a file synchronously on the main actor; the ordinary background profiler later replaces it.
+
 The library owns the detached scan worker directly. Replacing a scan cancels that worker and advances a generation token, so an obsolete result can neither consume another complete scan nor publish over a newer folder.
 
 ## Import

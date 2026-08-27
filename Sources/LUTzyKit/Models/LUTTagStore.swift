@@ -103,7 +103,7 @@ final class LUTTagStore: ObservableObject {
     func toggleFavourite(_ lut: CubeLUT) {
         var entry = entries[lut.contentHash] ?? Entry(
             name: lut.name, inputSpace: lut.inputSpace == .vlog ? "vlog" : "display",
-            metrics: LUTProfiler.measure(lut), measured: [], typed: [], taggerVersion: 0
+            metrics: .unmeasured, measured: [], typed: [], taggerVersion: 0
         )
         entry.isFavourite.toggle()
         entries[lut.contentHash] = entry
@@ -131,7 +131,7 @@ final class LUTTagStore: ObservableObject {
         guard cleaned.isEmpty == false else { return }
         var entry = entries[lut.contentHash] ?? Entry(
             name: lut.name, inputSpace: lut.inputSpace == .vlog ? "vlog" : "display",
-            metrics: LUTProfiler.measure(lut), measured: [], typed: [], taggerVersion: 0
+            metrics: .unmeasured, measured: [], typed: [], taggerVersion: 0
         )
         guard entry.typed.contains(cleaned) == false else { return }
         entry.typed.append(cleaned)
@@ -157,8 +157,24 @@ final class LUTTagStore: ObservableObject {
     func index(_ luts: [CubeLUT]) async {
         let pending = unmeasured(among: luts)
         guard pending.isEmpty == false else { return }
-        let measured = await Task.detached { Self.measure(pending) }.value
-        apply(measured)
+        // Keep each unit bounded: a curated 1,600-LUT library can take a while
+        // to profile, but completed batches should persist and a rescan should
+        // cancel the actual parser instead of stacking another full pass.
+        let batchSize = 24
+        for start in stride(from: 0, to: pending.count, by: batchSize) {
+            guard Task.isCancelled == false else { return }
+            let end = min(start + batchSize, pending.count)
+            let batch = Array(pending[start..<end])
+            let worker = Task.detached(priority: .utility) { Self.measure(batch) }
+            let measured = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+            guard Task.isCancelled == false else { return }
+            apply(measured)
+            await Task.yield()
+        }
     }
 
     /// The same work on the calling actor.
@@ -187,13 +203,19 @@ final class LUTTagStore: ObservableObject {
     }
 
     private nonisolated static func measure(_ luts: [CubeLUT]) -> [(String, String, String, LUTMetrics, [String])] {
-        luts.map { lut in
-            let metrics = LUTProfiler.measure(lut)
-            return (lut.contentHash, lut.name,
-                    lut.inputSpace == .vlog ? "vlog" : "display",
-                    metrics,
-                    LUTProfiler.completeTags(metrics, inputSpace: lut.inputSpace))
+        var measured: [(String, String, String, LUTMetrics, [String])] = []
+        measured.reserveCapacity(luts.count)
+        for lut in luts {
+            if Task.isCancelled { break }
+            guard let metrics = LUTProfiler.measureIfAvailable(lut) else { continue }
+            measured.append((
+                lut.contentHash, lut.name,
+                lut.inputSpace == .vlog ? "vlog" : "display",
+                metrics,
+                LUTProfiler.completeTags(metrics, inputSpace: lut.inputSpace)
+            ))
         }
+        return measured
     }
 
     private func apply(_ measured: [(String, String, String, LUTMetrics, [String])]) {

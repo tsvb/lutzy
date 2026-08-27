@@ -346,16 +346,34 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Materialize one lazy file-backed LUT while preserving the transform
+    /// identity observed by the scan. A file can be replaced between discovery
+    /// and rendering; accepting that replacement here would render new pixels
+    /// under the old catalog Brand, Tags, and fingerprint.
+    func materialized() -> CubeLUT? {
+        if embeddedTableData != nil { return self }
+        guard let parsed = try? CubeLUT(
+            url: url,
+            category: category,
+            retainTableData: true
+        ),
+        parsed.contentHash == storedContentHash,
+        let tableData = parsed.embeddedTableData
+        else { return nil }
+
+        return CubeLUT(
+            id: id, name: name, category: category, url: url, size: size,
+            inputSpace: inputSpace, photoStyleTag: photoStyleTag,
+            recordID: recordID, embeddedTableData: tableData,
+            storedContentHash: storedContentHash
+        )
+    }
+
     /// Reparse only when a caller actually needs pixels. Keeping this local to
     /// the operation means scanning 1,600 LUTs does not pin ~826 MiB of cube
     /// tables in `allLUTs`.
     private func resolvedTableData() -> Data? {
-        if let embeddedTableData { return embeddedTableData }
-        return try? CubeLUT(
-            url: url,
-            category: category,
-            retainTableData: true
-        ).embeddedTableData
+        materialized()?.embeddedTableData
     }
 
     /// Test/diagnostic seam for the library's memory contract.

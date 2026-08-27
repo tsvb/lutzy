@@ -104,6 +104,16 @@ The library SHALL authenticate current curated file bytes against the sidecar, d
 - **WHEN** raw-file SHA-256 no longer matches the sidecar
 - **THEN** the library falls back to the complete parser rather than trusting stale metadata
 
+#### Scenario: LUT security scope ends before rendering
+
+- **WHEN** an outside-root catalog record or newly saved derived LUT is parsed under temporary sandbox access
+- **THEN** that live LUT retains its table and remains renderable after the security scope closes
+
+#### Scenario: Lazy LUT changes after discovery
+
+- **WHEN** a lazy file-backed LUT is replaced in place after its scan-time fingerprint was recorded
+- **THEN** materialization rejects the mismatched transform until a rescan reconciles the new fingerprint, Brand, Tags, and pixels
+
 #### Scenario: Scan is replaced
 
 - **WHEN** another folder scan starts before the current scan completes
@@ -113,3 +123,8 @@ The library SHALL authenticate current curated file bytes against the sidecar, d
 
 - **WHEN** a valid sidecar encodes a SHA-256 fingerprint with uppercase hex
 - **THEN** metadata lookup normalizes the key and still seeds the matching record
+
+#### Scenario: Curated corpus still needs objective measurement
+
+- **WHEN** manifest metadata has seeded Brand, Input Profile, Tags, and Description
+- **THEN** objective colour, contrast, saturation, and similarity metrics continue in cancellable persisted background batches rather than being skipped or blocking discovery

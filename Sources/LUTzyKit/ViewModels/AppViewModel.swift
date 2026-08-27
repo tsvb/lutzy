@@ -476,13 +476,12 @@ final class AppViewModel: ObservableObject {
             Task { await engine.invalidateLUTCache() }
             // Measure whatever the scan found that has not been measured
             // before. Typed tags are never disturbed by this — see LUTTagStore.
-            // Curated sidecars already seed meaningful, reviewable tags. Do
-            // not immediately reparse all 1,600 file-backed tables merely to
-            // add measured tags; uncurated personal imports still get the
-            // existing profiler pass.
-            let scannedLUTs = self.library.allLUTs.filter {
-                self.catalog.record(for: $0)?.curatedMetadataSeed == nil
-            }
+            // Objective measured tags and similarity metrics are required for
+            // every renderable LUT, including curated corpora. The store runs
+            // this in cancellable persisted batches so discovery can publish
+            // first without launching overlapping whole-library profilers.
+            let scannedLUTs = self.library.allLUTs
+            self.tagIndexTask?.cancel()
             self.tagIndexTask = Task { await self.tags.index(scannedLUTs) }
         }
 
@@ -547,7 +546,12 @@ final class AppViewModel: ObservableObject {
     /// sidebar, and then save the derive from the still-open sheet; that must not steal the selection.
     @discardableResult
     private func adoptSavedLUT(at destination: URL) -> Bool {
-        guard let saved = try? CubeLUT(url: destination, category: "Derived") else {
+        // Save-panel access is temporary. The durable catalog keeps a bookmark
+        // for relaunch, while this live registry value must remain renderable
+        // after the panel/security scope has closed.
+        guard let saved = try? CubeLUT(
+            url: destination, category: "Derived", retainTableData: true
+        ) else {
             presentError("The saved LUT could not be read back for registration. Try saving again.")
             return false
         }

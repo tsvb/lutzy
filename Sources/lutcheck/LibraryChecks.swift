@@ -22,6 +22,17 @@ func runDurableLibraryChecks() async -> Bool {
         let lazyFileTableOK = first.retainsTableData == false
             && first.tableFloats.count == 2 * 2 * 2 * 4
             && first.retainsTableData == false
+        let replacedURL = root.appendingPathComponent("Replaced.cube")
+        try cubeText.write(to: replacedURL, atomically: true, encoding: .utf8)
+        let replacedAfterScan = try CubeLUT(url: replacedURL)
+        let replacedHash = replacedAfterScan.contentHash
+        let replacementText = cubeText.replacingOccurrences(
+            of: "0.000000 0.000000 0.000000", with: "0.250000 0.000000 0.000000"
+        )
+        try replacementText.write(to: replacedURL, atomically: true, encoding: .utf8)
+        let lazyIdentityOK = replacedAfterScan.contentHash == replacedHash
+            && replacedAfterScan.materialized() == nil
+            && LUTProfiler.measureIfAvailable(replacedAfterScan) == nil
         guard let firstID = catalog.adoptSavedLUT(first),
               let secondID = catalog.adoptSavedLUT(second),
               firstID != secondID,
@@ -37,12 +48,14 @@ func runDurableLibraryChecks() async -> Bool {
         catalog.removeTag("persisted-auto", from: [firstID], hidingMeasuredFor: [firstID])
 
         let relaunchedCatalog = LUTCatalog(fileURL: catalogURL)
+        let eagerlyLoadedOutsideRoot = relaunchedCatalog.loadLUT(for: firstID)
         let catalogOK = relaunchedCatalog.members(of: collection.id) == Set([firstID, secondID])
             && relaunchedCatalog.record(for: firstID)?.typedTags == ["soft"]
             && relaunchedCatalog.record(for: firstID)?.origin == .custom
             && relaunchedCatalog.record(for: firstID)?.isStarred == true
             && relaunchedCatalog.excludedMeasuredTags(for: firstID) == ["persisted-auto"]
-            && relaunchedCatalog.loadLUT(for: firstID)?.lutID == firstID
+            && eagerlyLoadedOutsideRoot?.lutID == firstID
+            && eagerlyLoadedOutsideRoot?.retainsTableData == true
         print("durable LUT catalog -> \(catalogOK ? "PASS" : "FAIL")")
 
         relaunchedCatalog.removeTag(
@@ -258,7 +271,7 @@ func runDurableLibraryChecks() async -> Bool {
             && descriptionPersists && inputProfilePersists && sidecarImportOK
             && legacyBrandSeeded && legacyBrandUserEditWins
             && seededUnknownSurvivesRescan && existingCustomUnknownSurvives
-            && lazyFileTableOK
+            && lazyFileTableOK && lazyIdentityOK
         print("curated LUT manifest seeds Brand/Input/Tags/Description and repairs legacy Brand once -> \(curatedManifestOK ? "PASS" : "FAIL")")
 
         let curatorSource = root.appendingPathComponent("Curator Inputs", isDirectory: true)

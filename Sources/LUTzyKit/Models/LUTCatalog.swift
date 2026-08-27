@@ -172,7 +172,12 @@ final class LUTCatalog: ObservableObject {
         }
 
         guard FileManager.default.fileExists(atPath: url.path),
-              let parsed = try? CubeLUT(url: url, category: "External")
+              // This scope closes before the returned LUT is rendered. Keep
+              // this one table resident; outside-root records cannot lazily
+              // reopen their sandbox URL after `stopAccessing`.
+              let parsed = try? CubeLUT(
+                url: url, category: "External", retainTableData: true
+              )
         else {
             if record.isAvailable {
                 record.isAvailable = false

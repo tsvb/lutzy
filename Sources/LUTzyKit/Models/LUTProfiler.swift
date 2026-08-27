@@ -22,6 +22,17 @@ struct LUTMetrics: Codable, Equatable, Sendable {
     var highlightHue: Double
     var splitAngle: Double
     var skinRatio: Double
+
+    /// Placeholder for user-authored metadata created before the background
+    /// profiler reaches a LUT. `taggerVersion == 0` keeps the entry eligible
+    /// for objective measurement; no file parsing is needed on the main actor.
+    static let unmeasured = LUTMetrics(
+        contrast: 1, saturation: 1, monoSpread: 0,
+        blackLevel: 0, whiteLevel: 1,
+        shadowChroma: 0, highlightChroma: 0,
+        shadowHue: 0, highlightHue: 0,
+        splitAngle: 0, skinRatio: 1
+    )
 }
 
 enum LUTProfiler {
@@ -29,6 +40,18 @@ enum LUTProfiler {
     // MARK: - Measuring
 
     static func measure(_ lut: CubeLUT) -> LUTMetrics {
+        measureIfAvailable(lut) ?? .unmeasured
+    }
+
+    /// Materialize once, then reuse the immutable table for every probe. This
+    /// both prevents a mid-profile file replacement from mixing transforms and
+    /// avoids reparsing a large text cube for each sample group.
+    static func measureIfAvailable(_ lut: CubeLUT) -> LUTMetrics? {
+        guard let materialized = lut.materialized() else { return nil }
+        return measureMaterialized(materialized)
+    }
+
+    private static func measureMaterialized(_ lut: CubeLUT) -> LUTMetrics {
         let isVLog = lut.inputSpace == .vlog
         let ramp = isVLog ? LUTProbes.vlogRamp : LUTProbes.displayRamp
         let skin = isVLog ? LUTProbes.vlogSkin : LUTProbes.displaySkin
