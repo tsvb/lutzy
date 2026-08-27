@@ -10,8 +10,8 @@
 - [x] 8. Display Description in LUT Library detail.
 - [x] 9. Add a deterministic curator and generate `LUTLibrary/LUTs`, unsupported/audit output, and the sidecar manifest.
 - [x] 10. Verify every active entry exists, parses, matches its fingerprint, has Brand and Description, and has no active duplicate fingerprint.
-- [ ] 11. Run strict OpenSpec validation, Debug and Release builds, complete lutcheck, corpus checks, and running-app acceptance.
-- [ ] 12. Obtain a fresh read-only sub-agent review and close every Critical or Important finding before handoff.
+- [x] 11. Run strict OpenSpec validation, Debug and Release builds, complete lutcheck, corpus checks, and running-app acceptance.
+- [x] 12. Obtain a fresh read-only sub-agent review and close every Critical or Important finding before handoff.
 - [x] 13. Add conservative one-time Brand repair for unambiguous legacy folder/name evidence.
 - [x] 14. Classify and audit concrete Input Profiles, including Panasonic STD versus V-Log and mixed Documents fallbacks.
 - [x] 15. Authenticate curated bytes for fast header-only discovery, lazily load cube tables, and make scan replacement cancellable.
