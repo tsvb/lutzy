@@ -33,9 +33,19 @@ Recorded from the user's 2026-08-27 request. Referenced screenshots are design c
 18. Keep maker/visual Brand, Source pack, and Input Profile independent. In particular, SmallHD camera subfolders are Input evidence and do not turn the LUT maker into Canon, Sony, Panasonic, and so on.
 19. Preserve separately authored Codex, Claude, V-Log-Alchemy, and downloaded implementations of the same named Look unless their transform fingerprints are exact duplicates.
 20. When a downloaded package does not establish its input encoding or redistribution rights, record `Unknown`/pending explicitly rather than guessing.
+21. Copy the current 79 Starred LUTs into a repository-local trial selection without adding duplicate records to the active Library.
+22. Starred state must survive an application relaunch.
+23. Keep Source independently visible so equally named Codex, Claude, V-Log-Alchemy, and downloaded implementations can be distinguished even when their Brand and LUT name are the same.
+24. Remove meaningless folder wrappers from browsing where they only repeat provenance or packaging format, without rewriting the physical corpus or flattening arbitrary authored nesting.
 
 Reference screenshot: `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8b3bb8db-be22-4d9c-95f5-bebf66cec92e.png`.
 
 Input-profile reference screenshot: `/Users/world4jason/Desktop/Screenshot 2026-08-27 at 12.45.20 PM.png`.
 
 Existing-Brand migration reference screenshot: `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-5ddf0a3a-b72c-47fe-b49e-c13e80d0e57a.png`.
+
+Starred-selection and folder/source-disambiguation references:
+
+- `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-eab3b8da-d75a-40ba-902b-4f740ae922fa.png`
+- `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8cf00710-b67f-4245-a3b3-0bea0083442b.png`
+- `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-e9505ce7-1344-4b2e-9000-895232c9c745.png`

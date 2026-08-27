@@ -9,3 +9,4 @@
 - [x] 2.1 Add XCTest and CLI checks using a twelve-level folder path
 - [x] 2.2 Run debug/release builds, `lutcheck`, OpenSpec validation, and interface inspection
 - [x] 2.3 Verify conflict-free integration and commit to the current branch
+- [x] 2.4 Add display-only suppression for repeated provenance and known format wrappers while preserving arbitrary nested paths and recursive selection

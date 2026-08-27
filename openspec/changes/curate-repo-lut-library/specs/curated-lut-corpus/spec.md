@@ -43,6 +43,11 @@ The project SHALL provide a reproducible repository-local LUT corpus whose activ
 
 The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed by SHA-256 fingerprint with source, Brand, Input Profile, Tags, Description provenance, and relative path metadata.
 
+#### Scenario: Distinguish independently authored same-name LUTs
+
+- **WHEN** two LUTs share a display name and Brand but originate from different curated Sources such as Codex and Claude
+- **THEN** Source persists as a dedicated catalog value and LUT Library presents it independently from Brand and ordinary Tags after relaunch
+
 #### Scenario: File is renamed during import
 
 - **WHEN** managed-library import renames a curated LUT to avoid a basename collision
@@ -52,6 +57,15 @@ The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed
 
 - **WHEN** a source has no confirmed reference supplied by the user
 - **THEN** its source record says that the reference is pending and does not invent a vendor, author, URL, or license
+
+### Requirement: Starred trial selections remain outside the active scan root
+
+When a dated repository-local LUT selection is stored under `LUTLibrary/Selections`, it SHALL include a machine-readable index and SHALL NOT make those copies active Library records.
+
+#### Scenario: Export the current Starred shelf for evaluation
+
+- **WHEN** the current 79 Starred LUTs are prepared as a trial selection
+- **THEN** all 79 copies are grouped by Brand and Source outside `LUTLibrary/LUTs`, and the index records their durable record IDs, fingerprints, original locators, and selection paths
 
 ### Requirement: Repository builds open the curated corpus by default
 

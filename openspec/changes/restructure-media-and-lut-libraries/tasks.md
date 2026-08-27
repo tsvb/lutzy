@@ -76,6 +76,7 @@
 - [x] 7.10 Restore originating shelf/card selection plus keyboard and assistive-technology focus across Back navigation, with safe fallback when Starred removal destroys that origin
 - [x] 7.11 Move LUT detail Back into a persistent full-width navigation header with contextual destination and Escape support
 - [x] 7.12 Keep the discovery header top-aligned and fill the remaining surface when a grouping has no shelves
+- [x] 7.13 Show curated Source independently from Brand on Gallery cards and LUT detail when it disambiguates same-name implementations
 
 ## 8. Verification
 

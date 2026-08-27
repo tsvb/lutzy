@@ -92,7 +92,12 @@ LUT Library SHALL allow Star, Add to Existing Collection, and Open in Viewer, an
 - **THEN** the application opens the corresponding LUT in LUT Manager rather than duplicating the management form
 
 ### Requirement: Gallery card content
-Each LUT Library Gallery card SHALL show a rendered sample preview, LUT name, explicit vendor name or Custom/Unknown origin, and no more than three tags.
+Each LUT Library Gallery card SHALL show a rendered sample preview, LUT name, explicit Brand name or Custom/Unknown origin, curated Source when present, and no more than three tags. Brand and Source SHALL remain distinct from ordinary descriptive Tags.
+
+#### Scenario: Same name and Brand have different Sources
+
+- **WHEN** Codex and Claude provide distinct LUT records with the same effective name and Brand
+- **THEN** each card identifies its Source beside the Brand so the records remain distinguishable without opening their physical folders
 
 #### Scenario: LUT has confirmed vendor and many tags
 - **WHEN** a vendor LUT has more than three tags

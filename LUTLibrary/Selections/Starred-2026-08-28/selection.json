@@ -1,0 +1,799 @@
+{
+  "version": 1,
+  "createdAt": "2026-08-28",
+  "source": "LUTStudio catalog Starred snapshot",
+  "count": 79,
+  "entries": [
+    {
+      "recordID": "record://57080bab-d586-437e-9e31-815ab069b277",
+      "fingerprint": "a0e341f898d846a672c1c8771d638a6c57bfca0bce108d4796759ebd7826bf5e",
+      "name": "1980s_01",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/1980S/1980s_01.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/1980s_01.cube"
+    },
+    {
+      "recordID": "record://e4f542bd-3e2e-44f7-a8e0-2bea07a53eff",
+      "fingerprint": "caa3ca35811cb84e7d578c5364b519fe8f8e93c7e1f36e3ecfb40490689b65a6",
+      "name": "65MM_FILM_01",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/65MM FILM/65MM_FILM_01.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/65MM_FILM_01.cube"
+    },
+    {
+      "recordID": "record://0513a13d-92a4-482b-9b1d-fe9ec6c6fe9f",
+      "fingerprint": "5c3e0a6e2aba76c7df32f9a50c85ad76fee6b8464cd61ab2514a58a08b135190",
+      "name": "ACTION_01",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/ACTION 800/ACTION_01.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/ACTION_01.cube"
+    },
+    {
+      "recordID": "record://afed6da2-6d7d-4ee9-8804-a8083d8af3d7",
+      "fingerprint": "b4e49f07f4e7ef5b1d033214201161039321c2bcea62e4f26f2e796c2875648f",
+      "name": "ASTIA_SOFT_01",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/ASTIA SOFT/ASTIA_SOFT_01.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/ASTIA_SOFT_01.cube"
+    },
+    {
+      "recordID": "record://966d72a5-cfc1-40a3-82a4-178994dd1566",
+      "fingerprint": "eb3f08e0ee959219d66e49c2b72afe2c6360c254a7d44c7b68974147d85a217d",
+      "name": "BLOCKBUSTER",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/BLOCKBUSTER/BLOCKBUSTER.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/BLOCKBUSTER.cube"
+    },
+    {
+      "recordID": "record://c4e15eab-b965-475c-917f-ab746cd831eb",
+      "fingerprint": "71671dc8d226758ca3ca1e8388531edf9c6b8bb3ccc646d865f6d0176f36392d",
+      "name": "CROSS_PROCESS_01",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/CROSS PROCESS/CROSS_PROCESS_01.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/CROSS_PROCESS_01.cube"
+    },
+    {
+      "recordID": "record://420e6671-b85f-47c5-b706-69d8de0886f2",
+      "fingerprint": "5fbfcd8fc0923d427f008d733786fae30883e0c53c24e934200057ffc7c56c1c",
+      "name": "GRINDHOUSE_03",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/GRINDHOUSE/GRINDHOUSE_03.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/GRINDHOUSE_03.cube"
+    },
+    {
+      "recordID": "record://a655f71a-def8-4ca9-9b8b-518060f5dc52",
+      "fingerprint": "6aae3ecd507147779b2642182d6aeb9feda568e76ee5d9d938f85c39185a5c89",
+      "name": "TEAL_AND_ORANGE",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/TEAL AND ORANGE/TEAL_AND_ORANGE.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/TEAL_AND_ORANGE.cube"
+    },
+    {
+      "recordID": "record://569fa013-9150-4e8c-8e5e-3567b69d4032",
+      "fingerprint": "54777288bdcebdc00fb6af09f570bd56899d3e8019e78b1faedff08397c5df18",
+      "name": "VELVIA_01",
+      "brand": "CINECOLOR",
+      "sourceID": "cinecolor",
+      "source": "CINECOLOR downloaded collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/CINECOLOR/CINECOLOR/VELVIA/VELVIA_01.cube",
+      "relativePath": "CINECOLOR/CINECOLOR downloaded collection/VELVIA_01.cube"
+    },
+    {
+      "recordID": "record://5d342e96-c04d-4b4d-928e-e3bb5c81ac05",
+      "fingerprint": "ba2839f40adf3b4645799c26e7c6f7618a4e9e4984bd3127f5b9c3069008c172",
+      "name": "MotionVFX mMatrix - Morpheus",
+      "brand": "DaVinci Resolve",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/DaVinci Resolve/Documents Collection/MotionVFX/mMatrix/MotionVFX mMatrix - Morpheus.cube",
+      "relativePath": "DaVinci Resolve/Documents LUT collection/MotionVFX mMatrix - Morpheus.cube"
+    },
+    {
+      "recordID": "record://16709561-f18d-4aeb-a99c-d6381ffd850c",
+      "fingerprint": "d606db36e6d7f951188e3e6649398f96e18a460c1d7f0ef6145bb15ba12f1e0e",
+      "name": "MotionVFX mMatrix - Trinity",
+      "brand": "DaVinci Resolve",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/DaVinci Resolve/Documents Collection/MotionVFX/mMatrix/MotionVFX mMatrix - Trinity.cube",
+      "relativePath": "DaVinci Resolve/Documents LUT collection/MotionVFX mMatrix - Trinity.cube"
+    },
+    {
+      "recordID": "record://71461138-f9d3-4e74-9e88-c632b5a1b363",
+      "fingerprint": "df342d80609dbfb6026934d646554221a61be4bad7dfa3b2790ad5bc03cac84e",
+      "name": "Rec709 Kodak 2383 D65",
+      "brand": "DaVinci Resolve",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/DaVinci Resolve/Documents Collection/Film Looks/Rec709 Kodak 2383 D65.cube",
+      "relativePath": "DaVinci Resolve/Documents LUT collection/Rec709 Kodak 2383 D65.cube"
+    },
+    {
+      "recordID": "record://80c4fda5-39a0-4154-83ea-813309811756",
+      "fingerprint": "b8529373c7aa60f242cb3d69ceb81d24574625467eea08088db870de17150ace",
+      "name": "BRIGHT",
+      "brand": "FREEMIUM 14",
+      "sourceID": "freemium-14",
+      "source": "FREEMIUM 14",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FREEMIUM 14/FREEMIUM 14/BRIGHT.cube",
+      "relativePath": "FREEMIUM 14/FREEMIUM 14/BRIGHT.cube"
+    },
+    {
+      "recordID": "record://37e2b4f3-f631-4f67-871c-ab837d9069ad",
+      "fingerprint": "7eae71c9b26e664879d957afa1da2da7690c0f6924e7fc125b52041b952e9f28",
+      "name": "BW HIGH CONTRAST",
+      "brand": "FREEMIUM 14",
+      "sourceID": "freemium-14",
+      "source": "FREEMIUM 14",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FREEMIUM 14/FREEMIUM 14/BW HIGH CONTRAST.cube",
+      "relativePath": "FREEMIUM 14/FREEMIUM 14/BW HIGH CONTRAST.cube"
+    },
+    {
+      "recordID": "record://12b662fc-917b-4e8f-829f-737d8cb06738",
+      "fingerprint": "55da979aed68184a4e7f9c86b1bb589d657c46773e4f2b335ddf8abbd7886a80",
+      "name": "CLASSY",
+      "brand": "FREEMIUM 14",
+      "sourceID": "freemium-14",
+      "source": "FREEMIUM 14",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FREEMIUM 14/FREEMIUM 14/CLASSY.cube",
+      "relativePath": "FREEMIUM 14/FREEMIUM 14/CLASSY.cube"
+    },
+    {
+      "recordID": "record://c783f625-2e0f-4d73-b559-e1d475770773",
+      "fingerprint": "afcb7e1db8f4c8f72cf0f274c0f21a22674ba82ef7b7d04fcda40ca8f303a79a",
+      "name": "DEEP",
+      "brand": "FREEMIUM 14",
+      "sourceID": "freemium-14",
+      "source": "FREEMIUM 14",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FREEMIUM 14/FREEMIUM 14/DEEP.cube",
+      "relativePath": "FREEMIUM 14/FREEMIUM 14/DEEP.cube"
+    },
+    {
+      "recordID": "record://28fbf40c-5bbb-44d1-883b-bd30ad9f79a0",
+      "fingerprint": "d499c29f17c00a6db7272aade1b48faa70c181010fd22124b717be32b8fe4259",
+      "name": "DREAM",
+      "brand": "FREEMIUM 14",
+      "sourceID": "freemium-14",
+      "source": "FREEMIUM 14",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FREEMIUM 14/FREEMIUM 14/DREAM.cube",
+      "relativePath": "FREEMIUM 14/FREEMIUM 14/DREAM.cube"
+    },
+    {
+      "recordID": "record://8e55fff1-dbe5-4cac-a75d-447b6b994e17",
+      "fingerprint": "93595aa0737c76af863d4ddcd13eb9e1a848105445e3fd8d88a8e0c9a6f4b524",
+      "name": "FG_CineTeal&Orange1",
+      "brand": "FilterGrade",
+      "sourceID": "filtergrade-free-cine-v2",
+      "source": "FilterGrade Free Cine LUTs Pack v2",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FilterGrade/FilterGrade Free Cine v2/FG_CineTeal&Orange1.cube",
+      "relativePath": "FilterGrade/FilterGrade Free Cine LUTs Pack v2/FG_CineTeal&Orange1.cube"
+    },
+    {
+      "recordID": "record://2a1ad365-1aa2-4f69-89a4-65130652a1b6",
+      "fingerprint": "7a6a05ac3f6fb59f5df2320c4a77a7313cbf61e47aaf6685f1b2032698cee78f",
+      "name": "FG_CineWarm",
+      "brand": "FilterGrade",
+      "sourceID": "filtergrade-free-cine-v2",
+      "source": "FilterGrade Free Cine LUTs Pack v2",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/FilterGrade/FilterGrade Free Cine v2/FG_CineWarm.cube",
+      "relativePath": "FilterGrade/FilterGrade Free Cine LUTs Pack v2/FG_CineWarm.cube"
+    },
+    {
+      "recordID": "record://24f5ef5b-a99a-49fe-ac7a-09470ad70852",
+      "fingerprint": "451b22ee9e58feafb457256a092345a4ea4400f75faeb1fef67c851418d1b76c",
+      "name": "fuji_3510_constlclip",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/print/fuji_3510_constlclip.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_3510_constlclip.cube"
+    },
+    {
+      "recordID": "record://ef9d66b3-e290-4072-955e-c3549ca0fce1",
+      "fingerprint": "296d0e939144edc617e68a62598b3737d4df7d5211f5d0b057f90040667fdbbf",
+      "name": "fuji_3510_cuspclip",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/print/fuji_3510_cuspclip.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_3510_cuspclip.cube"
+    },
+    {
+      "recordID": "record://e5a81f7b-e5cf-4102-9884-e848427f66c2",
+      "fingerprint": "ca9f3e68130c33821f0ef572d7a39b60057ffd852d09c6b27a6f0609bf0e700a",
+      "name": "fuji_fp-100c_negative_++",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_pro/fuji_fp-100c_negative_++.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_fp-100c_negative_++.cube"
+    },
+    {
+      "recordID": "record://2da4fd2b-d1d4-48f0-9b45-f9abbccffe4b",
+      "fingerprint": "02563d170ef8fb7f865bca350b52b00a58a1b2ad6920842197bd65c957032a83",
+      "name": "fuji_fp-100c_negative_+++",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_pro/fuji_fp-100c_negative_+++.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_fp-100c_negative_+++.cube"
+    },
+    {
+      "recordID": "record://45a4dd57-5f63-46cb-97c2-343dbcf60dae",
+      "fingerprint": "5e3fea72ad9ef39c72083f53aed5236b2d5d68889438c71671fc59af1302523e",
+      "name": "fuji_superia_200_xpro",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/colorslide/fuji_superia_200_xpro.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_superia_200_xpro.cube"
+    },
+    {
+      "recordID": "record://1936bb5c-896f-4515-b75f-01149abb5a1a",
+      "fingerprint": "0d167e19213c6c469100c6deaf4c93556dd8e30b44b55700076c6dd2f67a665b",
+      "name": "fuji_xtrans_iii_classic_chrome",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/fujixtransiii/fuji_xtrans_iii_classic_chrome.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_xtrans_iii_classic_chrome.cube"
+    },
+    {
+      "recordID": "record://ff61aa6d-10e9-4083-a121-e3b4d51ec87a",
+      "fingerprint": "d2649802f01fe75db2dd9b450b54ae66c3faa12198657bb8dab6119a9f6357ce",
+      "name": "fuji_xtrans_iii_sepia",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/fujixtransiii/fuji_xtrans_iii_sepia.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/fuji_xtrans_iii_sepia.cube"
+    },
+    {
+      "recordID": "record://4b5f9b2f-55be-4ec8-80aa-8d54bc38f2f5",
+      "fingerprint": "cfcd6778f0018029172fd589219bd3ebf409cd2f6b4452c6d468a97a752402e9",
+      "name": "kodak_elite_100_xpro",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/negative_color/kodak_elite_100_xpro.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/kodak_elite_100_xpro.cube"
+    },
+    {
+      "recordID": "record://e915039b-dd00-4801-9aae-0b0ac801b8e4",
+      "fingerprint": "a59317ab26024e252a6a8b130c47bf0dbb867f374bd0461c9db9334d8aa0fd99",
+      "name": "polaroid_669",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/colorslide/polaroid_669.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_669.cube"
+    },
+    {
+      "recordID": "record://ad4eea7e-fd40-448e-8a39-b1e611d46ac7",
+      "fingerprint": "7a9f5387a491ed1e80b1dfdc479b66f0bbe763bec0d6eb42639d10c70495fa5d",
+      "name": "polaroid_669_+",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_pro/polaroid_669_+.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_669_+.cube"
+    },
+    {
+      "recordID": "record://2cdcf140-dd41-4d75-a0c1-1a6df5fbfc92",
+      "fingerprint": "9e06e29d7272867775194b6b17970c3904d9953da7e3685112c084e94ff44e6a",
+      "name": "polaroid_669_++",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_pro/polaroid_669_++.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_669_++.cube"
+    },
+    {
+      "recordID": "record://a8132b72-5f4e-4e29-9540-82ed4d374c97",
+      "fingerprint": "8abfe287b80c8503d8f12b501a520cf25fbd33dcdde23da0da40dfb8f6d977ed",
+      "name": "polaroid_669_cold",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_pro/polaroid_669_cold.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_669_cold.cube"
+    },
+    {
+      "recordID": "record://53d917a7-e839-46f1-b00b-06891aed8306",
+      "fingerprint": "e5a35d7efd272b0a26498dfc7495df23a90f647db5315a764c300dd29f9beeb7",
+      "name": "polaroid_px-70_cold",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_consumer/polaroid_px-70_cold.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_px-70_cold.cube"
+    },
+    {
+      "recordID": "record://7b1e916c-a301-4cb7-9f8e-72610f12e208",
+      "fingerprint": "2ef5c768de07e5ddfa279470841022251d12862fd5c0f8795417a1d8c6bbd260",
+      "name": "polaroid_px-70_cold_+",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_consumer/polaroid_px-70_cold_+.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_px-70_cold_+.cube"
+    },
+    {
+      "recordID": "record://cfa1313c-06cf-46ad-870b-0b9735b793cf",
+      "fingerprint": "0aafd8678a2fc6010145a92b031dcb8864547b1254b679a1be80b55622efd12d",
+      "name": "polaroid_px-70_cold_-",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_consumer/polaroid_px-70_cold_-.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_px-70_cold_-.cube"
+    },
+    {
+      "recordID": "record://548db519-908a-49b2-8a39-f41980f9d102",
+      "fingerprint": "58ce82864db9332af4f3a1cc2e76e32f3cd65e2b7263113d57f478ab3026203c",
+      "name": "polaroid_px-70_cold_--",
+      "brand": "G'MIC Film LUTs",
+      "sourceID": "gmic-film-luts",
+      "source": "G'MIC Film LUTs Collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/G-MIC Film LUTs/Film-Luts/instant_consumer/polaroid_px-70_cold_--.cube",
+      "relativePath": "G'MIC Film LUTs/G'MIC Film LUTs Collection/polaroid_px-70_cold_--.cube"
+    },
+    {
+      "recordID": "record://317bd574-b23d-4093-9357-c6206d11e27a",
+      "fingerprint": "9c5dc1eae3bfacd041f02bf39435440edf0754ac95082ef6c5cb18f65ee03f75",
+      "name": "GPLOG_Creative_EV0_1.20",
+      "brand": "GoPro",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/GoPro/Documents Collection/HERO12 Black/GPLOG_Creative_EV0_1.20.cube",
+      "relativePath": "GoPro/Documents LUT collection/GPLOG_Creative_EV0_1.20.cube"
+    },
+    {
+      "recordID": "record://946d9389-cb4f-477a-9ea0-f41def96d470",
+      "fingerprint": "b939131dc7f6c5becd0552b0da64adefebbc4fd1ebd4eea6e28842676b4b75c0",
+      "name": "GPLOG_Creative_EV0_2.0",
+      "brand": "GoPro",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/GoPro/Documents Collection/HERO12 Black/GPLOG_Creative_EV0_2.0.cube",
+      "relativePath": "GoPro/Documents LUT collection/GPLOG_Creative_EV0_2.0.cube"
+    },
+    {
+      "recordID": "record://04510242-6389-4485-bf49-52711928d8f0",
+      "fingerprint": "56dc99ad083f16f6d31329898110cf5e70e195fe27cef1029022c6b92574cfc8",
+      "name": "GPLOG_Native_WB_5600K",
+      "brand": "GoPro",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/GoPro/Documents Collection/HERO12 Black/GPLOG_Native_WB_5600K.cube",
+      "relativePath": "GoPro/Documents LUT collection/GPLOG_Native_WB_5600K.cube"
+    },
+    {
+      "recordID": "record://5ee7d321-23a1-4b81-93f3-bc9bc4fcc6ff",
+      "fingerprint": "8b9fec027ed084721a5fa57fe7eefe0ea4b3b51049c9425226d9e6d4863df480",
+      "name": "WIDE_Flat_to_Rec709",
+      "brand": "GoPro",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/GoPro/Documents Collection/GoPro wide gamut to Rec709 color/WIDE_Flat_to_Rec709.cube",
+      "relativePath": "GoPro/Documents LUT collection/WIDE_Flat_to_Rec709.cube"
+    },
+    {
+      "recordID": "record://3162cfb4-8f44-4fa3-bb60-6ad0979f041b",
+      "fingerprint": "7b2cc63037c701c8898a36bce620686885ca0effbd9edc56df773489f0912ecd",
+      "name": "WIDE_LOG400_to_Rec709",
+      "brand": "GoPro",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/GoPro/Documents Collection/GoPro wide gamut to Rec709 color/WIDE_LOG400_to_Rec709.cube",
+      "relativePath": "GoPro/Documents LUT collection/WIDE_LOG400_to_Rec709.cube"
+    },
+    {
+      "recordID": "record://8f145b9a-e0bc-4b52-a488-53eb876c9f9a",
+      "fingerprint": "9e655e73d876235b1ff10f8f06e26533adf005e9c02d75b4237018ac6718f97c",
+      "name": "Rec709_Kodak_2383_D65",
+      "brand": "Kodak",
+      "sourceID": "print-film-emulation",
+      "source": "Print Film Emulation LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Kodak/Print Film Emulation/Rec709_Kodak_2383_D65.cube",
+      "relativePath": "Kodak/Print Film Emulation LUTs/Rec709_Kodak_2383_D65.cube"
+    },
+    {
+      "recordID": "record://b4ceb856-0752-4589-8994-11e4f3753be4",
+      "fingerprint": "4ed8e00e724471beae210363c6bba095aca63cfc9ba238f34f497d374929f126",
+      "name": "Rec709_Kodak_2393_D65",
+      "brand": "Kodak",
+      "sourceID": "print-film-emulation",
+      "source": "Print Film Emulation LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Kodak/Print Film Emulation/Rec709_Kodak_2393_D65.cube",
+      "relativePath": "Kodak/Print Film Emulation LUTs/Rec709_Kodak_2393_D65.cube"
+    },
+    {
+      "recordID": "record://f701dc62-b3d5-4bdf-8590-139d3b6f93b6",
+      "fingerprint": "8df4f870b65ae1287348946106b9ab2d9eebc2887f8992dbb87b606556549beb",
+      "name": "RED_FilmBiasOffset_Rec2020_N-Log_to_Rec709_BT1886",
+      "brand": "Nikon",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Nikon/Documents Collection/Red Luts for N-Log/RED_FilmBiasOffset_Rec2020_N-Log_to_Rec709_BT1886.cube",
+      "relativePath": "Nikon/Documents LUT collection/RED_FilmBiasOffset_Rec2020_N-Log_to_Rec709_BT1886.cube"
+    },
+    {
+      "recordID": "record://22432283-b0e6-4b20-af13-2399b5d778c0",
+      "fingerprint": "b8fe181aa2dd496fef3c97d4398ecefdffbbdb283443f6ced73c0511647ad93b",
+      "name": "Day for Night",
+      "brand": "Panasonic",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Panasonic/Documents Collection/lumix-s/Day for Night.cube",
+      "relativePath": "Panasonic/Documents LUT collection/Day for Night.cube"
+    },
+    {
+      "recordID": "record://64548dd4-2b8c-4530-b140-3a47b984046f",
+      "fingerprint": "2b943fe3731a4b9451220c9a592fc6fb95c218c5a14b074caffe5bf931c11493",
+      "name": "Gritty Cinema",
+      "brand": "Panasonic",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Panasonic/Documents Collection/lumix-s/Gritty Cinema.cube",
+      "relativePath": "Panasonic/Documents LUT collection/Gritty Cinema.cube"
+    },
+    {
+      "recordID": "record://30a17bc9-ea86-4c48-b396-85a53f9b5243",
+      "fingerprint": "e876d63c74cb30da7265c10f41607b40180852c21fdb511fa0738b077b4d080d",
+      "name": "Vintage Vibes",
+      "brand": "Panasonic",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Panasonic/Documents Collection/lumix-s/Vintage Vibes.cube",
+      "relativePath": "Panasonic/Documents LUT collection/Vintage Vibes.cube"
+    },
+    {
+      "recordID": "record://1acd4273-3301-489e-aac1-38ef4f8f1fef",
+      "fingerprint": "ff0395a02756e9e3d5b4986ea012c29b22fe5d67b1c005e43678b09a0b8bd288",
+      "name": "PB_Everest",
+      "brand": "PremiumBeat",
+      "sourceID": "premiumbeat-wanderlust",
+      "source": "PremiumBeat Wanderlust",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/PremiumBeat/PremiumBeat Wanderlust/PB_Everest.cube",
+      "relativePath": "PremiumBeat/PremiumBeat Wanderlust/PB_Everest.cube"
+    },
+    {
+      "recordID": "record://c62f5a61-6e67-4d15-b8fb-39d9a4270f12",
+      "fingerprint": "9863491a09e9020711e8dc7c38214696d49b9ba05d0946a6740a23a0cdf303ed",
+      "name": "PB_Oslo",
+      "brand": "PremiumBeat",
+      "sourceID": "premiumbeat-wanderlust",
+      "source": "PremiumBeat Wanderlust",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/PremiumBeat/PremiumBeat Wanderlust/PB_Oslo.cube",
+      "relativePath": "PremiumBeat/PremiumBeat Wanderlust/PB_Oslo.cube"
+    },
+    {
+      "recordID": "record://be6c7357-4333-483c-8f52-ef07bd5caa7c",
+      "fingerprint": "baf73139fb34c5ebbc808d0cae469f94cb88db41ce09aee3c03330e87d23a606",
+      "name": "PB_Phoenix",
+      "brand": "PremiumBeat",
+      "sourceID": "premiumbeat-wanderlust",
+      "source": "PremiumBeat Wanderlust",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/PremiumBeat/PremiumBeat Wanderlust/PB_Phoenix.cube",
+      "relativePath": "PremiumBeat/PremiumBeat Wanderlust/PB_Phoenix.cube"
+    },
+    {
+      "recordID": "record://6478ca51-7a43-45fb-9aab-94c40e56e856",
+      "fingerprint": "446c2af61d83a9082a48e22e7bb38c42ed184fd2a15a52fd6da5e5f47a5fc4c6",
+      "name": "PB_Tahoe",
+      "brand": "PremiumBeat",
+      "sourceID": "premiumbeat-wanderlust",
+      "source": "PremiumBeat Wanderlust",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/PremiumBeat/PremiumBeat Wanderlust/PB_Tahoe.cube",
+      "relativePath": "PremiumBeat/PremiumBeat Wanderlust/PB_Tahoe.cube"
+    },
+    {
+      "recordID": "record://0c3107ef-89ad-4096-bf8b-cd2ca7f497a7",
+      "fingerprint": "287092d3c02875a29f81b12bd0460b2b584e66238999fadfa21edc5aa46a5ec2",
+      "name": "ricoh-vlog-cross-processing",
+      "brand": "RICOH",
+      "sourceID": "claude-generated",
+      "source": "Claude-generated LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/RICOH/Claude Generated/ricoh-vlog-cross-processing.cube",
+      "relativePath": "RICOH/Claude-generated LUTs/ricoh-vlog-cross-processing.cube"
+    },
+    {
+      "recordID": "record://9196f8c8-2d2a-401e-8186-9c7a6ca1b1d9",
+      "fingerprint": "95ec91b6c26a3a4ff8c0d66ede37eda0fb1493c40527d75c6a4dfe8e4b58b663",
+      "name": "ricoh-vlog-negative-film",
+      "brand": "RICOH",
+      "sourceID": "claude-generated",
+      "source": "Claude-generated LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/RICOH/Claude Generated/ricoh-vlog-negative-film.cube",
+      "relativePath": "RICOH/Claude-generated LUTs/ricoh-vlog-negative-film.cube"
+    },
+    {
+      "recordID": "record://41614dae-7550-4fc2-bb8a-491f87b5f160",
+      "fingerprint": "fd7b94110c9d4326391390e7a024228ebc8450ed043cadc311ea886bab774f2d",
+      "name": "ricoh-vlog-positive-film",
+      "brand": "RICOH",
+      "sourceID": "claude-generated",
+      "source": "Claude-generated LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/RICOH/Claude Generated/ricoh-vlog-positive-film.cube",
+      "relativePath": "RICOH/Claude-generated LUTs/ricoh-vlog-positive-film.cube"
+    },
+    {
+      "recordID": "record://62b2760b-214d-43bf-b2a9-b1d0d227be5b",
+      "fingerprint": "c868353369ef70c707e78d70782699673b92d07681d4cd502d47fb6f7e291be3",
+      "name": "ricoh-vlog-vivid",
+      "brand": "RICOH",
+      "sourceID": "claude-generated",
+      "source": "Claude-generated LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/RICOH/Claude Generated/ricoh-vlog-vivid.cube",
+      "relativePath": "RICOH/Claude-generated LUTs/ricoh-vlog-vivid.cube"
+    },
+    {
+      "recordID": "record://6c5ed98c-90d4-479b-a8e0-73bbe0515096",
+      "fingerprint": "a1c6b9f384d5aa5b584a3986ca31356ca95bd76a57caaf11201b8f1086984a87",
+      "name": "AB04_warm_d65_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Anne Boyle_04_Warm_d65 Look Collection for Sony VENICE/AB04_warm_d65_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/AB04_warm_d65_r709.cube"
+    },
+    {
+      "recordID": "record://ea0d5eee-ce41-4ada-93e4-0e58f66409c1",
+      "fingerprint": "a5c6618584024bd33ceca65d85ad676e6d4edb51dfea8aaad740445e5dbb842e",
+      "name": "AB05_aged_tinted_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Anne Boyle_05_Aged_Tinted_FPE Look Collection for Sony VENICE/AB05_aged_tinted_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/AB05_aged_tinted_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://10c3f06c-6272-4713-aeb0-a8de380ce721",
+      "fingerprint": "6a332dd83eb8544f1d42b3ddc3e4fd350b427ad86aa630ca96d71191dc9f4377",
+      "name": "Halloween2",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Alexandru Don/Halloween2.cube",
+      "relativePath": "Sony/Documents LUT collection/Halloween2.cube"
+    },
+    {
+      "recordID": "record://dc1e7844-a74a-45df-971d-9a65018ebe62",
+      "fingerprint": "43dea3a36cf03e059bf69ff3a2f768400a82e5fc3bdeef1c132d66ad1e6a24b0",
+      "name": "JF02_cool_color_push_fpe_1000N_d65p3_PQ",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Jason Fabbro_02_Cool_Color_Push_FPE Look Collection for Sony VENICE/JF02_cool_color_push_fpe_1000N_d65p3_PQ.cube",
+      "relativePath": "Sony/Documents LUT collection/JF02_cool_color_push_fpe_1000N_d65p3_PQ.cube"
+    },
+    {
+      "recordID": "record://ec2b7edd-c18b-4d61-ae0f-80627ecefe65",
+      "fingerprint": "ea0be097e7ccec6873571ff91b7d49462e5138bb38542a53529b5024b0e32a6f",
+      "name": "JF02_cool_color_push_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Jason Fabbro_02_Cool_Color_Push_FPE Look Collection for Sony VENICE/JF02_cool_color_push_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/JF02_cool_color_push_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://1960a690-9a66-4d06-be0f-bf5ecdf677c2",
+      "fingerprint": "3f7117112a0c85e912fe2979bc29a4a26464754cdab392ba8c3e63d930714ea8",
+      "name": "JF03_silver_color_pull_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Jason Fabbro_03_Silver_Color_Pull_FPE Look Collection for Sony VENICE/JF03_silver_color_pull_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/JF03_silver_color_pull_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://64606afa-75dd-4fdc-959a-81c39d0304cf",
+      "fingerprint": "c9f3fe35a0ed1842ca5eba1cfd955ede155d98f260323ec9c09114e0c7d54f8c",
+      "name": "MG01_golden_lush_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Maxine Gervais_01_Golden_Lush_FPE Look Collection for Sony VENICE/MG01_golden_lush_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/MG01_golden_lush_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://04557094-75dc-4a5d-b71c-20ea3dccaa53",
+      "fingerprint": "ca6a9df6f5213a3f6d5bc36eb013cade1f8b9295628c6eb4df9868696e1d4732",
+      "name": "MG02_golden_lush_d65_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Maxine Gervais_02_Golden_Lush_d65 Look Collection for Sony VENICE/MG02_golden_lush_d65_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/MG02_golden_lush_d65_r709.cube"
+    },
+    {
+      "recordID": "record://7d255946-de0f-4672-bf94-0568b6da75bb",
+      "fingerprint": "8180b9f27d04edc5270d26cb9e6c43a05e6a614f072bdfb65500f9a10a62c838",
+      "name": "MG03_grit_cold_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Maxine Gervais_03_Grit_Cold_FPE Look Collection for Sony VENICE/MG03_grit_cold_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/MG03_grit_cold_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://30a3ffb5-b0cc-46e2-b17b-70c88ced6e66",
+      "fingerprint": "2ef774cb64ec54b6752dfe50595636b6e933c42ef63b03ebc5294d97e515c375",
+      "name": "MG04_grit_cold_d65_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Maxine Gervais_04_Grit_Cold_d65 Look Collection for Sony VENICE/MG04_grit_cold_d65_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/MG04_grit_cold_d65_r709.cube"
+    },
+    {
+      "recordID": "record://2ee589f3-75d6-4f92-b7b3-4e3899e626e7",
+      "fingerprint": "b014e134b464e7463e1935a5fa285669e4df8baa881696c990a55e7bc09ae934",
+      "name": "OPPENHEIMER",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Alexandru Don/OPPENHEIMER.cube",
+      "relativePath": "Sony/Documents LUT collection/OPPENHEIMER.cube"
+    },
+    {
+      "recordID": "record://e59def90-2628-4c97-9c92-4e0acbc624bc",
+      "fingerprint": "b57922779afafbc04b5651e06f3af02a4cc93398bd70c2041d819dd7935a64b3",
+      "name": "SA01_warm_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Sparkle_01_Warm_FPE Look Collection for Sony VENICE/SA01_warm_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/SA01_warm_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://1b37a370-1a63-4506-b812-3faec7a7102c",
+      "fingerprint": "7e50c5564d1a29ef7002bb548717d4a456dd788682cf5bb21b9fb87aaca49e7d",
+      "name": "SA02_cool_fpe_r709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Sony VENICE/Picture Shop Look Library/Sparkle_02_Cool_FPE Look Collection for Sony VENICE/SA02_cool_fpe_r709.cube",
+      "relativePath": "Sony/Documents LUT collection/SA02_cool_fpe_r709.cube"
+    },
+    {
+      "recordID": "record://355cdfc6-71d8-402c-b964-c0e55fb5412a",
+      "fingerprint": "952b9011173c6bd13f88fe3772c224abde98a0c16b6872aaab05ee8dfb7e1ab3",
+      "name": "SL3SG3tos709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/venice s709 Monitor Look/s709Cubes/SL3SG3tos709.cube",
+      "relativePath": "Sony/Documents LUT collection/SL3SG3tos709.cube"
+    },
+    {
+      "recordID": "record://2561c04c-51e3-4505-ab5a-29f1f81808f4",
+      "fingerprint": "be2b81ec90620a0bca1c1ceb07030194ca6289a90ebf9b2911ef4351774a606a",
+      "name": "SL3SG3tosP3DCI",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/venice s709 Monitor Look/sP3Cubes/SL3SG3tosP3DCI.cube",
+      "relativePath": "Sony/Documents LUT collection/SL3SG3tosP3DCI.cube"
+    },
+    {
+      "recordID": "record://b27845c8-4e48-4d5c-bb06-809a409c3c9e",
+      "fingerprint": "f30fcdd119f81a4288c98346831b26c9e6679b6623256f399cb3e8c7b78bed12",
+      "name": "SonyProSW-LUT1_REC709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Sjoerd Wesselink/SonyProSW-LUT1_REC709.cube",
+      "relativePath": "Sony/Documents LUT collection/SonyProSW-LUT1_REC709.cube"
+    },
+    {
+      "recordID": "record://82be09e3-690e-40a0-9495-4866b0d1af42",
+      "fingerprint": "13cabce0d45286f1ef6befb24ceeb2bacc7435f2b7296bcc60102fccbd32974b",
+      "name": "SonyProSW-LUT3_REC709",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Sjoerd Wesselink/SonyProSW-LUT3_REC709.cube",
+      "relativePath": "Sony/Documents LUT collection/SonyProSW-LUT3_REC709.cube"
+    },
+    {
+      "recordID": "record://c0cad581-2503-43b8-adf2-4a5a590d7e4d",
+      "fingerprint": "a18d85ed98ec01df6cd9efb257b4ba6fd86823c8bea3b8532a0c43bf8e14a1ce",
+      "name": "TH_Nordic_Greens_LUT_x33",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Thobias Hild__n/TH_Nordic_Greens_LUT_x33.cube",
+      "relativePath": "Sony/Documents LUT collection/TH_Nordic_Greens_LUT_x33.cube"
+    },
+    {
+      "recordID": "record://3cc923eb-fc10-4f05-9ec1-f9b86c1427bd",
+      "fingerprint": "d9be00c33cc15125ac96a1ce4da1be261f346badb1111faaa2c0f933191120f9",
+      "name": "TH_Street_Tones_LUT_x33",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Thobias Hild__n/TH_Street_Tones_LUT_x33.cube",
+      "relativePath": "Sony/Documents LUT collection/TH_Street_Tones_LUT_x33.cube"
+    },
+    {
+      "recordID": "record://22b52738-e6ff-491f-8c04-7c68d25999e7",
+      "fingerprint": "84e6c96b9340577873dda8657a98e37842720d9c2695591e3c3200046dfe7761",
+      "name": "TH_Studio_Mood_LUT_x33",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Thobias Hild__n/TH_Studio_Mood_LUT_x33.cube",
+      "relativePath": "Sony/Documents LUT collection/TH_Studio_Mood_LUT_x33.cube"
+    },
+    {
+      "recordID": "record://1d1ab6b4-ed60-4756-b0fe-3da1e8a72e23",
+      "fingerprint": "b1cde6f0b80f6536b092aca9e174f2e6291d7d42ba8a0a9ab7012177d8382401",
+      "name": "The_Creator",
+      "brand": "Sony",
+      "sourceID": "documents-collection",
+      "source": "Documents LUT collection",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Sony/Documents Collection/Ambassador LUT Gallery/Alexandru Don/The_Creator.cube",
+      "relativePath": "Sony/Documents LUT collection/The_Creator.cube"
+    },
+    {
+      "recordID": "record://d9af68f1-7ce0-4c03-bd2e-e4df2e69ca06",
+      "fingerprint": "98ebdc9e269dc6e477c190c65048ba64ec6a6d7574b2098de0cdb66ab69a798f",
+      "name": "Super 8 Daylight Sharp",
+      "brand": "Super 8 LUTs",
+      "sourceID": "super8-footage",
+      "source": "Free LUTs for Super 8 Footage",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Super 8 LUTs/Super 8 Footage/Super 8 Daylight Sharp.cube",
+      "relativePath": "Super 8 LUTs/Free LUTs for Super 8 Footage/Super 8 Daylight Sharp.cube"
+    },
+    {
+      "recordID": "record://56015fc7-5e73-431d-9126-0f6ac32fffc0",
+      "fingerprint": "678d4c20592e6fa70eaecfac0429d141b33910f49074f6f3f6096e35750cf4c0",
+      "name": "TOBI",
+      "brand": "Warm Tone LUTs",
+      "sourceID": "free-warm-tone",
+      "source": "Free Warm Tone LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Warm Tone LUTs/Warm Tone LUTs/TOBI.cube",
+      "relativePath": "Warm Tone LUTs/Free Warm Tone LUTs/TOBI.cube"
+    },
+    {
+      "recordID": "record://4a9e8094-4fa8-40e9-9ec3-10eeee7fd43c",
+      "fingerprint": "be0fd23a2230a8f29cf6d2a38bfa573e7f01967187ea89c41998d8346fe209b8",
+      "name": "Warm Film Tone",
+      "brand": "Warm Tone LUTs",
+      "sourceID": "free-warm-tone",
+      "source": "Free Warm Tone LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Warm Tone LUTs/Warm Tone LUTs/Warm Film Tone.cube",
+      "relativePath": "Warm Tone LUTs/Free Warm Tone LUTs/Warm Film Tone.cube"
+    },
+    {
+      "recordID": "record://b9630dc9-0467-4d81-97e9-d61fa0188602",
+      "fingerprint": "757237729d2d6ded355093f0d2ef106a7e5b8f03d441d3485e5b00f760b6c022",
+      "name": "Warm Tone TOBI",
+      "brand": "Warm Tone LUTs",
+      "sourceID": "free-warm-tone",
+      "source": "Free Warm Tone LUTs",
+      "originalLocator": "/Users/world4jason/code_ground/lut-studio/LUTLibrary/LUTs/Warm Tone LUTs/Warm Tone LUTs/Warm Tone TOBI.cube",
+      "relativePath": "Warm Tone LUTs/Free Warm Tone LUTs/Warm Tone TOBI.cube"
+    }
+  ]
+}
+

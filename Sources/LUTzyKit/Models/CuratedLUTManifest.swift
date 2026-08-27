@@ -67,6 +67,9 @@ struct CuratedLUTMetadata: Sendable, Equatable {
     let seedID: String
     let fingerprint: String
     let origin: LUTOrigin
+    /// Authored package/project provenance. Source is independent of Brand:
+    /// two Fujifilm looks may come from Codex and Claude respectively.
+    let sourceLabel: String
     let inputProfile: String
     let tags: [String]
     let description: String
@@ -219,6 +222,7 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
                 seedID: "manifest-v\(version):\(fingerprint)",
                 fingerprint: fingerprint,
                 origin: .vendor(entry.brand.trimmingCharacters(in: .whitespacesAndNewlines)),
+                sourceLabel: source.label.trimmingCharacters(in: .whitespacesAndNewlines),
                 inputProfile: input?.isEmpty == false ? input! : "Unknown",
                 tags: tags,
                 description: description

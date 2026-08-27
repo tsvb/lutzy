@@ -7,7 +7,10 @@ import Foundation
 @testable import LUTzyKit
 
 if CommandLine.arguments.contains("--library-bootstrap-only") {
-    Foundation.exit(runLibraryBootstrapCheck() ? EXIT_SUCCESS : EXIT_FAILURE)
+    let ok = runLibraryBootstrapCheck()
+        && runLibrarySourceMetadataCheck()
+        && runFolderNavigationNoiseCheck()
+    Foundation.exit(ok ? EXIT_SUCCESS : EXIT_FAILURE)
 }
 
 // Feed the kernel a known LINEAR value and read it back in the same linear

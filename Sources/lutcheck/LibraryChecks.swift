@@ -35,6 +35,100 @@ func runLibraryBootstrapCheck() -> Bool {
 }
 
 @MainActor
+func runLibrarySourceMetadataCheck() -> Bool {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("lutcheck-library-source-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    do {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let cubeURL = root.appendingPathComponent("A.cube")
+        try identityCube(size: 2).write(to: cubeURL, atomically: true, encoding: .utf8)
+        let cube = try CubeLUT(url: cubeURL)
+        let manifestURL = root.appendingPathComponent(CuratedLUTManifest.fileName)
+        let manifestJSON = """
+        {
+          "version": 1,
+          "sources": {
+            "codex": {
+              "label": "Codex Generated",
+              "description": "Codex source",
+              "reference": null,
+              "license": "project-owned"
+            }
+          },
+          "entries": [{
+            "relativePath": "A.cube",
+            "sha256": "\(cube.contentHash)",
+            "brand": "Fujifilm",
+            "inputProfile": "Panasonic V-Log",
+            "tags": ["相機風格"],
+            "sourceID": "codex",
+            "description": null
+          }],
+          "duplicates": [],
+          "unsupported": []
+        }
+        """
+        try manifestJSON.write(to: manifestURL, atomically: true, encoding: .utf8)
+        let manifest = try CuratedLUTManifest.load(from: manifestURL)
+        let catalogURL = root.appendingPathComponent("catalog.json")
+        let catalog = LUTCatalog(fileURL: catalogURL)
+        guard let id = catalog.adoptSavedLUT(cube) else { return false }
+        let durable = cube.withRecordID(id)
+        catalog.seedCuratedMetadata(manifest.metadataByFingerprint, for: [durable])
+        let relaunched = LUTCatalog(fileURL: catalogURL)
+        let ok = catalog.sourceLabel(for: durable) == "Codex Generated"
+            && relaunched.sourceLabel(for: durable) == "Codex Generated"
+        print("curated Source distinguishes same-named LUTs after relaunch -> \(ok ? "PASS" : "FAIL")")
+        return ok
+    } catch {
+        print("curated Source distinguishes same-named LUTs after relaunch -> FAIL (\(error))")
+        return false
+    }
+}
+
+func runFolderNavigationNoiseCheck() -> Bool {
+    let counts = [
+        "Canon/Documents Collection/3dlut/17grid-3dlut/full-to-full-range": 25,
+        "Canon/Documents Collection/3dlut/33grid-3dlut/full-to-full-range": 25,
+        "CINECOLOR/CINECOLOR/A24": 3,
+    ]
+    let tree = LUTFolderHierarchy.tree(from: counts)
+    let canonChildren = tree.first(where: { $0.name == "Canon" })?.children.map(\.name) ?? []
+    let cineChildren = tree.first(where: { $0.name == "CINECOLOR" })?.children.map(\.name) ?? []
+
+    let cube = [SIMD3<Float>](repeating: .zero, count: 8)
+    let canonLUTs = [
+        CubeLUT(
+            cube: cube, size: 2, name: "17 grid",
+            category: "Canon/Documents Collection/3dlut/17grid-3dlut/full-to-full-range"
+        ),
+        CubeLUT(
+            cube: cube, size: 2, name: "33 grid",
+            category: "Canon/Documents Collection/3dlut/33grid-3dlut/full-to-full-range"
+        ),
+    ]
+    let shelfTitles = LUTLibraryDiscovery.folderShelves(
+        from: canonLUTs, selectedFolder: "Canon"
+    ).map(\.title)
+    let authoredLevels = (1...12).map { "Authored \($0)" }
+    let authoredTree = LUTFolderHierarchy.tree(from: [authoredLevels.joined(separator: "/"): 1])
+    var preserved: [String] = []
+    var cursor = authoredTree.first
+    while let node = cursor {
+        preserved.append(node.name)
+        cursor = node.children.first
+    }
+    let ok = canonChildren == ["17grid-3dlut", "33grid-3dlut"]
+        && cineChildren == ["A24"]
+        && shelfTitles == ["17grid-3dlut", "33grid-3dlut"]
+        && preserved == authoredLevels
+    print("Folder navigation hides provenance/format wrappers -> \(ok ? "PASS" : "FAIL")")
+    return ok
+}
+
+@MainActor
 func runDurableLibraryChecks() async -> Bool {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("lutcheck-library-\(UUID().uuidString)", isDirectory: true)
@@ -263,6 +357,7 @@ func runDurableLibraryChecks() async -> Bool {
             && manifestCatalog.record(for: curatedID)?.inputProfile == "Panasonic V-Log"
             && manifestCatalog.record(for: curatedID)?.typedTags == ["完成色", "相機風格"]
             && manifestCatalog.description(for: curatedID) == "Codex 產生；測試用 V-Log LUT。"
+            && manifestCatalog.sourceLabel(for: curatedCube.withRecordID(curatedID)) == "Codex"
         let durableCuratedCube = curatedCube.withRecordID(curatedID)
         manifestCatalog.inferMissingOrigins(for: [durableCuratedCube])
         manifestCatalog.setOrigin(.unknown, for: [curatedID])

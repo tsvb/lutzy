@@ -44,6 +44,9 @@ struct LUTRecord: Identifiable, Codable, Sendable, Equatable {
     /// a CUBE comment, so third-party transform bytes remain untouched.
     var descriptionText: String? = nil
     var origin: LUTOrigin = .unknown
+    /// Package/project provenance, kept separate from Brand and ordinary Tags.
+    /// Optional keeps catalogs written before Source metadata decodable.
+    var sourceLabel: String? = nil
     /// The precise encoded pixels this transform expects (for example
     /// Panasonic V-Log or Sony S-Log3). This is catalog metadata and remains
     /// separate from both the emulated-look Brand and descriptive Tags.
@@ -203,6 +206,12 @@ final class LUTCatalog: ObservableObject {
     }
 
     func origin(for lut: CubeLUT) -> LUTOrigin { record(for: lut)?.origin ?? .unknown }
+    func sourceLabel(for lut: CubeLUT) -> String? {
+        guard let value = record(for: lut)?.sourceLabel?
+            .trimmingCharacters(in: .whitespacesAndNewlines), value.isEmpty == false
+        else { return nil }
+        return value
+    }
     func inputProfile(for lut: CubeLUT) -> String {
         if let value = record(for: lut)?.inputProfile?
             .trimmingCharacters(in: .whitespacesAndNewlines), value.isEmpty == false {
@@ -257,6 +266,14 @@ final class LUTCatalog: ObservableObject {
             }
             if record.inputProfile?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
                 record.inputProfile = metadata.inputProfile
+                recordChanged = true
+            }
+            // Source was added after the first curated seed shipped. Backfill
+            // it even when the old seed marker already exists; unlike Brand or
+            // Tags there was no earlier user-authored Source value to protect.
+            if record.sourceLabel?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+               metadata.sourceLabel.isEmpty == false {
+                record.sourceLabel = metadata.sourceLabel
                 recordChanged = true
             }
             if recordChanged {

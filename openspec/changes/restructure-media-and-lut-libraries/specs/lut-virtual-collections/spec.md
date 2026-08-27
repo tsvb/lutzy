@@ -80,3 +80,7 @@ Starred SHALL remain a single non-deletable source derived from the existing fav
 #### Scenario: Star a LUT
 - **WHEN** the user stars a LUT from Viewer or LUT Manager
 - **THEN** the LUT appears in Starred without being added to any Collection
+
+#### Scenario: Relaunch with Starred LUTs
+- **WHEN** the application relaunches after one or more durable LUT records were starred
+- **THEN** every still-available record remains starred and the Starred source reconstructs the same membership

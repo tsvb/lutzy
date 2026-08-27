@@ -329,6 +329,9 @@ private struct LUTLibraryDetailView: View {
                         Text(viewModel.catalog.effectiveName(for: lut))
                             .font(.title2.weight(.semibold))
                         LabeledContent("Brand", value: viewModel.catalog.origin(for: lut).label)
+                        if let source = viewModel.catalog.sourceLabel(for: lut) {
+                            LabeledContent("Source", value: source)
+                        }
                         LabeledContent("Input Profile", value: viewModel.managerInputLabel(for: lut))
                         LabeledContent("Size", value: "\(lut.size)³")
                         let description = viewModel.catalog.description(for: lut)

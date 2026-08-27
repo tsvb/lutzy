@@ -1,0 +1,3 @@
+# Local evaluation copies may include third-party LUT bytes.
+# Track the identity index and notes; adopt Git LFS/licensing policy before publishing binaries.
+*.cube

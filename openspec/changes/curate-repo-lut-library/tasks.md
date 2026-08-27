@@ -21,3 +21,6 @@
 - [x] 19. Add downloaded-pack classification checks, rebuild the complete corpus, and verify parseability, tags, fingerprints, duplicates, and unsupported counts.
 - [x] 20. Run the scoped OpenSpec, build, corpus, and diff acceptance gates for the expanded library.
 - [x] 21. Make repository builds open the curated 1,928-LUT corpus by default, retain the Application Support fallback, and verify the running app count.
+- [x] 22. Export the current 79 Starred LUTs into a dated Brand/Source evaluation snapshot outside the active scan root, with a durable identity index.
+- [x] 23. Persist curated Source independently from Brand/Tags and show it on Gallery cards and LUT detail to distinguish same-name implementations.
+- [x] 24. Verify Source after catalog relaunch and verify the actual 79-item Starred state after an application relaunch.

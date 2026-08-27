@@ -10,11 +10,15 @@ LUTLibrary/
     .lutzy-library.json         metadata sidecar
     <Brand>/<Source>/…/*.cube
   Unsupported/                  retained outside the active scan root
+  Selections/                   dated evaluation snapshots, not scanned
+    <selection>/<Brand>/<Source>/…/*.cube
   README.md                     regeneration and Git/LFS guidance
   SOURCE_AUDIT.md               source, license, exclusion, and tally audit
 ```
 
 The physical hierarchy answers where a transform belongs and where it came from. Brand remains a dedicated catalog namespace and does not become an ordinary Tag. A source subfolder prevents two independently generated looks with the same target brand from being conflated.
+
+Source also travels into the catalog as its own read-only curated provenance value. Gallery cards present `Brand · Source` when those values differ, and detail exposes Source separately. This keeps identically named Codex, Claude, V-Log-Alchemy, and downloaded implementations distinguishable without polluting ordinary Tags or changing their filenames.
 
 Downloaded packs keep the same separation. `CINECOLOR_*`, plus packages carrying CINECOLOR's own installation document, use Brand `CINECOLOR`. Other packages use an evidenced maker or a stable pack-family label rather than pretending an input-camera folder is the maker. For example, SmallHD's multi-camera Movie Looks stay Brand `SmallHD`, Source `SmallHD Movie Looks 2`, while Canon/Sony/Panasonic folder names become precise Input Profiles. A Fujifilm visual family may therefore contain separately sourced Codex, Claude, and V-Log-Alchemy implementations without flattening Source into Brand or ordinary Tags.
 
@@ -99,3 +103,5 @@ Description is prose provenance/context. It is not a Brand, Tag, filename, trans
 ## Git boundary
 
 The corpus is prepared inside the repository, but the initial implementation does not silently commit gigabytes of third-party assets or invent redistribution permission. `SOURCE_AUDIT.md` makes pending references explicit. Git LFS or another binary policy can be adopted when the user chooses to publish the corpus.
+
+`LUTLibrary/Selections` is the evaluation boundary. A selection copies exact LUT files while its JSON index retains the durable Library identity and original locator. Keeping it beside rather than inside `LUTs` prevents a test shortlist from doubling the active catalog.

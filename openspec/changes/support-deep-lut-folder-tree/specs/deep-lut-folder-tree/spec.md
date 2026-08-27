@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Arbitrary folder nesting
-Viewer SHALL represent every component of a LUT's relative folder path without a product-defined maximum depth.
+Viewer SHALL retain every component of a LUT's relative physical folder path and support it without a product-defined maximum depth. Navigation MAY suppress a narrow explicit set of non-semantic provenance/format wrappers and repeated ancestor labels, but SHALL NOT rewrite the physical path or flatten arbitrary authored nesting.
 
 #### Scenario: Scan a deeply nested LUT
 - **WHEN** a LUT exists at a path containing twelve nested folders
@@ -10,6 +10,16 @@ Viewer SHALL represent every component of a LUT's relative folder path without a
 #### Scenario: Select an intermediate folder
 - **WHEN** the user selects any non-leaf folder
 - **THEN** the contact sheet contains LUTs from that folder and every depth below it
+
+#### Scenario: Hide known packaging wrappers
+
+- **WHEN** a path contains a repeated Brand/Source label or a known wrapper such as `Documents Collection/3dlut/.../full-to-full-range`
+- **THEN** navigation hoists the meaningful descendant folders, while each visible node still selects its complete original physical path and recursive LUT scope
+
+#### Scenario: Preserve arbitrary authored levels
+
+- **WHEN** nested folder names are not in the explicit wrapper vocabulary
+- **THEN** every authored level remains visible and addressable regardless of whether it has only one child
 
 ### Requirement: Independent disclosure and selection
 Expanding or collapsing a branch SHALL NOT change the selected LUT scope, and selecting a folder SHALL NOT require clicking its disclosure control.

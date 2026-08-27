@@ -56,7 +56,10 @@ enum LUTLibraryDiscovery {
         for lut in luts {
             let category = lut.category == "General"
                 ? [] : lut.category.split(separator: "/").map(String.init)
-            let relative = category.dropFirst(min(base.count, category.count))
+            let relative = LUTFolderHierarchy.navigationComponents(
+                Array(category.dropFirst(min(base.count, category.count))),
+                ancestors: base
+            )
 
             let path: String
             let title: String

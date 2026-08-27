@@ -7,6 +7,7 @@ The scanner already keeps complete relative paths and the hierarchy model alread
 **Goals:**
 
 - Preserve every path component without a product-defined depth limit.
+- Hide only explicit repeated provenance and file-format packaging wrappers from navigation while retaining their physical path semantics.
 - Make expand/collapse independent from selecting the folder's LUT scope.
 - Keep a deep restored selection visible.
 - Make ancestry readable without adding visual noise to the colour workstation.
@@ -32,6 +33,10 @@ Branches with children receive an 18-point disclosure target followed by a full-
 
 Top-level packages open initially so their organisation is discoverable. Deeper branches stay collapsed unless they contain the restored selection. When selection moves into a hidden descendant, each ancestor opens to reveal it.
 
+### Display-only wrapper suppression
+
+The physical category remains the source of truth. Navigation hoists descendants only through a narrow explicit vocabulary (`Documents Collection`, generic `3dlut` wrappers, `full-to-full-range`, and a component that repeats an ancestor label). A hoisted row retains its complete original category path for identity, filtering, counts, and Manager moves. No generic single-child collapse is allowed because an apparently redundant authored folder may still carry meaning, and twelve-level arbitrary paths remain supported.
+
 ### Workstation hierarchy treatment
 
 Native typography and the existing accent selection remain. A one-pixel low-contrast vertical rail is the sole new visual device; it follows the folder lineage and prevents repeated indentation from reading as unrelated rows.
@@ -44,7 +49,7 @@ Native typography and the existing accent selection remain. A one-pixel low-cont
 
 ## Migration Plan
 
-No migration is required. Existing category paths and saved `browsedCategory` values are reused.
+No migration is required. Existing category paths and saved `browsedCategory` values are reused; wrapper suppression is derived presentation state only.
 
 ## Open Questions
 

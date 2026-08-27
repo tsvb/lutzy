@@ -286,7 +286,7 @@ struct LUTPreviewCard: View {
                     }
                 }
 
-                Text(viewModel.catalog.origin(for: lut).label)
+                Text(cardProvenance)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -361,7 +361,7 @@ struct LUTPreviewCard: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(viewModel.catalog.effectiveName(for: lut))
+        .accessibilityLabel("\(viewModel.catalog.effectiveName(for: lut)), \(cardProvenance)")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction {
             activate()
@@ -375,6 +375,14 @@ struct LUTPreviewCard: View {
                 maxSize: CGSize(width: 640, height: 400)
             )
         }
+    }
+
+    private var cardProvenance: String {
+        let brand = viewModel.catalog.origin(for: lut).label
+        guard let source = viewModel.catalog.sourceLabel(for: lut),
+              source.localizedCaseInsensitiveCompare(brand) != .orderedSame
+        else { return brand }
+        return "\(brand) · \(source)"
     }
 
     private struct RenderIdentity: Hashable {
