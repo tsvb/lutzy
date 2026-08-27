@@ -20,3 +20,4 @@
 - [x] 18. Extend deterministic curation for CINECOLOR, SmallHD, FilterGrade, PremiumBeat, film-emulation, Hollywood, and otherwise named downloaded packs.
 - [x] 19. Add downloaded-pack classification checks, rebuild the complete corpus, and verify parseability, tags, fingerprints, duplicates, and unsupported counts.
 - [x] 20. Run the scoped OpenSpec, build, corpus, and diff acceptance gates for the expanded library.
+- [x] 21. Make repository builds open the curated 1,928-LUT corpus by default, retain the Application Support fallback, and verify the running app count.

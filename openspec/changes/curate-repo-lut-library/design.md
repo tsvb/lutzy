@@ -52,6 +52,12 @@ After a scan reconciles physical LUTs, the library loads any valid `.lutzy-libra
 
 Once seeded, later scans never overwrite user changes. A malformed or unsupported manifest cannot prevent ordinary LUT scanning.
 
+## Launch ownership
+
+Repository development and acceptance builds resolve `LUTLibrary/LUTs` as the managed Library whenever its curated manifest is present. This keeps discovery, Manager edits, Editor access, and new managed imports on the same repository-local source of truth instead of reopening the obsolete 46-LUT Application Support seed. The resolver uses the compile-time source checkout location and supports an explicit `LUTZY_CURATED_LIBRARY` path override for local build environments.
+
+A distributed build may not have a source checkout or redistribution-ready binary corpus. If the curated manifest is unavailable, launch falls back to the existing Application Support Library. This fallback is explicit and testable; it is not allowed to override an available repository corpus.
+
 ## Input-profile evidence and runtime boundary
 
 The curator records the most specific defensible input profile, using evidence in this order: an explicit CUBE photo-style/header declaration, an upstream per-file or package contract, then an unambiguous filename or containing folder. Conflicting or absent evidence becomes `Unknown`. The profile vocabulary is human-readable and extensible because vendor generations such as C-Log 1/2/3, F-Log/F-Log2, and S-Log2/S-Log3 are operationally distinct.

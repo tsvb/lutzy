@@ -53,6 +53,20 @@ The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed
 - **WHEN** a source has no confirmed reference supplied by the user
 - **THEN** its source record says that the reference is pending and does not invent a vendor, author, URL, or license
 
+### Requirement: Repository builds open the curated corpus by default
+
+A development or acceptance build launched from this repository SHALL use `LUTLibrary/LUTs` as its app-owned Library when the curated manifest is present, rather than silently opening the legacy Application Support seed.
+
+#### Scenario: Launch from a curated repository checkout
+
+- **WHEN** `LUTLibrary/LUTs/.lutzy-library.json` exists beside the source checkout
+- **THEN** the initial Library scan, Manager mutations, and managed imports all target that curated corpus
+
+#### Scenario: Launch without a source checkout
+
+- **WHEN** a distributed build cannot find the repository curated manifest
+- **THEN** it falls back to the app-owned Application Support Library without failing launch
+
 ### Requirement: Input Profile is classified independently and conservatively
 
 Every active manifest entry SHALL record the most specific defensible Input Profile independently of Brand and ordinary Tags.

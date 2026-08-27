@@ -6,6 +6,10 @@ import UniformTypeIdentifiers
 import Foundation
 @testable import LUTzyKit
 
+if CommandLine.arguments.contains("--library-bootstrap-only") {
+    Foundation.exit(runLibraryBootstrapCheck() ? EXIT_SUCCESS : EXIT_FAILURE)
+}
+
 // Feed the kernel a known LINEAR value and read it back in the same linear
 // space, so no gamma round-trip can contaminate the measurement. The kernel's
 // contract is: linear Rec.709 in → V-Log/V-Gamut out. That is what is checked.

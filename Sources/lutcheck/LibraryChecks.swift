@@ -2,6 +2,38 @@ import AppKit
 import Foundation
 @testable import LUTzyKit
 
+func runLibraryBootstrapCheck() -> Bool {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("lutcheck-library-bootstrap-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    do {
+        let appSupport = root.appendingPathComponent("Application Support LUTs", isDirectory: true)
+        let repository = root.appendingPathComponent("Repository LUTs", isDirectory: true)
+        try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(
+            to: repository.appendingPathComponent(CuratedLUTManifest.fileName)
+        )
+        let repositoryOK = LUTLibrary.resolveManagedFolder(
+            applicationSupportFolder: appSupport,
+            repositoryCandidate: repository
+        ).standardizedFileURL == repository.standardizedFileURL
+        try FileManager.default.removeItem(
+            at: repository.appendingPathComponent(CuratedLUTManifest.fileName)
+        )
+        let fallbackOK = LUTLibrary.resolveManagedFolder(
+            applicationSupportFolder: appSupport,
+            repositoryCandidate: repository
+        ).standardizedFileURL == appSupport.standardizedFileURL
+        let ok = repositoryOK && fallbackOK
+        print("curated repository is the default managed Library -> \(ok ? "PASS" : "FAIL")")
+        return ok
+    } catch {
+        print("curated repository is the default managed Library -> FAIL (\(error))")
+        return false
+    }
+}
+
 @MainActor
 func runDurableLibraryChecks() async -> Bool {
     let root = FileManager.default.temporaryDirectory
@@ -10,6 +42,8 @@ func runDurableLibraryChecks() async -> Bool {
 
     do {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let libraryBootstrapOK = runLibraryBootstrapCheck()
+
         let catalogURL = root.appendingPathComponent("catalog.json")
         let catalog = LUTCatalog(fileURL: catalogURL)
         let cubeA = root.appendingPathComponent("A.cube")
@@ -650,7 +684,7 @@ func runDurableLibraryChecks() async -> Bool {
             && Set(relaunchedMedia.records.map(\.id)) == mediaIDs
             && relaunchedMedia.records.contains { $0.logicalPath == "Shoot/Day 1/frame.png" }
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
-        return catalogOK && mixedSelectionTagOK && visibleTagEditingOK && recoveryOK
+        return libraryBootstrapOK && catalogOK && mixedSelectionTagOK && visibleTagEditingOK && recoveryOK
             && recoveredSessionOK && discoveryOK && focusRecoveryOK
             && managerBrandColumnOK && curatedManifestOK && curatorOK
             && repositoryCorpusScanOK

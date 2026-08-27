@@ -39,16 +39,52 @@ final class LUTLibrary: ObservableObject {
 
     private static let settingsKey = "lutFolderBookmark"
 
-    /// The library the app owns, under Application Support.
+    /// Resolve the app-owned Library at the launch seam.
     ///
-    /// The reason the app has one at all: pointing at a folder somewhere on
-    /// disk means re-granting access to it, and losing the whole library the
-    /// day that folder moves. Files imported here belong to the app, need no
-    /// security scope, and are simply there on the next launch.
+    /// Development and acceptance builds use the curated corpus kept in this
+    /// repository. It is the source of truth the Manager edits and the Import
+    /// flow extends, so launching the app cannot silently fall back to the old
+    /// 46-LUT Application Support seed. A distributed build has no source
+    /// checkout, and safely falls back to its Application Support Library.
+    nonisolated static func resolveManagedFolder(
+        applicationSupportFolder: URL,
+        repositoryCandidate: URL?
+    ) -> URL {
+        guard let repositoryCandidate else { return applicationSupportFolder }
+        var isDirectory: ObjCBool = false
+        let hasFolder = FileManager.default.fileExists(
+            atPath: repositoryCandidate.path, isDirectory: &isDirectory
+        ) && isDirectory.boolValue
+        let hasManifest = FileManager.default.fileExists(
+            atPath: repositoryCandidate
+                .appendingPathComponent(CuratedLUTManifest.fileName).path
+        )
+        return hasFolder && hasManifest ? repositoryCandidate : applicationSupportFolder
+    }
+
+    private nonisolated static var repositoryCuratedFolder: URL {
+        if let override = ProcessInfo.processInfo.environment["LUTZY_CURATED_LIBRARY"],
+           override.isEmpty == false {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // Models
+            .deletingLastPathComponent() // LUTzyKit
+            .deletingLastPathComponent() // Sources
+            .deletingLastPathComponent() // repository root
+            .appendingPathComponent("LUTLibrary/LUTs", isDirectory: true)
+    }
+
+    /// The library the app owns. In a repository build this is the curated
+    /// corpus; otherwise it lives under Application Support.
     static var managedFolder: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        let folder = base.appendingPathComponent("LUTStudio/LUTs", isDirectory: true)
+        let applicationSupportFolder = base.appendingPathComponent("LUTStudio/LUTs", isDirectory: true)
+        let folder = resolveManagedFolder(
+            applicationSupportFolder: applicationSupportFolder,
+            repositoryCandidate: repositoryCuratedFolder
+        )
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder
     }
