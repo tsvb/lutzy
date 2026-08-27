@@ -9,6 +9,7 @@ Recorded from the user's 2026-08-27 request. Referenced screenshots are design c
 - `/Users/world4jason/code_ground/claude lut`
 - `/Users/world4jason/code_ground/V-Log_alchemy` (resolved from the previously supplied existing path `/Users/world4jason/code_ground/V-Log-Alchemy`)
 - `/Users/world4jason/Douctments/luts` (resolved from the previously supplied existing path `/Users/world4jason/Documents/luts`)
+- `/Users/world4jason/Downloads/Downloaded Luts/lut unzip`
 
 ## Requested behaviour
 
@@ -27,6 +28,11 @@ Recorded from the user's 2026-08-27 request. Referenced screenshots are design c
 13. The `code_ground` projects are predominantly camera-log LUTs. Use their README, CUBE header, folder, and filename evidence to determine the exact input; do not reduce every camera brand to Panasonic V-Log and do not treat the emulated-look brand as the input camera.
 14. The Documents collection is mixed. Record `Unknown` when its input cannot be supported by explicit evidence rather than guessing.
 15. Existing local records whose Brand is still `Unknown` should receive a one-time conservative Brand migration from an unambiguous physical folder or filename prefix; later user edits must win.
+16. Import the downloaded multi-site collection, retain only LUTs the application can render, deduplicate exact transforms, and assign useful descriptive Tags.
+17. Treat `CINECOLOR_*` packages, plus the adjacent `BEAUTY` and `INTERVIEW` packages carrying CINECOLOR installation documentation, as Brand `CINECOLOR` and preserve their pack names as Look folders.
+18. Keep maker/visual Brand, Source pack, and Input Profile independent. In particular, SmallHD camera subfolders are Input evidence and do not turn the LUT maker into Canon, Sony, Panasonic, and so on.
+19. Preserve separately authored Codex, Claude, V-Log-Alchemy, and downloaded implementations of the same named Look unless their transform fingerprints are exact duplicates.
+20. When a downloaded package does not establish its input encoding or redistribution rights, record `Unknown`/pending explicitly rather than guessing.
 
 Reference screenshot: `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8b3bb8db-be22-4d9c-95f5-bebf66cec92e.png`.
 

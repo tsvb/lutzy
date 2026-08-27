@@ -21,4 +21,4 @@ The application also has no durable Description field. LUT Manager can edit Name
 
 ## Scope
 
-Initial curation covers the user-supplied Film-Luts, Codex-generated LUT project, Claude-generated LUT project, V-Log-Alchemy GitHub project, and Documents LUT collection. Missing references for the Documents collection remain explicitly pending rather than being guessed.
+Initial curation covers the user-supplied Film-Luts, Codex-generated LUT project, Claude-generated LUT project, V-Log-Alchemy GitHub project, Documents LUT collection, and the downloaded multi-site LUT collection. Missing references remain explicitly pending rather than being guessed.

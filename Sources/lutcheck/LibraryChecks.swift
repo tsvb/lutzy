@@ -385,6 +385,47 @@ func runDurableLibraryChecks() async -> Bool {
         let rec709FolderProfileOK = LUTInputProfileInference.profile(
             relativePath: "Sony/Rec.709 to Color Grading LUTs/Soft Contrast.cube"
         ) == "Display / Rec.709"
+        let cinecolorDownloaded = DownloadedLUTClassifier.classify(
+            relativePath: "CINECOLOR_A24_/CUBE/FLORIDA.cube"
+        )
+        let cinecolorDownloadedOK = cinecolorDownloaded.brand == "CINECOLOR"
+            && cinecolorDownloaded.sourceID == "cinecolor"
+            && cinecolorDownloaded.destinationSubpath == "A24/FLORIDA.cube"
+            && cinecolorDownloaded.inputProfile == "Unknown"
+            && cinecolorDownloaded.tags.contains("電影風格")
+        let cinecolorDocumentedAlias = DownloadedLUTClassifier.classify(
+            relativePath: "BEAUTY/CUBE/BEAUTY_01.cube"
+        )
+        let cinecolorAliasOK = cinecolorDocumentedAlias.brand == "CINECOLOR"
+            && cinecolorDocumentedAlias.destinationSubpath == "BEAUTY/BEAUTY_01.cube"
+            && cinecolorDocumentedAlias.tags.contains("人像")
+        let smallHDDownloaded = DownloadedLUTClassifier.classify(
+            relativePath: "SmallHD+LUT+Pack_Movie+Looks+2/Canon/Arrakis-CLog2.cube"
+        )
+        let smallHDDownloadedOK = smallHDDownloaded.brand == "SmallHD"
+            && smallHDDownloaded.sourceID == "smallhd-movie-looks-2"
+            && smallHDDownloaded.destinationSubpath == "Canon/Arrakis-CLog2.cube"
+            && smallHDDownloaded.inputProfile == "Canon C-Log 2"
+            && smallHDDownloaded.tags.contains("電影風格")
+        let smallHDInputBoundariesOK = DownloadedLUTClassifier.classify(
+            relativePath: "SmallHD+LUT+Pack_Movie+Looks+2/Arri/Cliff-LogC4.cube"
+        ).inputProfile == "ARRI LogC4"
+            && DownloadedLUTClassifier.classify(
+                relativePath: "SmallHD+LUT+Pack_Movie+Looks+2/RED/Gems-Log3G10.cube"
+            ).inputProfile == "RED Log3G10"
+            && DownloadedLUTClassifier.classify(
+                relativePath: "SmallHD+LUT+Pack_Movie+Looks+2/Panasonic/Arrakis-VLog.cube"
+            ).inputProfile == "Panasonic V-Log"
+            && LUTInputProfileInference.profile(
+                relativePath: "DJI/P4DeLOGCube/DJI_Phantom4_DLOG2Rec709.cube"
+            ) == "DJI D-Log"
+        let printFilmDownloaded = DownloadedLUTClassifier.classify(
+            relativePath: "Print+Film+Emulation+LUTs/Rec709_Kodak_2383_D65.cube"
+        )
+        let printFilmDownloadedOK = printFilmDownloaded.brand == "Kodak"
+            && printFilmDownloaded.sourceID == "print-film-emulation"
+            && printFilmDownloaded.inputProfile == "Display / Rec.709"
+            && printFilmDownloaded.tags.contains("底片模擬")
         let curatorOK = curatorResult.active == 3
             && curatorResult.duplicates == 1
             && curatorResult.unsupported == 1
@@ -395,6 +436,11 @@ func runDurableLibraryChecks() async -> Bool {
             && authenticatedFastScanOK
             && staleSidecarFallbackOK
             && rec709FolderProfileOK
+            && cinecolorDownloadedOK
+            && cinecolorAliasOK
+            && smallHDDownloadedOK
+            && smallHDInputBoundariesOK
+            && printFilmDownloadedOK
             && generatedManifest.entries.first?.tags == ["相機風格"]
             && FileManager.default.fileExists(
                 atPath: curatedOutput.appendingPathComponent("LUTs/Fujifilm/Codex/A.cube").path

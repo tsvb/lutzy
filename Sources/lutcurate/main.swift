@@ -9,6 +9,10 @@ private struct Arguments {
     var claude = URL(fileURLWithPath: "/Users/world4jason/code_ground/claude lut", isDirectory: true)
     var alchemy = URL(fileURLWithPath: "/Users/world4jason/code_ground/V-Log-Alchemy", isDirectory: true)
     var documents = URL(fileURLWithPath: "/Users/world4jason/Documents/luts", isDirectory: true)
+    var downloads = URL(
+        fileURLWithPath: "/Users/world4jason/Downloads/Downloaded Luts/lut unzip",
+        isDirectory: true
+    )
     var verify: URL?
 
     init(_ values: [String]) throws {
@@ -24,6 +28,7 @@ private struct Arguments {
             case "--claude": claude = url
             case "--vlog-alchemy": alchemy = url
             case "--documents": documents = url
+            case "--downloads": downloads = url
             case "--verify": verify = url
             default: throw CLIError.unknownArgument(key)
             }
@@ -79,6 +84,90 @@ private let sources: [LUTCorpusCurator.SourceDefinition] = [
         id: "documents-collection",
         label: "Documents LUT collection",
         description: "使用者本機 Documents/luts 收藏；原始作者、下載網址與再散布授權等待使用者補充，不在此階段猜測。",
+        reference: nil,
+        license: "Pending source-by-source review; do not publish"
+    ),
+    .init(
+        id: "cinecolor",
+        label: "CINECOLOR downloaded collection",
+        description: "來自 CINECOLOR.IO 的創意調色 LUT；保留原始套件／Look 名稱，輸入色彩空間未由隨附安裝文件明確指定。",
+        reference: "https://www.cinecolor.io",
+        license: "Downloaded third-party assets; redistribution rights not established; do not publish"
+    ),
+    .init(
+        id: "smallhd-movie-looks-2",
+        label: "SmallHD Movie Looks 2",
+        description: "SmallHD Movie Looks 2 多相機套件；Look 名稱跨相機重複，Canon、Sony、Panasonic、ARRI 等資料夾作為 Input Profile 證據。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "filtergrade-film-tone",
+        label: "FilterGrade Free Film Tone LUTs",
+        description: "FilterGrade 免費 Film Tone 套件；來源由下載資料夾名稱明確標示，Input Profile 未明示。",
+        reference: "https://filtergrade.com",
+        license: "Downloaded third-party assets; redistribution rights pending"
+    ),
+    .init(
+        id: "filtergrade-free-cine-v2",
+        label: "FilterGrade Free Cine LUTs Pack v2",
+        description: "FilterGrade Free Cine LUTs Pack v2；隨附支援文件指向 filtergrade.com，重複軟體格式只保留不同 transform。",
+        reference: "https://filtergrade.com",
+        license: "Downloaded third-party assets; redistribution rights pending"
+    ),
+    .init(
+        id: "premiumbeat-wanderlust",
+        label: "PremiumBeat Wanderlust",
+        description: "PremiumBeat Wanderlust 17 Free LUTs；隨附授權禁止轉售、轉移、分享或單獨提供原始 LUT。",
+        reference: "local package: Wanderlust License and Guide.pdf",
+        license: "Local use only for this corpus; do not publish or redistribute"
+    ),
+    .init(
+        id: "print-film-emulation",
+        label: "Print Film Emulation LUTs",
+        description: "Rec.709 輸入的 Kodak／Fujifilm print-film emulation LUT；品牌由檔名中的底片廠牌判定。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "cine-luts-free",
+        label: "Cine LUTs Free",
+        description: "Cine LUTs Free 創意套件；隨附說明僅確認一般剪輯軟體使用方式，未指定 Input Profile 或可再散布授權。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "freemium-14",
+        label: "FREEMIUM 14",
+        description: "FREEMIUM 14 創意 LUT 套件；名稱保留原始 Look，來源網址與 Input Profile 待補。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "free-warm-tone",
+        label: "Free Warm Tone LUTs",
+        description: "Free Warm Tone LUTs 創意暖調套件；來源網址、Input Profile 與再散布權利待補。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "super8-footage",
+        label: "Free LUTs for Super 8 Footage",
+        description: "Super 8 Footage 日光／夜間創意套件；保留底片與時段標籤，Input Profile 未明示。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "hollywood-lut-color-pack",
+        label: "Hollywood LUT Color Pack",
+        description: "以電影片名命名的 Hollywood LUT Color Pack；片名視為 Look 參考，不宣稱與片商或原作有官方關係。",
+        reference: nil,
+        license: "Downloaded third-party assets; reference and redistribution rights pending"
+    ),
+    .init(
+        id: "downloaded-unresolved",
+        label: "Downloaded LUT pack (unresolved)",
+        description: "下載集合中尚未能由隨附檔案確認製作者的套件；保留原資料夾名稱，不猜測作者、Input Profile 或授權。",
         reference: nil,
         license: "Pending source-by-source review; do not publish"
     ),
@@ -306,6 +395,23 @@ private func documentCandidates(root: URL) throws -> [LUTCorpusCurator.Candidate
     }
 }
 
+private func downloadedCandidates(root: URL) throws -> [LUTCorpusCurator.Candidate] {
+    try cubeFiles(under: root).map { url in
+        let rel = relative(url, to: root)
+        let classification = DownloadedLUTClassifier.classify(relativePath: rel)
+        return .init(
+            url: url,
+            sourceID: classification.sourceID,
+            sourcePath: "Downloaded Luts/lut unzip/\(rel)",
+            destinationRelativePath: "\(cleanPathComponent(classification.brand))/\(cleanPathComponent(classification.sourceFolder))/\(classification.destinationSubpath)",
+            brand: classification.brand,
+            inputProfile: classification.inputProfile,
+            tags: classification.tags,
+            priority: 50
+        )
+    }
+}
+
 do {
     let arguments = try Arguments(CommandLine.arguments)
     if let root = arguments.verify {
@@ -316,7 +422,10 @@ do {
         }
         exit(0)
     }
-    for root in [arguments.film, arguments.codex, arguments.claude, arguments.alchemy, arguments.documents]
+    for root in [
+        arguments.film, arguments.codex, arguments.claude,
+        arguments.alchemy, arguments.documents, arguments.downloads,
+    ]
         where FileManager.default.fileExists(atPath: root.path) == false {
         throw CLIError.missingDirectory(root)
     }
@@ -333,6 +442,7 @@ do {
     candidates += try alchemyCandidates(root: arguments.alchemy)
     candidates += try filmCandidates(root: arguments.film)
     candidates += try documentCandidates(root: arguments.documents)
+    candidates += try downloadedCandidates(root: arguments.downloads)
 
     print("Curating \(candidates.count) canonical candidates into \(arguments.output.path)…")
     let result = try LUTCorpusCurator.curate(

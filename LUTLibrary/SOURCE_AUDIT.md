@@ -1,36 +1,50 @@
 # LUT corpus source audit
 
-- Active renderable LUTs: 1607
-- Exact transform duplicates skipped: 115
+- Active renderable LUTs: 1928
+- Exact transform duplicates skipped: 116
 - Unsupported inputs retained outside the active root: 115
 
 ## Input profiles
 
 - ARRI LogC: 7
-- ARRI LogC4: 1
+- ARRI LogC4: 8
 - Apple Log: 1
-- Blackmagic Film: 21
+- Blackmagic Film: 28
 - Blackmagic Film Gen 5: 2
-- Canon C-Log: 13
-- Canon C-Log 2: 33
-- Canon C-Log 3: 33
-- DJI D-Log: 20
+- Canon C-Log: 20
+- Canon C-Log 2: 40
+- Canon C-Log 3: 41
+- DJI D-Log: 27
 - DJI D-Log M: 1
-- Display / Rec.709: 300
-- Fujifilm F-Log: 20
+- Display / Rec.709: 303
+- Fujifilm F-Log: 27
 - Fujifilm F-Log2: 16
 - GoPro GP-Log: 4
 - GoPro Protune: 1
-- Nikon N-Log: 5
+- Nikon N-Log: 12
 - Panasonic STD: 8
-- Panasonic V-Log: 139
-- RED Log3G10: 2
-- Sony S-Log: 17
-- Sony S-Log2: 9
-- Sony S-Log3: 54
-- Unknown: 900
+- Panasonic V-Log: 157
+- RED Log3G10: 9
+- Sony S-Log: 24
+- Sony S-Log2: 16
+- Sony S-Log3: 61
+- Unknown: 1115
 
 ## Sources
+
+### Cine LUTs Free (`cine-luts-free`)
+
+Cine LUTs Free 創意套件；隨附說明僅確認一般剪輯軟體使用方式，未指定 Input Profile 或可再散布授權。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
+
+### CINECOLOR downloaded collection (`cinecolor`)
+
+來自 CINECOLOR.IO 的創意調色 LUT；保留原始套件／Look 名稱，輸入色彩空間未由隨附安裝文件明確指定。
+
+- Reference: https://www.cinecolor.io
+- License/status: Downloaded third-party assets; redistribution rights not established; do not publish
 
 ### Claude-generated LUTs (`claude-generated`)
 
@@ -53,12 +67,82 @@ Codex 產生；為 LUMIX S9 建立的 V-Log/V-Gamut 完成色 LUT，包含 Sony�
 - Reference: Pending user-supplied reference
 - License/status: Pending source-by-source review; do not publish
 
+### Downloaded LUT pack (unresolved) (`downloaded-unresolved`)
+
+下載集合中尚未能由隨附檔案確認製作者的套件；保留原資料夾名稱，不猜測作者、Input Profile 或授權。
+
+- Reference: Pending user-supplied reference
+- License/status: Pending source-by-source review; do not publish
+
+### FilterGrade Free Film Tone LUTs (`filtergrade-film-tone`)
+
+FilterGrade 免費 Film Tone 套件；來源由下載資料夾名稱明確標示，Input Profile 未明示。
+
+- Reference: https://filtergrade.com
+- License/status: Downloaded third-party assets; redistribution rights pending
+
+### FilterGrade Free Cine LUTs Pack v2 (`filtergrade-free-cine-v2`)
+
+FilterGrade Free Cine LUTs Pack v2；隨附支援文件指向 filtergrade.com，重複軟體格式只保留不同 transform。
+
+- Reference: https://filtergrade.com
+- License/status: Downloaded third-party assets; redistribution rights pending
+
+### Free Warm Tone LUTs (`free-warm-tone`)
+
+Free Warm Tone LUTs 創意暖調套件；來源網址、Input Profile 與再散布權利待補。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
+
+### FREEMIUM 14 (`freemium-14`)
+
+FREEMIUM 14 創意 LUT 套件；名稱保留原始 Look，來源網址與 Input Profile 待補。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
+
 ### G'MIC Film LUTs Collection (`gmic-film-luts`)
 
 來自 GitHub 專案 YahiaAngelo/Film-Luts（G'MIC Film LUTs Collection）。上游以 MIT 提供，但 README 提醒個別 LUT 可能另有權利；發佈二進位 corpus 前仍需複核。
 
 - Reference: https://github.com/YahiaAngelo/Film-Luts
 - License/status: MIT repository; individual-LUT rights require review
+
+### Hollywood LUT Color Pack (`hollywood-lut-color-pack`)
+
+以電影片名命名的 Hollywood LUT Color Pack；片名視為 Look 參考，不宣稱與片商或原作有官方關係。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
+
+### PremiumBeat Wanderlust (`premiumbeat-wanderlust`)
+
+PremiumBeat Wanderlust 17 Free LUTs；隨附授權禁止轉售、轉移、分享或單獨提供原始 LUT。
+
+- Reference: local package: Wanderlust License and Guide.pdf
+- License/status: Local use only for this corpus; do not publish or redistribute
+
+### Print Film Emulation LUTs (`print-film-emulation`)
+
+Rec.709 輸入的 Kodak／Fujifilm print-film emulation LUT；品牌由檔名中的底片廠牌判定。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
+
+### SmallHD Movie Looks 2 (`smallhd-movie-looks-2`)
+
+SmallHD Movie Looks 2 多相機套件；Look 名稱跨相機重複，Canon、Sony、Panasonic、ARRI 等資料夾作為 Input Profile 證據。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
+
+### Free LUTs for Super 8 Footage (`super8-footage`)
+
+Super 8 Footage 日光／夜間創意套件；保留底片與時段標籤，Input Profile 未明示。
+
+- Reference: Pending user-supplied reference
+- License/status: Downloaded third-party assets; reference and redistribution rights pending
 
 ### V-Log Alchemy (`vlog-alchemy`)
 
@@ -184,6 +268,7 @@ Codex 產生；為 LUMIX S9 建立的 V-Log/V-Gamut 完成色 LUT，包含 Sony�
 - `Documents/luts/test/Sony/venice s709 Monitor Look/s709Cubes/SL3SG3Ctos709.cube` → `LUTs/Sony/Documents Collection/Sony S-LOG 3 to standard color spaces/Slog3-S-Gamut3.Cine_To_s709_V200.cube`
 - `Documents/luts/test/Sony/venice s709 Monitor Look/sP3Cubes/SL3SG3CtosP3D65.cube` → `LUTs/Sony/Documents Collection/Sony S-LOG 3 to standard color spaces/Slog3-S-Gamut3.Cine_To_sP3D65_V200.cube`
 - `Documents/luts/test/Sony/venice s709 Monitor Look/sP3Cubes/SL3SG3CtosP3DCI.cube` → `LUTs/Sony/Documents Collection/Sony S-LOG 3 to standard color spaces/Slog3-S-Gamut3.Cine_To_sP3DCI_V200.cube`
+- `Downloaded Luts/lut unzip/hollywood-lut-color-pack/hollywood-lut-color-pack/LUT .cube Files/Avengers Endgame.cube` → `LUTs/FreshLUTs/Documents Collection/Cinematic.cube`
 
 ## Unsupported inputs
 

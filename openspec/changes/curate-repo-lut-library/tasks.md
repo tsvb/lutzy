@@ -16,3 +16,7 @@
 - [x] 14. Classify and audit concrete Input Profiles, including Panasonic STD versus V-Log and mixed Documents fallbacks.
 - [x] 15. Authenticate curated bytes for fast header-only discovery, lazily load cube tables, and make scan replacement cancellable.
 - [x] 16. Normalize manifest fingerprint casing and close seeded/authored Brand migration replay.
+- [x] 17. Inventory the downloaded multi-site collection and record package-level Brand, Source, Input, reference, and license evidence.
+- [x] 18. Extend deterministic curation for CINECOLOR, SmallHD, FilterGrade, PremiumBeat, film-emulation, Hollywood, and otherwise named downloaded packs.
+- [x] 19. Add downloaded-pack classification checks, rebuild the complete corpus, and verify parseability, tags, fingerprints, duplicates, and unsupported counts.
+- [x] 20. Run the scoped OpenSpec, build, corpus, and diff acceptance gates for the expanded library.

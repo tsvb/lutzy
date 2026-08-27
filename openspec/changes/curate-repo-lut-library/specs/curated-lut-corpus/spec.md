@@ -6,8 +6,28 @@ The project SHALL provide a reproducible repository-local LUT corpus whose activ
 
 #### Scenario: Curate generated and third-party sources
 
-- **WHEN** the curator processes the five supplied source roots
+- **WHEN** the curator processes the six supplied source roots
 - **THEN** it selects documented canonical outputs, groups active LUTs under `<Brand>/<Source>`, and records the source path and provenance of every canonical LUT
+
+#### Scenario: Curate downloaded multi-site packs
+
+- **WHEN** a downloaded CUBE file parses through the application's supported 3D LUT path
+- **THEN** it is grouped by evidenced Brand and Source pack, receives an evidence-based Input Profile plus descriptive Tags, and remains separately addressable unless its transform fingerprint is an exact duplicate
+
+#### Scenario: Organise CINECOLOR packages
+
+- **WHEN** a package is named `CINECOLOR_*` or carries CINECOLOR's installation document
+- **THEN** Brand is `CINECOLOR`, Source is the CINECOLOR collection, and its cleaned package name remains visible as the Look folder
+
+#### Scenario: Organise a multi-camera vendor pack
+
+- **WHEN** SmallHD Movie Looks contains the same creative Look for several camera-log folders
+- **THEN** Brand remains `SmallHD`, Source remains `SmallHD Movie Looks 2`, and each camera folder determines the corresponding Input Profile rather than the Brand
+
+#### Scenario: Preserve separately authored versions
+
+- **WHEN** Codex, Claude, V-Log-Alchemy, or another source provides a similarly named Look with a different transform fingerprint
+- **THEN** every distinct implementation remains active under its own Source path
 
 #### Scenario: Encounter an exact duplicate
 

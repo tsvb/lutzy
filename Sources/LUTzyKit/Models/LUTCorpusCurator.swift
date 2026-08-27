@@ -109,7 +109,8 @@ public enum LUTCorpusCurator {
             guard let seeded = metadata[entry.sha256.lowercased()],
                   seeded.origin != .unknown,
                   seeded.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
-                  seeded.inputProfile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                  seeded.inputProfile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
+                  seeded.tags.isEmpty == false
             else {
                 throw CuratorError.verificationFailed("incomplete metadata for \(entry.relativePath)")
             }

@@ -16,9 +16,13 @@ LUTLibrary/
 
 The physical hierarchy answers where a transform belongs and where it came from. Brand remains a dedicated catalog namespace and does not become an ordinary Tag. A source subfolder prevents two independently generated looks with the same target brand from being conflated.
 
+Downloaded packs keep the same separation. `CINECOLOR_*`, plus packages carrying CINECOLOR's own installation document, use Brand `CINECOLOR`. Other packages use an evidenced maker or a stable pack-family label rather than pretending an input-camera folder is the maker. For example, SmallHD's multi-camera Movie Looks stay Brand `SmallHD`, Source `SmallHD Movie Looks 2`, while Canon/Sony/Panasonic folder names become precise Input Profiles. A Fujifilm visual family may therefore contain separately sourced Codex, Claude, and V-Log-Alchemy implementations without flattening Source into Brand or ordinary Tags.
+
 ## Canonicalisation
 
 The curator considers only `.cube` inputs. A candidate must contain a supported 3D size and parse through the same `CubeLUT` implementation used by the application before entering `LUTs/`. Exact SHA-256 duplicates keep one deterministic canonical file; the audit records skipped source paths. Unsupported 1D or unreadable inputs remain outside `LUTs/` and are reported rather than silently disappearing.
+
+Only exact transform fingerprints deduplicate. Similar names, the same target Look, or independently authored implementations remain separate when their transform fingerprints differ.
 
 Generated projects use their documented canonical output, not every historical release, staging directory, SD-card short-name copy, calibration derivative, archive, virtual environment, or test fixture. This prevents release history from masquerading as distinct looks.
 
