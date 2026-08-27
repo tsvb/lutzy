@@ -40,7 +40,14 @@ struct LUTRecord: Identifiable, Codable, Sendable, Equatable {
     var fingerprint: String
     var isAvailable: Bool
     var displayNameOverride: String?
+    /// Human-readable provenance or usage context. It is record metadata, not
+    /// a CUBE comment, so third-party transform bytes remain untouched.
+    var descriptionText: String? = nil
     var origin: LUTOrigin = .unknown
+    /// The precise encoded pixels this transform expects (for example
+    /// Panasonic V-Log or Sony S-Log3). This is catalog metadata and remains
+    /// separate from both the emulated-look Brand and descriptive Tags.
+    var inputProfile: String? = nil
     var typedTags: [String] = []
     /// Per-record curation of content-level measured tags. Optional keeps
     /// catalogs written before this field was introduced decode-compatible.
@@ -49,6 +56,12 @@ struct LUTRecord: Identifiable, Codable, Sendable, Equatable {
     var excludedMeasuredTags: [String]?
     var isStarred: Bool = false
     var collectionIDs: Set<UUID> = []
+    /// A repository manifest is an initial seed, not a live policy engine.
+    /// Once considered, rescans must not put metadata back after a user edit.
+    var curatedMetadataSeed: String? = nil
+    /// A one-time compatibility repair for catalogs created before Brand was
+    /// persisted. Optional keeps legacy snapshots decode-compatible.
+    var legacyBrandInferenceVersion: Int? = nil
 
     var url: URL { URL(fileURLWithPath: locator) }
 }
@@ -185,6 +198,15 @@ final class LUTCatalog: ObservableObject {
     }
 
     func origin(for lut: CubeLUT) -> LUTOrigin { record(for: lut)?.origin ?? .unknown }
+    func inputProfile(for lut: CubeLUT) -> String {
+        if let value = record(for: lut)?.inputProfile?
+            .trimmingCharacters(in: .whitespacesAndNewlines), value.isEmpty == false {
+            return value
+        }
+        return lut.inputSpace == .vlog ? "Panasonic V-Log" : "Display / Rec.709"
+    }
+    func description(for id: LUTRecordID) -> String { record(for: id)?.descriptionText ?? "" }
+    func description(for lut: CubeLUT) -> String { description(for: lut.lutID) }
     func typedTags(for lut: CubeLUT) -> [String] { record(for: lut)?.typedTags ?? [] }
     func excludedMeasuredTags(for id: LUTRecordID) -> [String] {
         record(for: id)?.excludedMeasuredTags ?? []
@@ -197,6 +219,66 @@ final class LUTCatalog: ObservableObject {
     func setDisplayName(_ name: String?, for ids: Set<LUTRecordID>) {
         let cleaned = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         mutate(ids) { $0.displayNameOverride = cleaned?.isEmpty == false ? cleaned : nil }
+    }
+
+    func setDescription(_ description: String?, for ids: Set<LUTRecordID>) {
+        let cleaned = description?.trimmingCharacters(in: .whitespacesAndNewlines)
+        mutate(ids) { $0.descriptionText = cleaned?.isEmpty == false ? cleaned : nil }
+    }
+
+    /// Seed repository-curated metadata exactly once per durable record.
+    /// Existing non-empty values win so adding sidecar support cannot erase a
+    /// catalog that the user already curated before this version.
+    func seedCuratedMetadata(
+        _ metadataByFingerprint: [String: CuratedLUTMetadata],
+        for luts: [CubeLUT]
+    ) {
+        var changed = false
+        for lut in luts {
+            guard let metadata = metadataByFingerprint[lut.contentHash],
+                  var record = records[lut.lutID]
+            else { continue }
+
+            var recordChanged = false
+            if record.curatedMetadataSeed == nil {
+                if record.descriptionText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+                   metadata.description.isEmpty == false {
+                    record.descriptionText = metadata.description
+                }
+                if record.origin == .unknown { record.origin = metadata.origin }
+                record.typedTags = Array(Set(record.typedTags + metadata.tags)).sorted()
+                record.curatedMetadataSeed = metadata.seedID
+                recordChanged = true
+            }
+            if record.inputProfile?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+                record.inputProfile = metadata.inputProfile
+                recordChanged = true
+            }
+            if recordChanged {
+                records[lut.lutID] = record
+                changed = true
+            }
+        }
+        if changed { persist() }
+    }
+
+    /// Repair the old local library shown before Brand metadata existed. Only
+    /// strong top-level folder or filename-prefix evidence participates, and a
+    /// record is considered once so a later user-authored Unknown remains so.
+    func inferMissingOrigins(for luts: [CubeLUT]) {
+        var changed = false
+        for lut in luts {
+            guard var record = records[lut.lutID],
+                  record.origin == .unknown,
+                  record.legacyBrandInferenceVersion == nil,
+                  let inferred = Self.inferredLegacyOrigin(for: lut)
+            else { continue }
+            record.origin = inferred
+            record.legacyBrandInferenceVersion = 1
+            records[lut.lutID] = record
+            changed = true
+        }
+        if changed { persist() }
     }
 
     func setOrigin(_ origin: LUTOrigin, for ids: Set<LUTRecordID>) {
@@ -616,5 +698,20 @@ final class LUTCatalog: ObservableObject {
 
     private static func isInside(_ locator: String, root: String) -> Bool {
         locator == root || locator.hasPrefix(root + "/")
+    }
+
+    private static func inferredLegacyOrigin(for lut: CubeLUT) -> LUTOrigin? {
+        let folder = lut.category.split(separator: "/").first.map(String.init) ?? ""
+        let prefix = lut.name.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? ""
+        let key = (folder.isEmpty || folder == "General" ? prefix : folder)
+            .trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
+        let names: [String: String] = [
+            "arri": "ARRI", "blackmagic": "Blackmagic Design", "blackmagic design": "Blackmagic Design",
+            "canon": "Canon", "dji": "DJI", "fuji": "Fujifilm", "fujifilm": "Fujifilm",
+            "gopro": "GoPro", "hasselblad": "Hasselblad", "leica": "Leica", "nikon": "Nikon",
+            "panasonic": "Panasonic", "panasonic-standard": "Panasonic", "red": "RED",
+            "ricoh": "RICOH", "sony": "Sony"
+        ]
+        return names[key].map(LUTOrigin.vendor)
     }
 }

@@ -1358,10 +1358,15 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    /// The Manager's user-facing Brand column. This is deliberately the catalog's persisted
-    /// Brand / Source value — never an inference from the physical folder, filename, or Tags.
+    /// The Manager's user-facing Brand column. This is the catalog's persisted
+    /// Brand / Source value. A one-time legacy migration may seed it from
+    /// unambiguous folder/name evidence; the UI never performs live inference.
     func managerBrandLabel(for lut: CubeLUT) -> String {
         catalog.origin(for: lut).label
+    }
+
+    func managerInputLabel(for lut: CubeLUT) -> String {
+        catalog.inputProfile(for: lut)
     }
 
     /// Star or unstar a whole selection.

@@ -215,7 +215,6 @@ final class LUTLibrary: ObservableObject {
                     continue
                 }
                 while let url = walker.nextObject() as? URL {
-                    guard url.pathExtension.lowercased() == "cube" else { continue }
                     let path = url.resolvingSymlinksInPath().path
                     let relative = path.hasPrefix(root)
                         ? String(path.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -224,7 +223,11 @@ final class LUTLibrary: ObservableObject {
                     let folder = subfolder.isEmpty
                         ? top
                         : top.appendingPathComponent(subfolder.joined(separator: "/"), isDirectory: true)
-                    copyOne(url, into: folder, existing: &existing, result: &result)
+                    if url.pathExtension.lowercased() == "cube" {
+                        copyOne(url, into: folder, existing: &existing, result: &result)
+                    } else if url.lastPathComponent == CuratedLUTManifest.fileName {
+                        copyCuratedManifest(url, into: folder, result: &result)
+                    }
                 }
             } else if source.pathExtension.lowercased() == "cube" {
                 copyOne(source, into: destination, existing: &existing, result: &result)
@@ -262,6 +265,29 @@ final class LUTLibrary: ObservableObject {
             existing.insert(hash)
             result.imported += 1
             result.importedURLs.append(destination.standardizedFileURL)
+        } catch {
+            result.failed += 1
+        }
+    }
+
+    private nonisolated static func copyCuratedManifest(
+        _ source: URL, into folder: URL, result: inout ImportResult
+    ) {
+        guard (try? CuratedLUTManifest.load(from: source)) != nil,
+              let data = try? Data(contentsOf: source)
+        else {
+            result.failed += 1
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let destination = folder.appendingPathComponent(CuratedLUTManifest.fileName)
+            if FileManager.default.fileExists(atPath: destination.path),
+               let existing = try? Data(contentsOf: destination), existing != data {
+                result.failed += 1
+                return
+            }
+            try data.write(to: destination, options: .atomic)
         } catch {
             result.failed += 1
         }
@@ -373,6 +399,11 @@ final class LUTLibrary: ObservableObject {
             case .success(let cats):
                 self.scanError = nil
                 let reconciled = self.catalog.reconcile(cats, scannedRoot: folder)
+                self.catalog.seedCuratedMetadata(
+                    CuratedLUTManifest.metadataUnder(folder),
+                    for: reconciled.flatMap(\.luts)
+                )
+                self.catalog.inferMissingOrigins(for: reconciled.flatMap(\.luts))
                 self.categories = reconciled
                 self.allLUTs = reconciled.flatMap(\.luts)
             }

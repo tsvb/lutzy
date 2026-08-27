@@ -33,3 +33,9 @@ build/
 
 # Local real-world test assets (large RAW/JPG fixtures, not for version control)
 realworldtest/
+
+# Local curated LUT binaries. Source/license review and a Git LFS policy must
+# be completed before publishing these large third-party assets. The manifest,
+# audit, and curator remain tracked so this local corpus is reproducible.
+/LUTLibrary/LUTs/**/*.cube
+/LUTLibrary/Unsupported/**/*.cube

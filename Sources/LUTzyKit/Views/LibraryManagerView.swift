@@ -9,6 +9,8 @@ struct LUTManagerSelectionState: Equatable {
     let commonTags: [String]
     let mixedTags: [String]
     let commonOrigin: LUTOrigin?
+    let commonDescription: String?
+    let hasMixedDescription: Bool
     let allStarred: Bool
 
     init(
@@ -25,6 +27,9 @@ struct LUTManagerSelectionState: Equatable {
         mixedTags = union.subtracting(common).sorted()
         let origins = Set(records.map(\.origin))
         commonOrigin = origins.count == 1 ? origins.first : nil
+        let descriptions = Set(records.map { $0.descriptionText ?? "" })
+        commonDescription = descriptions.count == 1 ? descriptions.first : nil
+        hasMixedDescription = descriptions.count > 1
         allStarred = records.isEmpty == false && records.allSatisfy(\.isStarred)
     }
 
@@ -50,6 +55,7 @@ struct LibraryManagerView: View {
     @State private var newTag = ""
     @State private var newFolder = ""
     @State private var displayName = ""
+    @State private var descriptionDraft = ""
     @State private var originChoice: OriginChoice = .unknown
     @State private var vendorName = ""
     @State private var inspectorFolder = ""
@@ -147,12 +153,22 @@ struct LibraryManagerView: View {
                 }
                 .width(min: 80, ideal: 110)
 
-                TableColumn("Input") { row in
-                    Text(row.lut.inputSpace == .vlog ? "V-Log" : "Display")
+                TableColumn("Description") { row in
+                    let description = viewModel.catalog.description(for: row.lut)
+                    Text(description.isEmpty ? "—" : description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .width(60)
+                .width(min: 130, ideal: 220)
+
+                TableColumn("Input") { row in
+                    Text(viewModel.managerInputLabel(for: row.lut))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .width(min: 90, ideal: 130)
 
                 TableColumn("Tags") { row in
                     // Measured and typed together: from here they are all just
@@ -184,13 +200,15 @@ struct LibraryManagerView: View {
                 if selection.isEmpty {
                     ContentUnavailableView(
                         "Select LUTs", systemImage: "slider.horizontal.3",
-                        description: Text("Edit Name, Brand / Source, Tags, folders, Starred, and Collections here.")
+                        description: Text("Edit Name, Brand / Source, Description, Tags, folders, Starred, and Collections here.")
                     )
                     .frame(maxWidth: .infinity)
                 } else {
                     nameSection
                     Divider()
                     originSection
+                    Divider()
+                    descriptionSection
                     Divider()
                     tagsSection
                     Divider()
@@ -252,6 +270,39 @@ struct LibraryManagerView: View {
                 Button("Apply Brand", action: commitOrigin).buttonStyle(.bordered)
             }
             Text("Used for Brand browsing; it does not change the LUT file.")
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+
+    private var descriptionSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Description").font(.subheadline.weight(.semibold))
+            if selectionState.hasMixedDescription {
+                Text("Mixed descriptions. Applying replaces the Description on all selected LUTs.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            TextEditor(text: $descriptionDraft)
+                .font(.body)
+                .frame(minHeight: 72, maxHeight: 130)
+                .padding(5)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                }
+                .accessibilityLabel("Description")
+            HStack {
+                Button(selection.count == 1 ? "Apply" : "Apply to \(selection.count) LUTs") {
+                    commitDescription()
+                }
+                .buttonStyle(.bordered)
+                Button("Clear") {
+                    descriptionDraft = ""
+                    commitDescription()
+                }
+                .buttonStyle(.borderless)
+            }
+            Text("Provenance and context only; the .cube file is not changed.")
                 .font(.caption2).foregroundStyle(.tertiary)
         }
     }
@@ -429,10 +480,12 @@ struct LibraryManagerView: View {
 
     private func refreshInspectorDrafts() {
         guard let first = selected.first else {
-            displayName = ""; originChoice = .unknown; vendorName = ""; inspectorFolder = ""; newFolder = ""; return
+            displayName = ""; descriptionDraft = ""; originChoice = .unknown
+            vendorName = ""; inspectorFolder = ""; newFolder = ""; return
         }
         displayName = selected.count == 1
             ? (viewModel.catalog.record(for: first)?.displayNameOverride ?? "") : ""
+        descriptionDraft = selectionState.commonDescription ?? ""
         inspectorFolder = selected.count == 1 ? (selectedRows.first?.category ?? "") : ""
         newFolder = ""
         guard let origin = selectionState.commonOrigin else {
@@ -448,6 +501,11 @@ struct LibraryManagerView: View {
     private func commitDisplayName() {
         guard selection.count == 1 else { return }
         viewModel.catalog.setDisplayName(displayName, for: selectedIDs)
+    }
+
+    private func commitDescription() {
+        viewModel.catalog.setDescription(descriptionDraft, for: selectedIDs)
+        refreshInspectorDrafts()
     }
 
     private func commitOrigin() {

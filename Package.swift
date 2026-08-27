@@ -11,6 +11,7 @@ let package = Package(
     products: [
         .executable(name: "LUTzy", targets: ["LUTzy"]),
         .executable(name: "lutcheck", targets: ["lutcheck"]),
+        .executable(name: "lutcurate", targets: ["lutcurate"]),
         .library(name: "LUTzyKit", targets: ["LUTzyKit"]),
     ],
     targets: [
@@ -39,6 +40,11 @@ let package = Package(
         ),
         .executableTarget(
             name: "lutcheck",
+            dependencies: ["LUTzyKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .executableTarget(
+            name: "lutcurate",
             dependencies: ["LUTzyKit"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

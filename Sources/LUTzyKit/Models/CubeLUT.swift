@@ -135,7 +135,13 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         }
         self.name = cleaned
 
-        let content = try String(contentsOf: url, encoding: .utf8)
+        let sourceData = try Data(contentsOf: url)
+        guard let content = String(data: sourceData, encoding: .utf8)
+                ?? String(data: sourceData, encoding: .windowsCP1252)
+                ?? String(data: sourceData, encoding: .isoLatin1)
+        else {
+            throw LUTError.invalidFormat("Unsupported text encoding")
+        }
         let lines = content.components(separatedBy: .newlines)
 
         var photoStyle: String? = nil
@@ -145,7 +151,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         var rows: [(Float, Float, Float)] = []
 
         for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             if trimmed.hasPrefix("#") {
                 // #LUMIXPHOTOSTYLE <TAG> declares the base Photo Style, i.e. the
@@ -155,23 +161,23 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
                 if upper.hasPrefix("#LUMIXPHOTOSTYLE") {
                     photoStyle = trimmed
                         .dropFirst("#LUMIXPHOTOSTYLE".count)
-                        .trimmingCharacters(in: .whitespaces)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
                 }
                 continue
             }
 
             if trimmed.hasPrefix("LUT_3D_SIZE") {
-                let parts = trimmed.split(separator: " ")
+                let parts = trimmed.split(whereSeparator: { $0.isWhitespace })
                 guard parts.count >= 2, let s = Int(parts[1]) else { continue }
                 lutSize = s
             } else if trimmed.hasPrefix("DOMAIN_MIN") {
-                let parts = trimmed.split(separator: " ").compactMap { Float($0) }
+                let parts = trimmed.split(whereSeparator: { $0.isWhitespace }).compactMap { Float($0) }
                 if parts.count >= 3 { domainMin = SIMD3(parts[0], parts[1], parts[2]) }
             } else if trimmed.hasPrefix("DOMAIN_MAX") {
-                let parts = trimmed.split(separator: " ").compactMap { Float($0) }
+                let parts = trimmed.split(whereSeparator: { $0.isWhitespace }).compactMap { Float($0) }
                 if parts.count >= 3 { domainMax = SIMD3(parts[0], parts[1], parts[2]) }
             } else if !trimmed.hasPrefix("TITLE") {
-                let parts = trimmed.split(separator: " ")
+                let parts = trimmed.split(whereSeparator: { $0.isWhitespace })
                 if parts.count == 3,
                    let r = Float(parts[0]),
                    let g = Float(parts[1]),

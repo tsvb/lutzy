@@ -1,0 +1,75 @@
+# Design: repository-local curated LUT corpus and Description metadata
+
+## Corpus layout
+
+The repository owns a top-level `LUTLibrary/` workspace:
+
+```text
+LUTLibrary/
+  LUTs/                         active, renderable, unique 3D LUTs
+    .lutzy-library.json         metadata sidecar
+    <Brand>/<Source>/…/*.cube
+  Unsupported/                  retained outside the active scan root
+  README.md                     regeneration and Git/LFS guidance
+  SOURCE_AUDIT.md               source, license, exclusion, and tally audit
+```
+
+The physical hierarchy answers where a transform belongs and where it came from. Brand remains a dedicated catalog namespace and does not become an ordinary Tag. A source subfolder prevents two independently generated looks with the same target brand from being conflated.
+
+## Canonicalisation
+
+The curator considers only `.cube` inputs. A candidate must contain a supported 3D size and parse through the same `CubeLUT` implementation used by the application before entering `LUTs/`. Exact SHA-256 duplicates keep one deterministic canonical file; the audit records skipped source paths. Unsupported 1D or unreadable inputs remain outside `LUTs/` and are reported rather than silently disappearing.
+
+Generated projects use their documented canonical output, not every historical release, staging directory, SD-card short-name copy, calibration derivative, archive, virtual environment, or test fixture. This prevents release history from masquerading as distinct looks.
+
+The curation operation is reproducible and does not mutate or delete any supplied source directory.
+
+## Manifest contract
+
+`.lutzy-library.json` is versioned and contains:
+
+- source definitions with stable IDs, labels, descriptions, reference URLs or local-reference status, and license status;
+- one entry per active canonical LUT with relative path, SHA-256 fingerprint, Brand / Source value, Input Profile, descriptive Tags, and a source ID;
+- audit information for duplicates and unsupported candidates.
+
+The SHA-256 fingerprint is the durable join. Import may rename a file to avoid a basename collision, and the user may later move it between physical folders, without losing the seed metadata.
+
+## Catalog seeding
+
+`LUTRecord` gains an optional `descriptionText` and an optional manifest-seed marker. Old snapshots decode with nil values.
+
+After a scan reconciles physical LUTs, the library loads any valid `.lutzy-library.json` sidecars under the scanned root and offers matching fingerprint metadata to the catalog. The catalog applies a manifest entry at most once to a record:
+
+- Description is seeded from the source or entry description.
+- Brand is seeded into the dedicated `LUTOrigin` namespace.
+- Input Profile is seeded as dedicated record metadata. It describes what image encoding the LUT expects, and is not inferred from the emulated-look Brand or stored as an ordinary Tag.
+- Tags are seeded into record-level typed Tags, excluding internal `input:*` values.
+- A seed marker records that the manifest was considered.
+
+Once seeded, later scans never overwrite user changes. A malformed or unsupported manifest cannot prevent ordinary LUT scanning.
+
+## Input-profile evidence and runtime boundary
+
+The curator records the most specific defensible input profile, using evidence in this order: an explicit CUBE photo-style/header declaration, an upstream per-file or package contract, then an unambiguous filename or containing folder. Conflicting or absent evidence becomes `Unknown`. The profile vocabulary is human-readable and extensible because vendor generations such as C-Log 1/2/3, F-Log/F-Log2, and S-Log2/S-Log3 are operationally distinct.
+
+Brand describes the maker or visual family being organised. Input Profile describes the encoded pixels the transform accepts. For example, Codex/Claude Fujifilm-look files remain Brand `Fujifilm` with Input Profile `Panasonic V-Log`; V-Log-Alchemy `*S2V` adapters are Brand `Panasonic` with Input Profile `Panasonic STD`.
+
+`CubeLUT.inputSpace` remains the rendering pipeline's current coarse adapter choice. Manifest Input Profile is truthful catalog metadata and does not silently pretend LUTzy implements every vendor log-to-display adapter. Panasonic V-Log keeps the existing automatic V-Log route; other camera-log profiles are presented explicitly instead of being mislabeled as Display.
+
+## Conservative legacy Brand migration
+
+Existing catalog records may predate Brand metadata even when their physical top-level folder or filename starts with an unambiguous known brand. After reconcile and manifest seeding, a one-time migration fills only `Unknown` Brand values from this narrow mapping. It records that inference was applied so a later deliberate user change to `Unknown` is not undone. Ambiguous folders and names remain `Unknown`.
+
+## Import
+
+Folder import continues to copy renderable `.cube` files. When a selected folder contains a valid `.lutzy-library.json`, import copies the sidecar beside the copied hierarchy. The normal post-copy scan then performs metadata seeding. Generic folders without a sidecar behave exactly as before.
+
+## Description editing and presentation
+
+LUT Manager exposes Description as a table column so missing provenance is visible at list scale. The Inspector edits one Description directly and applies an explicit batch Description only when the user asks; it does not infer content from a filename. LUT Library detail displays a non-empty Description beneath the core transform facts.
+
+Description is prose provenance/context. It is not a Brand, Tag, filename, transform comment, or colour-processing instruction.
+
+## Git boundary
+
+The corpus is prepared inside the repository, but the initial implementation does not silently commit gigabytes of third-party assets or invent redistribution permission. `SOURCE_AUDIT.md` makes pending references explicit. Git LFS or another binary policy can be adopted when the user chooses to publish the corpus.

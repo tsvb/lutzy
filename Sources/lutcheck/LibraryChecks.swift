@@ -142,6 +142,184 @@ func runDurableLibraryChecks() async -> Bool {
         let managerBrandColumnOK = managerBrandDefaultsOK && managerVendorBrandOK
         print("Manager Brand column uses persisted Brand / Source -> \(managerBrandColumnOK ? "PASS" : "FAIL")")
 
+        // A repository sidecar joins by immutable content fingerprint, seeds
+        // record metadata once, and then gets out of the user's way.
+        let curatedSource = root.appendingPathComponent("Curated Source", isDirectory: true)
+        try FileManager.default.createDirectory(at: curatedSource, withIntermediateDirectories: true)
+        let curatedCubeURL = curatedSource.appendingPathComponent("look.cube")
+        try cubeText.write(to: curatedCubeURL, atomically: true, encoding: .utf8)
+        let curatedCube = try CubeLUT(url: curatedCubeURL)
+        let manifestURL = curatedSource.appendingPathComponent(CuratedLUTManifest.fileName)
+        let manifestJSON = """
+        {
+          "version": 1,
+          "sources": {
+            "codex": {
+              "label": "Codex",
+              "description": "Codex 產生；測試用 V-Log LUT。",
+              "reference": null,
+              "license": "project-owned"
+            }
+          },
+          "entries": [
+            {
+              "relativePath": "look.cube",
+              "sha256": "\(curatedCube.contentHash)",
+              "brand": "Fujifilm",
+              "inputProfile": "Panasonic V-Log",
+              "tags": ["相機風格", "完成色", "input:vlog"],
+              "sourceID": "codex",
+              "description": null
+            }
+          ],
+          "duplicates": [],
+          "unsupported": []
+        }
+        """
+        try manifestJSON.write(to: manifestURL, atomically: true, encoding: .utf8)
+        let manifest = try CuratedLUTManifest.load(from: manifestURL)
+        let manifestCatalogURL = root.appendingPathComponent("manifest-catalog.json")
+        let manifestCatalog = LUTCatalog(fileURL: manifestCatalogURL)
+        guard let curatedID = manifestCatalog.adoptSavedLUT(curatedCube) else {
+            print("curated LUT manifest metadata -> FAIL")
+            return false
+        }
+        manifestCatalog.seedCuratedMetadata(
+            manifest.metadataByFingerprint,
+            for: [curatedCube.withRecordID(curatedID)]
+        )
+        let firstSeedOK = manifestCatalog.record(for: curatedID)?.origin == .vendor("Fujifilm")
+            && manifestCatalog.record(for: curatedID)?.inputProfile == "Panasonic V-Log"
+            && manifestCatalog.record(for: curatedID)?.typedTags == ["完成色", "相機風格"]
+            && manifestCatalog.description(for: curatedID) == "Codex 產生；測試用 V-Log LUT。"
+        manifestCatalog.setDescription("使用者改寫", for: [curatedID])
+        manifestCatalog.setOrigin(.custom, for: [curatedID])
+        manifestCatalog.removeTag("完成色", from: [curatedID])
+        manifestCatalog.seedCuratedMetadata(
+            manifest.metadataByFingerprint,
+            for: [curatedCube.withRecordID(curatedID)]
+        )
+        let userEditSurvivesRescan = manifestCatalog.record(for: curatedID)?.origin == .custom
+            && manifestCatalog.record(for: curatedID)?.typedTags == ["相機風格"]
+            && manifestCatalog.description(for: curatedID) == "使用者改寫"
+        let manifestRelaunch = LUTCatalog(fileURL: manifestCatalogURL)
+        let descriptionPersists = manifestRelaunch.description(for: curatedID) == "使用者改寫"
+        let inputProfilePersists = manifestRelaunch.inputProfile(for: curatedCube.withRecordID(curatedID))
+            == "Panasonic V-Log"
+
+        // Records created before Brand metadata existed get one conservative
+        // repair from an unambiguous folder/name. The migration is one-shot:
+        // explicitly setting Unknown afterwards is a user choice and must win.
+        let legacyBrandURL = root.appendingPathComponent("fuji/fuji-vlog-provia.cube")
+        try FileManager.default.createDirectory(
+            at: legacyBrandURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try cubeText.write(to: legacyBrandURL, atomically: true, encoding: .utf8)
+        let legacyBrandLUT = try CubeLUT(url: legacyBrandURL, category: "fuji")
+        guard let legacyBrandID = manifestCatalog.adoptSavedLUT(legacyBrandLUT) else { return false }
+        let durableLegacyBrandLUT = legacyBrandLUT.withRecordID(legacyBrandID)
+        manifestCatalog.inferMissingOrigins(for: [durableLegacyBrandLUT])
+        let legacyBrandSeeded = manifestCatalog.origin(for: durableLegacyBrandLUT) == .vendor("Fujifilm")
+        manifestCatalog.setOrigin(.unknown, for: [legacyBrandID])
+        manifestCatalog.inferMissingOrigins(for: [durableLegacyBrandLUT])
+        let legacyBrandUserEditWins = manifestCatalog.origin(for: durableLegacyBrandLUT) == .unknown
+
+        let importedRoot = root.appendingPathComponent("Curated Import", isDirectory: true)
+        let curatedImport = LUTLibrary.copyIn([curatedSource], to: importedRoot)
+        let importedSidecar = importedRoot
+            .appendingPathComponent(curatedSource.lastPathComponent, isDirectory: true)
+            .appendingPathComponent(CuratedLUTManifest.fileName)
+        let sidecarImportOK = curatedImport.imported == 1
+            && FileManager.default.fileExists(atPath: importedSidecar.path)
+            && (try? CuratedLUTManifest.load(from: importedSidecar)) != nil
+        let curatedManifestOK = firstSeedOK && userEditSurvivesRescan
+            && descriptionPersists && inputProfilePersists && sidecarImportOK
+            && legacyBrandSeeded && legacyBrandUserEditWins
+        print("curated LUT manifest seeds Brand/Input/Tags/Description and repairs legacy Brand once -> \(curatedManifestOK ? "PASS" : "FAIL")")
+
+        let curatorSource = root.appendingPathComponent("Curator Inputs", isDirectory: true)
+        try FileManager.default.createDirectory(at: curatorSource, withIntermediateDirectories: true)
+        let curatorA = curatorSource.appendingPathComponent("A.cube")
+        let curatorDuplicate = curatorSource.appendingPathComponent("A duplicate.cube")
+        let curatorTabbed = curatorSource.appendingPathComponent("tabbed.cube")
+        let curatorLatin1 = curatorSource.appendingPathComponent("latin1.cube")
+        let curator1D = curatorSource.appendingPathComponent("shaper.cube")
+        try cubeText.write(to: curatorA, atomically: true, encoding: .utf8)
+        try cubeText.write(to: curatorDuplicate, atomically: true, encoding: .utf8)
+        try cubeText.replacingOccurrences(of: "LUT_3D_SIZE 2", with: "LUT_3D_SIZE\t2")
+            .replacingOccurrences(of: "0.000000 0.000000 0.000000", with: "0.001000\t0.000000\t0.000000")
+            .write(to: curatorTabbed, atomically: true, encoding: .utf8)
+        let latin1Cube = "# Crème LUT\n" + cubeText.replacingOccurrences(
+            of: "0.000000 0.000000 0.000000", with: "0.002000 0.000000 0.000000"
+        )
+        guard let latin1Data = latin1Cube.data(using: .isoLatin1) else { return false }
+        try latin1Data.write(to: curatorLatin1)
+        try "LUT_1D_SIZE 2\n0 0 0\n1 1 1\n".write(
+            to: curator1D, atomically: true, encoding: .utf8
+        )
+        let curatedOutput = root.appendingPathComponent("Generated Corpus", isDirectory: true)
+        let curatorResult = try LUTCorpusCurator.curate(
+            sources: [
+                .init(
+                    id: "codex", label: "Codex",
+                    description: "Codex 產生。", reference: nil, license: "project-owned"
+                )
+            ],
+            candidates: [
+                .init(
+                    url: curatorA, sourceID: "codex", sourcePath: "A.cube",
+                    destinationRelativePath: "Fujifilm/Codex/A.cube",
+                    brand: "Fujifilm", inputProfile: "Panasonic V-Log",
+                    tags: ["相機風格"], priority: 0
+                ),
+                .init(
+                    url: curatorDuplicate, sourceID: "codex", sourcePath: "A duplicate.cube",
+                    destinationRelativePath: "Fujifilm/Codex/A duplicate.cube",
+                    brand: "Fujifilm", inputProfile: "Panasonic V-Log",
+                    tags: ["相機風格"], priority: 1
+                ),
+                .init(
+                    url: curatorTabbed, sourceID: "codex", sourcePath: "tabbed.cube",
+                    destinationRelativePath: "Fujifilm/Codex/tabbed.cube",
+                    brand: "Fujifilm", inputProfile: "Panasonic V-Log",
+                    tags: ["相機風格"], priority: 1
+                ),
+                .init(
+                    url: curatorLatin1, sourceID: "codex", sourcePath: "latin1.cube",
+                    destinationRelativePath: "Fujifilm/Codex/latin1.cube",
+                    brand: "Fujifilm", inputProfile: "Panasonic V-Log",
+                    tags: ["相機風格"], priority: 1
+                ),
+                .init(
+                    url: curator1D, sourceID: "codex", sourcePath: "shaper.cube",
+                    destinationRelativePath: "Fujifilm/Codex/shaper.cube",
+                    brand: "Fujifilm", inputProfile: "Panasonic V-Log",
+                    tags: ["技術轉換"], priority: 2
+                ),
+            ],
+            outputRoot: curatedOutput
+        )
+        let generatedManifest = try CuratedLUTManifest.load(
+            from: curatedOutput.appendingPathComponent("LUTs/\(CuratedLUTManifest.fileName)")
+        )
+        let verifiedCorpus = try LUTCorpusCurator.verify(outputRoot: curatedOutput)
+        let curatorOK = curatorResult.active == 3
+            && curatorResult.duplicates == 1
+            && curatorResult.unsupported == 1
+            && generatedManifest.entries.count == 3
+            && generatedManifest.entries.first?.brand == "Fujifilm"
+            && generatedManifest.entries.first?.inputProfile == "Panasonic V-Log"
+            && verifiedCorpus.active == 3
+            && generatedManifest.entries.first?.tags == ["相機風格"]
+            && FileManager.default.fileExists(
+                atPath: curatedOutput.appendingPathComponent("LUTs/Fujifilm/Codex/A.cube").path
+            )
+            && FileManager.default.fileExists(
+                atPath: curatedOutput.appendingPathComponent("Unsupported/Fujifilm/Codex/shaper.cube").path
+            )
+            && FileManager.default.fileExists(atPath: curatorA.path)
+        print("repository LUT curator deduplicates and separates unsupported transforms -> \(curatorOK ? "PASS" : "FAIL")")
+
         let brandShelves = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
         let tagShelves = recoveryViewModel.libraryDiscoveryShelves(for: .tag)
         let collectionShelves = recoveryViewModel.libraryDiscoveryShelves(for: .collectionAndStar)
@@ -324,7 +502,8 @@ func runDurableLibraryChecks() async -> Bool {
         print("durable Media Library -> \(mediaOK ? "PASS" : "FAIL")")
         return catalogOK && mixedSelectionTagOK && visibleTagEditingOK && recoveryOK
             && recoveredSessionOK && discoveryOK && focusRecoveryOK
-            && managerBrandColumnOK && previewCacheOK && legacyMigrationOK && mediaOK
+            && managerBrandColumnOK && curatedManifestOK && curatorOK
+            && previewCacheOK && legacyMigrationOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")
         return false

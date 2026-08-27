@@ -328,9 +328,16 @@ private struct LUTLibraryDetailView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(viewModel.catalog.effectiveName(for: lut))
                             .font(.title2.weight(.semibold))
-                        LabeledContent("Origin", value: viewModel.catalog.origin(for: lut).label)
-                        LabeledContent("Input", value: lut.inputSpace == .vlog ? "V-Log" : "Display")
+                        LabeledContent("Brand / Source", value: viewModel.catalog.origin(for: lut).label)
+                        LabeledContent("Input Profile", value: viewModel.managerInputLabel(for: lut))
                         LabeledContent("Size", value: "\(lut.size)³")
+                        let description = viewModel.catalog.description(for: lut)
+                        if description.isEmpty == false {
+                            Text("Description").font(.subheadline.weight(.semibold))
+                            Text(description)
+                                .font(.body)
+                                .textSelection(.enabled)
+                        }
                         LabeledContent("Sample", value: viewModel.selectedLibrarySample.name)
                         Text(viewModel.selectedLibrarySample.note)
                             .font(.caption).foregroundStyle(.secondary)
