@@ -8,6 +8,13 @@ import SwiftUI
 /// panel and the tags can never disagree.
 struct LUTInspectorView: View {
     @ObservedObject var viewModel: AppViewModel
+    @State private var curveSamples: [Float]?
+
+    private static let curveSteps = 64
+    private static let curveProbe = (0...curveSteps).flatMap { step -> [Float] in
+        let value = Float(step) / Float(curveSteps)
+        return [value, value, value]
+    }
 
     var body: some View {
         // Scrolled and pinned to the top, like the other tabs. A bare stack
@@ -17,7 +24,7 @@ struct LUTInspectorView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if let lut = viewModel.selectedLUT {
                     header(lut)
-                    curve(lut)
+                    curve(lut, sampled: curveSamples)
                     if let metrics = viewModel.tags.metrics(for: lut) {
                         numbers(metrics)
                     }
@@ -33,6 +40,15 @@ struct LUTInspectorView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+        }
+        .task(id: viewModel.selectedLUT?.contentHash) {
+            curveSamples = nil
+            guard let lut = viewModel.selectedLUT else { return }
+            let sampled = await viewModel.lutMaterializationCache.sample(
+                Self.curveProbe, from: lut
+            )
+            guard Task.isCancelled == false else { return }
+            curveSamples = sampled
         }
     }
 
@@ -53,14 +69,7 @@ struct LUTInspectorView: View {
     /// One line each rather than a single luma curve, because the gap between
     /// them *is* the colour cast — a warm look shows as red above blue, which a
     /// combined curve would average away.
-    private func curve(_ lut: CubeLUT) -> some View {
-        let steps = 64
-        let probe = (0...steps).flatMap { step -> [Float] in
-            let v = Float(step) / Float(steps)
-            return [v, v, v]
-        }
-        let sampled = lut.sample(probe)
-
+    private func curve(_ lut: CubeLUT, sampled: [Float]?) -> some View {
         return VStack(alignment: .leading, spacing: 6) {
             Text("Response on grey")
                 .font(.subheadline.weight(.semibold))
@@ -76,16 +85,22 @@ struct LUTInspectorView: View {
                     }
                     .stroke(Color.white.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
 
-                    ForEach(Array(channels.enumerated()), id: \.offset) { index, channel in
-                        Path { path in
-                            for step in 0...steps {
-                                let x = geo.size.width * CGFloat(step) / CGFloat(steps)
-                                let value = CGFloat(sampled[step * 3 + index])
-                                let point = CGPoint(x: x, y: geo.size.height * (1 - value))
-                                if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                    if let sampled, sampled.count >= (Self.curveSteps + 1) * 3 {
+                        ForEach(Array(channels.enumerated()), id: \.offset) { index, channel in
+                            Path { path in
+                                for step in 0...Self.curveSteps {
+                                    let x = geo.size.width * CGFloat(step) / CGFloat(Self.curveSteps)
+                                    let value = CGFloat(sampled[step * 3 + index])
+                                    let point = CGPoint(x: x, y: geo.size.height * (1 - value))
+                                    if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                                }
                             }
+                            .stroke(channel, lineWidth: 1.5)
                         }
-                        .stroke(channel, lineWidth: 1.5)
+                    } else {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
                 .padding(6)

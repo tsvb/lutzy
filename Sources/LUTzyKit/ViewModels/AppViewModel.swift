@@ -235,6 +235,9 @@ final class AppViewModel: ObservableObject {
     /// The baked result, held so the editor can save exactly what is on screen.
     @Published var editedLUT: CubeLUT?
     var editorPreviewTask: Task<Void, Never>?
+    var editorMaterializeTask: Task<Void, Never>?
+    var editorBaseMaterialized: CubeLUT?
+    var editorStackMaterialized: CubeLUT?
 
     /// Inspector visibility. Computing the histogram is gated on this — plus on the Info tab being
     /// the one on screen — so we don't tally pixels for a panel nobody's looking at.
@@ -367,6 +370,9 @@ final class AppViewModel: ObservableObject {
             if oldValue == .lutLibrary && section != .lutLibrary {
                 setLUTDetailFocused(false)
             }
+            if oldValue == .editor && section != .editor {
+                editorMaterializeTask?.cancel()
+            }
             scheduleSessionSave()
         }
     }
@@ -395,6 +401,7 @@ final class AppViewModel: ObservableObject {
     private var originalPreviewTask: Task<Void, Never>?
     private var intensityTask: Task<Void, Never>?
     private let lutGalleryPreviewCache = LUTGalleryPreviewCache()
+    let lutMaterializationCache = LUTMaterializationCache()
     private var cancellables: [AnyCancellable] = []
 
     // MARK: - Init
@@ -612,12 +619,18 @@ final class AppViewModel: ObservableObject {
     func migrateLegacyLUTReferences() {
         let previousDocumentID = document.lut.lutID
         let previousCells = cellLUTIDs
+        let previousEditorBaseID = editorBaseID
+        let previousEditorStackID = editorStackID
         if let id = document.lut.lutID { document.lut.lutID = library.migratedRecordID(for: id) }
         cellLUTIDs = cellLUTIDs.map { $0.map(library.migratedRecordID(for:)) }
         if let id = editorBaseID { editorBaseID = library.migratedRecordID(for: id) }
         if let id = editorStackID { editorStackID = library.migratedRecordID(for: id) }
         if document.lut.lutID != previousDocumentID || cellLUTIDs != previousCells {
             scheduleMigratedSessionSave()
+        }
+        if section == .editor,
+           editorBaseID != previousEditorBaseID || editorStackID != previousEditorStackID {
+            prepareEditorLUTsAndRefresh()
         }
     }
 

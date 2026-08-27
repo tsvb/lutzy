@@ -40,7 +40,7 @@ extension AppViewModel {
         // against eight other LUTs, which is what a grid left over from the
         // viewer would show.
         showBaseAgainstEdit()
-        refreshEditedPreview()
+        prepareEditorLUTsAndRefresh()
     }
 
     func setEdit(_ transform: (inout LookEdit) -> Void) {
@@ -51,7 +51,7 @@ extension AppViewModel {
     func setEditorBase(_ lut: CubeLUT?) {
         editorBaseID = lut?.lutID
         showBaseAgainstEdit()
-        refreshEditedPreview()
+        prepareEditorLUTsAndRefresh()
     }
 
     /// Put the unedited base on the left and the edit on the right.
@@ -65,14 +65,19 @@ extension AppViewModel {
 
     func setEditorStack(_ lut: CubeLUT?) {
         editorStackID = lut?.lutID
-        refreshEditedPreview()
+        prepareEditorLUTsAndRefresh()
     }
 
     func resetEdit() {
         editorEdit = .neutral
         editorStackID = nil
         editorStackAmount = 1
-        refreshEditedPreview()
+        editorStackMaterialized = nil
+        if editorBaseMaterialized != nil {
+            refreshEditedPreview()
+        } else {
+            prepareEditorLUTsAndRefresh()
+        }
     }
 
     /// Debounced, because every slider tick asks for a fresh 33³ bake plus a
@@ -86,15 +91,57 @@ extension AppViewModel {
         }
     }
 
+    /// File-backed library rows are intentionally lazy. Inspector and Editor
+    /// share a small actor cache so parsing a 65³ text cube happens off the
+    /// main actor once, never on every slider tick.
+    func prepareEditorLUTsAndRefresh() {
+        editorMaterializeTask?.cancel()
+        let baseSource = editorBase
+        let stackSource = editorStack
+        let expectedBaseID = editorBaseID
+        let expectedStackID = editorStackID
+        editorBaseMaterialized = nil
+        editorStackMaterialized = nil
+        guard let baseSource else {
+            editedLUT = nil
+            return
+        }
+
+        let cache = lutMaterializationCache
+        editorMaterializeTask = Task { [weak self] in
+            guard let base = await cache.materialized(baseSource),
+                  Task.isCancelled == false
+            else { return }
+            let stack: CubeLUT?
+            if let stackSource {
+                guard let readyStack = await cache.materialized(stackSource),
+                      Task.isCancelled == false
+                else { return }
+                stack = readyStack
+            } else {
+                stack = nil
+            }
+            guard let self,
+                  self.editorBaseID == expectedBaseID,
+                  self.editorStackID == expectedStackID
+            else { return }
+            self.editorBaseMaterialized = base
+            self.editorStackMaterialized = stack
+            self.refreshEditedPreview()
+        }
+    }
+
     /// Bake the edit and show it.
     ///
     /// The baked LUT is registered like a derived one, so the ordinary render
     /// path resolves it: the editor previews through exactly the pipeline the
     /// viewer uses, rather than a second one that could disagree with it.
     func refreshEditedPreview() {
-        guard section == .editor, let base = editorBase else { return }
+        guard section == .editor, let base = editorBaseMaterialized else { return }
+        if editorStackID != nil && editorStackMaterialized == nil { return }
         let entries = LookBaker.bake(base: base, edit: editorEdit,
-                                     stacked: editorStack, stackAmount: editorStackAmount)
+                                     stacked: editorStackMaterialized,
+                                     stackAmount: editorStackAmount)
         let edited = CubeLUT(
             cube: entries,
             size: LookBaker.size,
@@ -122,15 +169,22 @@ extension AppViewModel {
     /// to end up with a look you can use, and one that lands outside the
     /// library is one you have to import before you can.
     func saveEditedLUT(named name: String) {
-        guard let base = editorBase else {
-            statusMessage = "Nothing to save — choose a LUT to edit first"
+        guard let base = editorBaseMaterialized else {
+            statusMessage = editorBaseID == nil
+                ? "Nothing to save — choose a LUT to edit first"
+                : "The LUT is still being prepared — try again in a moment"
             return
         }
         let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard cleaned.isEmpty == false else { return }
 
+        if editorStackID != nil && editorStackMaterialized == nil {
+            statusMessage = "The stacked LUT is still being prepared — try again in a moment"
+            return
+        }
         let entries = LookBaker.bake(base: base, edit: editorEdit,
-                                     stacked: editorStack, stackAmount: editorStackAmount)
+                                     stacked: editorStackMaterialized,
+                                     stackAmount: editorStackAmount)
         let folder = LUTLibrary.managedFolder.appendingPathComponent("Edited", isDirectory: true)
         let destination = folder.appendingPathComponent("\(cleaned).cube")
         do {

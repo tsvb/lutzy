@@ -72,6 +72,8 @@ Curated descriptive Tags do not replace objective measured tags or similarity me
 
 A lazy LUT materializes into one immutable table before rendering or profiling. Materialization verifies that the parsed transform fingerprint still matches the scan-time fingerprint; an in-place replacement is rejected until the next scan reconciles its new identity. Profiling reuses that one materialized table for every probe rather than reparsing the source for each metric. Star and typed-Tag actions create an explicitly unmeasured placeholder instead of parsing a file synchronously on the main actor; the ordinary background profiler later replaces it.
 
+Inspector and Editor use a shared four-entry materialized-table LRU. A cache miss parses on a detached worker; Inspector stores the sampled curve instead of sampling from SwiftUI body, and Editor retains prepared base/stack tables so slider ticks only bake from memory. This bounds common memory to four active UI tables while keeping large text parsing off the main actor.
+
 The library owns the detached scan worker directly. Replacing a scan cancels that worker and advances a generation token, so an obsolete result can neither consume another complete scan nor publish over a newer folder.
 
 ## Import

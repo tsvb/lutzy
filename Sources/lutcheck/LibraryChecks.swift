@@ -22,6 +22,13 @@ func runDurableLibraryChecks() async -> Bool {
         let lazyFileTableOK = first.retainsTableData == false
             && first.tableFloats.count == 2 * 2 * 2 * 4
             && first.retainsTableData == false
+        let materializationCache = LUTMaterializationCache(capacity: 1)
+        let cachedFirst = await materializationCache.materialized(first)
+        let cachedProbe = await materializationCache.sample([0.5, 0.5, 0.5], from: first)
+        let cachedCount = await materializationCache.count
+        let boundedUICacheOK = cachedFirst?.retainsTableData == true
+            && cachedProbe?.count == 3
+            && cachedCount == 1
         let replacedURL = root.appendingPathComponent("Replaced.cube")
         try cubeText.write(to: replacedURL, atomically: true, encoding: .utf8)
         let replacedAfterScan = try CubeLUT(url: replacedURL)
@@ -271,7 +278,7 @@ func runDurableLibraryChecks() async -> Bool {
             && descriptionPersists && inputProfilePersists && sidecarImportOK
             && legacyBrandSeeded && legacyBrandUserEditWins
             && seededUnknownSurvivesRescan && existingCustomUnknownSurvives
-            && lazyFileTableOK && lazyIdentityOK
+            && lazyFileTableOK && lazyIdentityOK && boundedUICacheOK
         print("curated LUT manifest seeds Brand/Input/Tags/Description and repairs legacy Brand once -> \(curatedManifestOK ? "PASS" : "FAIL")")
 
         let curatorSource = root.appendingPathComponent("Curator Inputs", isDirectory: true)

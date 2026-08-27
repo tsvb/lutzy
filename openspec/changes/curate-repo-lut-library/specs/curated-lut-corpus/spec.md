@@ -128,3 +128,8 @@ The library SHALL authenticate current curated file bytes against the sidecar, d
 
 - **WHEN** manifest metadata has seeded Brand, Input Profile, Tags, and Description
 - **THEN** objective colour, contrast, saturation, and similarity metrics continue in cancellable persisted background batches rather than being skipped or blocking discovery
+
+#### Scenario: Inspector and Editor use a lazy LUT repeatedly
+
+- **WHEN** Inspector draws a response curve or Editor refreshes after slider changes
+- **THEN** the LUT is materialized off the main actor and reused through a bounded cache rather than reparsed from disk in SwiftUI body or on every slider tick
