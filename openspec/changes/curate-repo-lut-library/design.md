@@ -29,7 +29,7 @@ The curation operation is reproducible and does not mutate or delete any supplie
 `.lutzy-library.json` is versioned and contains:
 
 - source definitions with stable IDs, labels, descriptions, reference URLs or local-reference status, and license status;
-- one entry per active canonical LUT with relative path, SHA-256 fingerprint, Brand / Source value, Input Profile, descriptive Tags, and a source ID;
+- one entry per active canonical LUT with relative path, SHA-256 fingerprint, Brand value, Input Profile, descriptive Tags, and a source ID;
 - audit information for duplicates and unsupported candidates.
 
 The SHA-256 fingerprint is the durable join. Import may rename a file to avoid a basename collision, and the user may later move it between physical folders, without losing the seed metadata.
@@ -59,6 +59,14 @@ Brand describes the maker or visual family being organised. Input Profile descri
 ## Conservative legacy Brand migration
 
 Existing catalog records may predate Brand metadata even when their physical top-level folder or filename starts with an unambiguous known brand. After reconcile and manifest seeding, a one-time migration fills only `Unknown` Brand values from this narrow mapping. It records that inference was applied so a later deliberate user change to `Unknown` is not undone. Ambiguous folders and names remain `Unknown`.
+
+"Considered" is recorded for every first-pass record, including a record that already has a manifest-seeded, Custom, or vendor Brand. Otherwise changing that Brand to `Unknown` later would incorrectly reopen the compatibility migration.
+
+## Scalable scan contract
+
+Current manifests also carry an optional SHA-256 of the exact CUBE file bytes. For a matching file, discovery authenticates that cheap raw digest, reads only the header, and uses the manifest's normalized transform fingerprint. The float table is reparsed only when a render, profiler, or inspector actually needs it; the renderer's existing eight-entry LRU bounds retained Core Image filters. Old manifests or changed files use the complete parser.
+
+The library owns the detached scan worker directly. Replacing a scan cancels that worker and advances a generation token, so an obsolete result can neither consume another complete scan nor publish over a newer folder.
 
 ## Import
 

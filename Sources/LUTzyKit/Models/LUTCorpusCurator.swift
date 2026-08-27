@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Deterministically builds a repository-local corpus from already classified
 /// candidates. Source discovery and brand inference belong to the CLI; this
@@ -95,13 +96,17 @@ public enum LUTCorpusCurator {
                 throw CuratorError.verificationFailed("missing \(entry.relativePath)")
             }
             let lut = try CubeLUT(url: file)
-            guard lut.contentHash == entry.sha256 else {
+            guard lut.contentHash == entry.sha256.lowercased() else {
                 throw CuratorError.verificationFailed("fingerprint mismatch for \(entry.relativePath)")
             }
-            guard fingerprints.insert(entry.sha256).inserted else {
+            if let expectedFileHash = entry.fileSHA256,
+               try CubeLUT.fileSHA256(at: file) != expectedFileHash.lowercased() {
+                throw CuratorError.verificationFailed("file-byte mismatch for \(entry.relativePath)")
+            }
+            guard fingerprints.insert(entry.sha256.lowercased()).inserted else {
                 throw CuratorError.verificationFailed("duplicate fingerprint \(entry.sha256)")
             }
-            guard let seeded = metadata[entry.sha256],
+            guard let seeded = metadata[entry.sha256.lowercased()],
                   seeded.origin != .unknown,
                   seeded.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
                   seeded.inputProfile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -191,6 +196,7 @@ public enum LUTCorpusCurator {
                 entries.append(.init(
                     relativePath: relative,
                     sha256: lut.contentHash,
+                    fileSHA256: try CubeLUT.fileSHA256(at: candidate.url),
                     brand: candidate.brand,
                     inputProfile: candidate.inputProfile,
                     tags: Array(Set(candidate.tags.filter {

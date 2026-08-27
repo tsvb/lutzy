@@ -273,7 +273,7 @@ struct LUTLibraryView: View {
         switch grouping {
         case .folder: return "Import LUT folders or choose another source."
         case .collectionAndStar: return "Create Collections in LUT Manager or Star LUTs while browsing."
-        case .brand: return "Set Origin metadata in LUT Manager to organise confirmed brands."
+        case .brand: return "Set Brand in LUT Manager to organise confirmed brands."
         case .tag: return "Add Tags in LUT Manager or let local measurement finish."
         }
     }
@@ -328,7 +328,7 @@ private struct LUTLibraryDetailView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(viewModel.catalog.effectiveName(for: lut))
                             .font(.title2.weight(.semibold))
-                        LabeledContent("Brand / Source", value: viewModel.catalog.origin(for: lut).label)
+                        LabeledContent("Brand", value: viewModel.catalog.origin(for: lut).label)
                         LabeledContent("Input Profile", value: viewModel.managerInputLabel(for: lut))
                         LabeledContent("Size", value: "\(lut.size)³")
                         let description = viewModel.catalog.description(for: lut)

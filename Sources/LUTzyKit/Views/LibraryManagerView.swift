@@ -200,7 +200,7 @@ struct LibraryManagerView: View {
                 if selection.isEmpty {
                     ContentUnavailableView(
                         "Select LUTs", systemImage: "slider.horizontal.3",
-                        description: Text("Edit Name, Brand / Source, Description, Tags, folders, Starred, and Collections here.")
+                        description: Text("Edit Name, Brand, Description, Tags, folders, Starred, and Collections here.")
                     )
                     .frame(maxWidth: .infinity)
                 } else {
@@ -252,8 +252,8 @@ struct LibraryManagerView: View {
 
     private var originSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Brand / Source").font(.subheadline.weight(.semibold))
-            Picker("Brand / Source", selection: $originChoice) {
+            Text("Brand").font(.subheadline.weight(.semibold))
+            Picker("Brand", selection: $originChoice) {
                 ForEach(OriginChoice.allCases, id: \.self) { choice in
                     Text(choice.label).tag(choice)
                 }

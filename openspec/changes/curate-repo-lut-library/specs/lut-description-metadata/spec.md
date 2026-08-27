@@ -2,7 +2,7 @@
 
 ### Requirement: LUT records preserve Description metadata
 
-The catalog SHALL persist an optional user-editable Description independently from Name, Brand / Source, Tags, folder, Collections, Starred state, and transform bytes.
+The catalog SHALL persist an optional user-editable Description independently from Name, Brand, Tags, folder, Collections, Starred state, and transform bytes.
 
 #### Scenario: Decode an older catalog
 
@@ -49,5 +49,4 @@ LUT Library detail SHALL display a non-empty Description in its metadata panel w
 #### Scenario: Open a described LUT
 
 - **WHEN** a LUT with Description metadata is opened in visual detail
-- **THEN** the complete Description appears near Brand / Source and transform facts while Gallery card density remains unchanged
-
+- **THEN** the complete Description appears near Brand and transform facts while Gallery card density remains unchanged

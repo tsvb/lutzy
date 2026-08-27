@@ -171,44 +171,7 @@ private func lumixInputProfile(_ url: URL) -> String? {
 
 private func documentedInputProfile(for url: URL, relativePath: String) -> String {
     if let explicit = lumixInputProfile(url) { return explicit }
-
-    let path = relativePath.localizedLowercase
-    let name = url.deletingPathExtension().lastPathComponent.localizedLowercase
-
-    // Prefer the input side of an explicit transform name. The patterns below
-    // intentionally require a profile token; Brand alone is never evidence.
-    if path.contains("flog2") || path.contains("f-log2") { return "Fujifilm F-Log2" }
-    if path.contains("flog") || path.contains("f-log") { return "Fujifilm F-Log" }
-    if path.contains("slog3") || path.contains("s-log3") || name.hasPrefix("sl3") { return "Sony S-Log3" }
-    if path.contains("slog2") || path.contains("s-log2") { return "Sony S-Log2" }
-    if path.contains("slog") || path.contains("s-log") { return "Sony S-Log" }
-    if path.contains("canonlog3") || path.contains("canon log 3") || path.contains("c-log3") { return "Canon C-Log 3" }
-    if path.contains("canonlog2") || path.contains("canon log 2") || path.contains("c-log2") { return "Canon C-Log 2" }
-    if path.contains("canonlog") || path.contains("canon log") || path.contains("c-log") { return "Canon C-Log" }
-    if path.contains("d-log m") || path.contains("dlog-m") || path.contains("dlogm") { return "DJI D-Log M" }
-    if path.contains("d-log") || path.contains("dlog") { return "DJI D-Log" }
-    if path.contains("n-log") || path.contains("nlog") { return "Nikon N-Log" }
-    if path.contains("logc4") || path.contains("log c4") { return "ARRI LogC4" }
-    if path.contains("logc3") || path.contains("log c3") { return "ARRI LogC3" }
-    if path.contains("arri logc") || path.contains("logc") { return "ARRI LogC" }
-    if path.contains("log3g10") || path.contains("rg4") { return "RED Log3G10" }
-    if path.contains("redlogfilm") || path.contains("rlf") { return "REDlogFilm" }
-    if path.contains("blackmagic gen 5 film") { return "Blackmagic Film Gen 5" }
-    if path.contains("bmdfilm") || path.contains("blackmagic") && path.contains(" film") { return "Blackmagic Film" }
-    if path.contains("gplog") || path.contains("gp-log") { return "GoPro GP-Log" }
-    if path.contains("protune") { return "GoPro Protune" }
-    if path.contains("l-log") { return "Leica L-Log" }
-    if path.contains("apple log") || path.contains("applelog") { return "Apple Log" }
-    if name.hasPrefix("cineon") || name.contains("cineon to") { return "Cineon Log" }
-
-    // Explicit display/linear inputs are safe only when they are on the source
-    // side. A destination named Rec.709 does not prove a display input.
-    if name.hasPrefix("rec.709 to") || name.hasPrefix("rec709 to")
-        || name.hasPrefix("srgb to") || name.hasPrefix("gamma 2")
-        || name.hasPrefix("linear to") || name.hasPrefix("dci to") {
-        return "Display / Linear"
-    }
-    return "Unknown"
+    return LUTInputProfileInference.profile(relativePath: relativePath)
 }
 
 private func generatedCandidates(

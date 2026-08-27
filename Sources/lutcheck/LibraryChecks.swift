@@ -19,6 +19,9 @@ func runDurableLibraryChecks() async -> Bool {
         try cubeText.write(to: cubeB, atomically: true, encoding: .utf8)
         let first = try CubeLUT(url: cubeA)
         let second = try CubeLUT(url: cubeB)
+        let lazyFileTableOK = first.retainsTableData == false
+            && first.tableFloats.count == 2 * 2 * 2 * 4
+            && first.retainsTableData == false
         guard let firstID = catalog.adoptSavedLUT(first),
               let secondID = catalog.adoptSavedLUT(second),
               firstID != secondID,
@@ -132,7 +135,7 @@ func runDurableLibraryChecks() async -> Bool {
             && ProjectStore(root: recoveryProjectRoot).current?.session.selectedLUT == recoveredID?.raw
         print("derived session adoption -> \(recoveredSessionOK ? "PASS" : "FAIL")")
 
-        // Manager exposes the dedicated persisted Brand / Source namespace as a table column.
+        // Manager exposes the dedicated persisted Brand namespace as a table column.
         // Unknown and Custom remain explicit values; a vendor uses its actual authored name.
         let managerBrandDefaultsOK = recoveryViewModel.managerBrandLabel(for: durableFirst) == "Custom"
             && recoveryViewModel.managerBrandLabel(for: second.withRecordID(secondID)) == "Unknown"
@@ -140,7 +143,7 @@ func runDurableLibraryChecks() async -> Bool {
         let managerVendorBrandOK = recoveryViewModel.managerBrandLabel(for: durableFirst) == "Panasonic"
         recoveryViewModel.catalog.setOrigin(.custom, for: [firstID])
         let managerBrandColumnOK = managerBrandDefaultsOK && managerVendorBrandOK
-        print("Manager Brand column uses persisted Brand / Source -> \(managerBrandColumnOK ? "PASS" : "FAIL")")
+        print("Manager Brand column uses persisted Brand -> \(managerBrandColumnOK ? "PASS" : "FAIL")")
 
         // A repository sidecar joins by immutable content fingerprint, seeds
         // record metadata once, and then gets out of the user's way.
@@ -164,7 +167,7 @@ func runDurableLibraryChecks() async -> Bool {
           "entries": [
             {
               "relativePath": "look.cube",
-              "sha256": "\(curatedCube.contentHash)",
+              "sha256": "\(curatedCube.contentHash.uppercased())",
               "brand": "Fujifilm",
               "inputProfile": "Panasonic V-Log",
               "tags": ["相機風格", "完成色", "input:vlog"],
@@ -192,6 +195,11 @@ func runDurableLibraryChecks() async -> Bool {
             && manifestCatalog.record(for: curatedID)?.inputProfile == "Panasonic V-Log"
             && manifestCatalog.record(for: curatedID)?.typedTags == ["完成色", "相機風格"]
             && manifestCatalog.description(for: curatedID) == "Codex 產生；測試用 V-Log LUT。"
+        let durableCuratedCube = curatedCube.withRecordID(curatedID)
+        manifestCatalog.inferMissingOrigins(for: [durableCuratedCube])
+        manifestCatalog.setOrigin(.unknown, for: [curatedID])
+        manifestCatalog.inferMissingOrigins(for: [durableCuratedCube])
+        let seededUnknownSurvivesRescan = manifestCatalog.origin(for: durableCuratedCube) == .unknown
         manifestCatalog.setDescription("使用者改寫", for: [curatedID])
         manifestCatalog.setOrigin(.custom, for: [curatedID])
         manifestCatalog.removeTag("完成色", from: [curatedID])
@@ -224,6 +232,20 @@ func runDurableLibraryChecks() async -> Bool {
         manifestCatalog.inferMissingOrigins(for: [durableLegacyBrandLUT])
         let legacyBrandUserEditWins = manifestCatalog.origin(for: durableLegacyBrandLUT) == .unknown
 
+        let existingCustomURL = root.appendingPathComponent("sony/custom-look.cube")
+        try FileManager.default.createDirectory(
+            at: existingCustomURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try cubeText.write(to: existingCustomURL, atomically: true, encoding: .utf8)
+        let existingCustomLUT = try CubeLUT(url: existingCustomURL, category: "sony")
+        guard let existingCustomID = manifestCatalog.adoptSavedLUT(existingCustomLUT) else { return false }
+        let durableExistingCustom = existingCustomLUT.withRecordID(existingCustomID)
+        manifestCatalog.setOrigin(.custom, for: [existingCustomID])
+        manifestCatalog.inferMissingOrigins(for: [durableExistingCustom])
+        manifestCatalog.setOrigin(.unknown, for: [existingCustomID])
+        manifestCatalog.inferMissingOrigins(for: [durableExistingCustom])
+        let existingCustomUnknownSurvives = manifestCatalog.origin(for: durableExistingCustom) == .unknown
+
         let importedRoot = root.appendingPathComponent("Curated Import", isDirectory: true)
         let curatedImport = LUTLibrary.copyIn([curatedSource], to: importedRoot)
         let importedSidecar = importedRoot
@@ -235,6 +257,8 @@ func runDurableLibraryChecks() async -> Bool {
         let curatedManifestOK = firstSeedOK && userEditSurvivesRescan
             && descriptionPersists && inputProfilePersists && sidecarImportOK
             && legacyBrandSeeded && legacyBrandUserEditWins
+            && seededUnknownSurvivesRescan && existingCustomUnknownSurvives
+            && lazyFileTableOK
         print("curated LUT manifest seeds Brand/Input/Tags/Description and repairs legacy Brand once -> \(curatedManifestOK ? "PASS" : "FAIL")")
 
         let curatorSource = root.appendingPathComponent("Curator Inputs", isDirectory: true)
@@ -303,6 +327,30 @@ func runDurableLibraryChecks() async -> Bool {
             from: curatedOutput.appendingPathComponent("LUTs/\(CuratedLUTManifest.fileName)")
         )
         let verifiedCorpus = try LUTCorpusCurator.verify(outputRoot: curatedOutput)
+        let generatedActiveRoot = curatedOutput.appendingPathComponent("LUTs", isDirectory: true)
+        let fastScanCatalog = LUTCatalog(fileURL: root.appendingPathComponent("fast-scan-catalog.json"))
+        let fastScanLibrary = LUTLibrary(catalog: fastScanCatalog)
+        fastScanLibrary.scan(generatedActiveRoot)
+        await fastScanLibrary.scanCompletion()
+        let authenticatedFastScanOK = fastScanLibrary.allLUTs.count == 3
+            && fastScanLibrary.allLUTs.allSatisfy { $0.retainsTableData == false }
+
+        // A changed file must not inherit the stale manifest fingerprint merely
+        // because its relative path still matches.
+        guard let changedEntry = generatedManifest.entries.first else { return false }
+        let changedURL = generatedActiveRoot.appendingPathComponent(changedEntry.relativePath)
+        let changedText = cubeText.replacingOccurrences(
+            of: "0.000000 0.000000 0.000000", with: "0.125000 0.000000 0.000000"
+        )
+        try changedText.write(to: changedURL, atomically: true, encoding: .utf8)
+        fastScanLibrary.scan(generatedActiveRoot)
+        await fastScanLibrary.scanCompletion()
+        let staleSidecarFallbackOK = fastScanLibrary.allLUTs.first {
+            $0.url.standardizedFileURL == changedURL.standardizedFileURL
+        }?.contentHash != changedEntry.sha256
+        let rec709FolderProfileOK = LUTInputProfileInference.profile(
+            relativePath: "Sony/Rec.709 to Color Grading LUTs/Soft Contrast.cube"
+        ) == "Display / Rec.709"
         let curatorOK = curatorResult.active == 3
             && curatorResult.duplicates == 1
             && curatorResult.unsupported == 1
@@ -310,6 +358,9 @@ func runDurableLibraryChecks() async -> Bool {
             && generatedManifest.entries.first?.brand == "Fujifilm"
             && generatedManifest.entries.first?.inputProfile == "Panasonic V-Log"
             && verifiedCorpus.active == 3
+            && authenticatedFastScanOK
+            && staleSidecarFallbackOK
+            && rec709FolderProfileOK
             && generatedManifest.entries.first?.tags == ["相機風格"]
             && FileManager.default.fileExists(
                 atPath: curatedOutput.appendingPathComponent("LUTs/Fujifilm/Codex/A.cube").path
@@ -319,6 +370,25 @@ func runDurableLibraryChecks() async -> Bool {
             )
             && FileManager.default.fileExists(atPath: curatorA.path)
         print("repository LUT curator deduplicates and separates unsupported transforms -> \(curatorOK ? "PASS" : "FAIL")")
+
+        var repositoryCorpusScanOK = true
+        if let corpusPath = ProcessInfo.processInfo.environment["LUTCHECK_CORPUS"] {
+            let corpusRoot = URL(fileURLWithPath: corpusPath, isDirectory: true)
+            let corpusManifest = try CuratedLUTManifest.load(
+                from: corpusRoot.appendingPathComponent(CuratedLUTManifest.fileName)
+            )
+            let corpusLibrary = LUTLibrary(
+                catalog: LUTCatalog(fileURL: root.appendingPathComponent("corpus-scan-catalog.json"))
+            )
+            let started = ContinuousClock.now
+            corpusLibrary.scan(corpusRoot)
+            await corpusLibrary.scanCompletion()
+            let elapsed = started.duration(to: .now)
+            repositoryCorpusScanOK = corpusLibrary.allLUTs.count == corpusManifest.entries.count
+                && corpusLibrary.allLUTs.allSatisfy { $0.retainsTableData == false }
+                && elapsed < .seconds(30)
+            print("repository corpus authenticated lazy scan \(corpusLibrary.allLUTs.count) LUTs in \(elapsed) -> \(repositoryCorpusScanOK ? "PASS" : "FAIL")")
+        }
 
         let brandShelves = recoveryViewModel.libraryDiscoveryShelves(for: .brand)
         let tagShelves = recoveryViewModel.libraryDiscoveryShelves(for: .tag)
@@ -503,6 +573,7 @@ func runDurableLibraryChecks() async -> Bool {
         return catalogOK && mixedSelectionTagOK && visibleTagEditingOK && recoveryOK
             && recoveredSessionOK && discoveryOK && focusRecoveryOK
             && managerBrandColumnOK && curatedManifestOK && curatorOK
+            && repositoryCorpusScanOK
             && previewCacheOK && legacyMigrationOK && mediaOK
     } catch {
         print("durable library checks -> FAIL (\(error))")

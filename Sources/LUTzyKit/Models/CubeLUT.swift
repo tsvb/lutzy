@@ -33,7 +33,11 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// Assigned by `LUTCatalog` after a scan. Nil for raw parser results and
     /// in-memory derived LUTs.
     let recordID: LUTRecordID?
-    private let tableData: Data  // flattened RGBARGBA... float32 for Core Image
+    /// File-backed LUTs keep only their parsed header and stable content hash.
+    /// The large RGBA float table is reconstructed on demand, then owned by
+    /// Core Image's bounded filter cache instead of every library row.
+    private let embeddedTableData: Data?
+    private let storedContentHash: String
 
     // MARK: - Hashable
 
@@ -75,7 +79,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
             floats.append(1.0)
         }
         let table = floats.withUnsafeBufferPointer { Data(buffer: $0) }
-        self.tableData = table
+        self.embeddedTableData = table
+        self.storedContentHash = Self.digest(table)
         // The table has to be built before the ID, because the ID is made from it.
         self.id = sourceURL?.path ?? Self.derivedID(name: name, table: table)
     }
@@ -122,7 +127,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
 
     // MARK: - Parsing
 
-    init(url: URL, category: String = "General") throws {
+    init(url: URL, category: String = "General", retainTableData: Bool = false) throws {
         self.url = url
         self.id = url.path
         self.category = category
@@ -151,6 +156,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         var rows: [(Float, Float, Float)] = []
 
         for line in lines {
+            if Task.isCancelled { throw CancellationError() }
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             if trimmed.hasPrefix("#") {
@@ -229,9 +235,74 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
             floats.append(1.0) // alpha
         }
 
-        self.tableData = floats.withUnsafeBufferPointer { buffer in
+        let tableData = floats.withUnsafeBufferPointer { buffer in
             Data(buffer: buffer)
         }
+        self.storedContentHash = Self.digest(tableData)
+        self.embeddedTableData = retainTableData ? tableData : nil
+    }
+
+    /// Header-only construction for a file whose exact bytes were authenticated
+    /// against a curated sidecar. This preserves the normal render contract
+    /// while avoiding a full text parse during discovery.
+    init(url: URL, category: String, knownContentHash: String) throws {
+        self.url = url
+        self.id = url.path
+        self.category = category
+        let rawName = url.deletingPathExtension().lastPathComponent
+        var cleaned = rawName
+        for suffix in ["_33_Rec709", "_65_Rec709", "_Rec709"] {
+            cleaned = cleaned.replacingOccurrences(of: suffix, with: "")
+        }
+        self.name = cleaned
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let prefix = try handle.read(upToCount: 65_536) ?? Data()
+        guard let content = String(data: prefix, encoding: .utf8)
+                ?? String(data: prefix, encoding: .windowsCP1252)
+                ?? String(data: prefix, encoding: .isoLatin1)
+        else { throw LUTError.invalidFormat("Unsupported text encoding") }
+
+        var photoStyle: String?
+        var lutSize: Int?
+        for line in content.components(separatedBy: .newlines) {
+            if Task.isCancelled { throw CancellationError() }
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            let upper = trimmed.uppercased()
+            if upper.hasPrefix("#LUMIXPHOTOSTYLE") {
+                photoStyle = trimmed.dropFirst("#LUMIXPHOTOSTYLE".count)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if trimmed.hasPrefix("LUT_3D_SIZE") {
+                let parts = trimmed.split(whereSeparator: { $0.isWhitespace })
+                if parts.count >= 2 { lutSize = Int(parts[1]) }
+            }
+            if photoStyle != nil, lutSize != nil { break }
+        }
+        guard let lutSize, (2...128).contains(lutSize) else {
+            throw LUTError.invalidFormat("LUT_3D_SIZE not found in header")
+        }
+        self.size = lutSize
+        self.photoStyleTag = photoStyle
+        self.inputSpace = Self.resolveInputSpace(photoStyle: photoStyle, name: cleaned)
+        self.recordID = nil
+        self.embeddedTableData = nil
+        self.storedContentHash = knownContentHash.lowercased()
+    }
+
+    /// Stream the raw file digest so authenticating a 1.5 GB corpus never
+    /// requires holding that corpus (or even one large text LUT) in memory.
+    static func fileSHA256(at url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while true {
+            if Task.isCancelled { throw CancellationError() }
+            let chunk = try handle.read(upToCount: 1_048_576) ?? Data()
+            if chunk.isEmpty { break }
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     /// Copy a parsed LUT while attaching the catalog identity. The render
@@ -241,7 +312,9 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         CubeLUT(
             id: id, name: name, category: category, url: url, size: size,
             inputSpace: inputSpace, photoStyleTag: photoStyleTag,
-            recordID: recordID, tableData: tableData
+            recordID: recordID,
+            embeddedTableData: embeddedTableData,
+            storedContentHash: storedContentHash
         )
     }
 
@@ -254,7 +327,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         inputSpace: LUTInputSpace,
         photoStyleTag: String?,
         recordID: LUTRecordID?,
-        tableData: Data
+        embeddedTableData: Data?,
+        storedContentHash: String
     ) {
         self.id = id
         self.name = name
@@ -264,8 +338,28 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         self.inputSpace = inputSpace
         self.photoStyleTag = photoStyleTag
         self.recordID = recordID
-        self.tableData = tableData
+        self.embeddedTableData = embeddedTableData
+        self.storedContentHash = storedContentHash
     }
+
+    private static func digest(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Reparse only when a caller actually needs pixels. Keeping this local to
+    /// the operation means scanning 1,600 LUTs does not pin ~826 MiB of cube
+    /// tables in `allLUTs`.
+    private func resolvedTableData() -> Data? {
+        if let embeddedTableData { return embeddedTableData }
+        return try? CubeLUT(
+            url: url,
+            category: category,
+            retainTableData: true
+        ).embeddedTableData
+    }
+
+    /// Test/diagnostic seam for the library's memory contract.
+    var retainsTableData: Bool { embeddedTableData != nil }
 
     // MARK: - Sampling
 
@@ -277,6 +371,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// interpolation difference would be a tag nobody could reproduce.
     func sample(_ points: [Float]) -> [Float] {
         guard size > 1, points.count >= 3 else { return points }
+        guard let tableData = resolvedTableData() else { return points }
         let n = size
         let maxIndex = Float(n - 1)
         var out = [Float](repeating: 0, count: points.count - points.count % 3)
@@ -333,7 +428,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// The largest channel spread anywhere in the table. Zero means the LUT is
     /// monochrome — it cannot produce a coloured pixel from any input.
     var monoSpread: Double {
-        tableData.withUnsafeBytes { raw in
+        guard let tableData = resolvedTableData() else { return 0 }
+        return tableData.withUnsafeBytes { raw in
             let table = raw.bindMemory(to: Float.self)
             var worst: Float = 0
             for entry in stride(from: 0, to: table.count, by: 4) {
@@ -347,7 +443,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// A stable identity for the *contents* of a LUT, so tags survive a file
     /// being renamed or moved and follow a duplicate to its copy.
     var contentHash: String {
-        SHA256.hash(data: tableData).map { String(format: "%02x", $0) }.joined()
+        storedContentHash
     }
 
     // MARK: - Inspection
@@ -358,7 +454,8 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// corrupt table is invisible from the output side and has to be inspected
     /// directly.
     var tableFloats: [Float] {
-        tableData.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        guard let tableData = resolvedTableData() else { return [] }
+        return tableData.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
     }
 
     // MARK: - Core Image Filter
@@ -369,6 +466,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     /// lockstep with the output encoding space; both default to `WorkingSpace.current` so they cannot
     /// drift apart. See `WorkingSpace`.
     func makeFilter(space: WorkingSpace = .current) -> CIFilter? {
+        guard let tableData = resolvedTableData() else { return nil }
         // A V-Log LUT is indexed with code values the adapter produced, so it
         // uses the colour-space-free cube: `CIColorCubeWithColorSpace` would
         // convert those codes into its space first and index the wrong entry.

@@ -14,3 +14,5 @@
 - [ ] 12. Obtain a fresh read-only sub-agent review and close every Critical or Important finding before handoff.
 - [x] 13. Add conservative one-time Brand repair for unambiguous legacy folder/name evidence.
 - [x] 14. Classify and audit concrete Input Profiles, including Panasonic STD versus V-Log and mixed Documents fallbacks.
+- [x] 15. Authenticate curated bytes for fast header-only discovery, lazily load cube tables, and make scan replacement cancellable.
+- [x] 16. Normalize manifest fingerprint casing and close seeded/authored Brand migration replay.

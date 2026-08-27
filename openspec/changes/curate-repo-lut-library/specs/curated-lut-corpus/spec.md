@@ -52,6 +52,11 @@ Every active manifest entry SHALL record the most specific defensible Input Prof
 - **WHEN** no header, upstream contract, folder, or filename establishes the input encoding without conflict
 - **THEN** Input Profile is `Unknown` and the curator does not infer it from Brand alone
 
+#### Scenario: Package folder declares a Rec.709 input
+
+- **WHEN** a Documents LUT is inside a package folder named `Rec.709 to Color Grading LUTs`
+- **THEN** Input Profile is `Display / Rec.709` even when the creative LUT filename has no profile token
+
 ### Requirement: Legacy records receive conservative one-time Brand repair
 
 The catalog SHALL repair an `Unknown` Brand once when a known physical top-level folder or filename prefix is unambiguous, without overwriting authored metadata.
@@ -66,6 +71,11 @@ The catalog SHALL repair an `Unknown` Brand once when a known physical top-level
 - **WHEN** the one-time migration has already considered that record
 - **THEN** later scans do not restore the inferred Brand over the user's choice
 
+#### Scenario: Record already has seeded or authored Brand
+
+- **WHEN** the migration first considers a manifest-seeded, Custom, or vendor Brand
+- **THEN** it records that consideration without changing the Brand, so a later authored `Unknown` remains `Unknown`
+
 ### Requirement: Folder import preserves curated sidecars
 
 Importing a folder SHALL preserve a valid `.lutzy-library.json` sidecar so the ordinary post-import scan can seed metadata.
@@ -79,3 +89,27 @@ Importing a folder SHALL preserve a valid `.lutzy-library.json` sidecar so the o
 
 - **WHEN** the user imports a folder without a curated sidecar
 - **THEN** existing import, deduplication, naming, and review behaviour remains unchanged
+
+### Requirement: Large curated corpora scan with bounded memory and cancellation
+
+The library SHALL authenticate current curated file bytes against the sidecar, discover valid LUT metadata without retaining every 3D float table, and cancel an obsolete scan worker before starting its replacement.
+
+#### Scenario: Scan an unchanged curated corpus
+
+- **WHEN** an entry's raw-file SHA-256 matches its sidecar
+- **THEN** discovery uses the authenticated content fingerprint and header without retaining its RGBA cube table
+
+#### Scenario: Curated LUT is modified without updating the sidecar
+
+- **WHEN** raw-file SHA-256 no longer matches the sidecar
+- **THEN** the library falls back to the complete parser rather than trusting stale metadata
+
+#### Scenario: Scan is replaced
+
+- **WHEN** another folder scan starts before the current scan completes
+- **THEN** the actual background worker receives cancellation and only the newest generation may publish
+
+#### Scenario: Manifest uses uppercase SHA-256
+
+- **WHEN** a valid sidecar encodes a SHA-256 fingerprint with uppercase hex
+- **THEN** metadata lookup normalizes the key and still seeds the matching record

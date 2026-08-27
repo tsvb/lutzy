@@ -269,11 +269,15 @@ final class LUTCatalog: ObservableObject {
         var changed = false
         for lut in luts {
             guard var record = records[lut.lutID],
-                  record.origin == .unknown,
-                  record.legacyBrandInferenceVersion == nil,
-                  let inferred = Self.inferredLegacyOrigin(for: lut)
+                  record.legacyBrandInferenceVersion == nil
             else { continue }
-            record.origin = inferred
+            if record.origin == .unknown,
+               let inferred = Self.inferredLegacyOrigin(for: lut) {
+                record.origin = inferred
+            }
+            // "Considered" is itself durable state. Without this marker on a
+            // seeded/vendor/custom record, a later authored Unknown would be
+            // mistaken for legacy missing metadata and silently overwritten.
             record.legacyBrandInferenceVersion = 1
             records[lut.lutID] = record
             changed = true

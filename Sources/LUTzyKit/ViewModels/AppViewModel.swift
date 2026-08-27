@@ -476,7 +476,13 @@ final class AppViewModel: ObservableObject {
             Task { await engine.invalidateLUTCache() }
             // Measure whatever the scan found that has not been measured
             // before. Typed tags are never disturbed by this — see LUTTagStore.
-            let scannedLUTs = self.library.allLUTs
+            // Curated sidecars already seed meaningful, reviewable tags. Do
+            // not immediately reparse all 1,600 file-backed tables merely to
+            // add measured tags; uncurated personal imports still get the
+            // existing profiler pass.
+            let scannedLUTs = self.library.allLUTs.filter {
+                self.catalog.record(for: $0)?.curatedMetadataSeed == nil
+            }
             self.tagIndexTask = Task { await self.tags.index(scannedLUTs) }
         }
 
@@ -1359,7 +1365,7 @@ final class AppViewModel: ObservableObject {
     }
 
     /// The Manager's user-facing Brand column. This is the catalog's persisted
-    /// Brand / Source value. A one-time legacy migration may seed it from
+    /// Brand value. A one-time legacy migration may seed it from
     /// unambiguous folder/name evidence; the UI never performs live inference.
     func managerBrandLabel(for lut: CubeLUT) -> String {
         catalog.origin(for: lut).label

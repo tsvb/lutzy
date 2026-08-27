@@ -6,7 +6,7 @@ import CryptoKit
 @MainActor
 final class LUTLibrary: ObservableObject {
 
-    struct Category: Identifiable {
+    struct Category: Identifiable, Sendable {
         let id: String      // category name
         let name: String
         let luts: [CubeLUT]
@@ -64,6 +64,8 @@ final class LUTLibrary: ObservableObject {
     /// move to a different folder or the library goes away.
     private var scopedURL: URL?
     private var scanTask: Task<Void, Never>?
+    private var scanWorker: Task<ScanOutcome, Never>?
+    private var scanGeneration = 0
     /// All writers target the same managed folder. Keep their read-deduplicate-
     /// choose-name-write transaction in one queue so two quick drops cannot
     /// both claim the same free filename and overwrite one another.
@@ -383,12 +385,19 @@ final class LUTLibrary: ObservableObject {
     /// folder of a few dozen looks would otherwise stall the window at launch.
     func scan(_ folder: URL) {
         scanTask?.cancel()
+        scanWorker?.cancel()
+        scanGeneration += 1
+        let generation = scanGeneration
         scanError = nil
         isScanning = true
 
+        let worker = Task.detached(priority: .userInitiated) {
+            Self.scanSync(folder)
+        }
+        scanWorker = worker
         scanTask = Task {
-            let outcome = await Task.detached { Self.scanSync(folder) }.value
-            guard !Task.isCancelled else { return }
+            let outcome = await worker.value
+            guard !Task.isCancelled, generation == self.scanGeneration else { return }
 
             self.isScanning = false
             switch outcome {
@@ -422,7 +431,7 @@ final class LUTLibrary: ObservableObject {
         await scanTask?.value
     }
 
-    private enum ScanOutcome {
+    private enum ScanOutcome: Sendable {
         case success([Category])
         case failure(String)
     }
@@ -431,6 +440,7 @@ final class LUTLibrary: ObservableObject {
     /// `nonisolated` so it can run on a background executor.
     private nonisolated static func scanSync(_ folder: URL) -> ScanOutcome {
         var categoryMap: [String: [CubeLUT]] = [:]
+        let curatedHints = CuratedLUTManifest.scanHintsUnder(folder)
 
         // `enumerator(at:)` hands back a live-but-empty enumerator for a folder
         // that has been moved or deleted, so a nil check alone would report
@@ -474,7 +484,17 @@ final class LUTLibrary: ObservableObject {
             let category = components.isEmpty ? "General" : components.joined(separator: "/")
 
             do {
-                let lut = try CubeLUT(url: fileURL, category: category)
+                let hint = curatedHints[path]
+                let lut: CubeLUT
+                if let hint,
+                   try CubeLUT.fileSHA256(at: fileURL) == hint.fileSHA256 {
+                    lut = try CubeLUT(
+                        url: fileURL, category: category,
+                        knownContentHash: hint.fingerprint
+                    )
+                } else {
+                    lut = try CubeLUT(url: fileURL, category: category)
+                }
                 categoryMap[category, default: []].append(lut)
             } catch {
                 skipped += 1

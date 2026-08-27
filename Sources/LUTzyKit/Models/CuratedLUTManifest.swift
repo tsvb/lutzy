@@ -1,5 +1,58 @@
 import Foundation
 
+/// Conservative, path-only input-profile inference shared by the curator and
+/// its durable checks. Brand names by themselves are deliberately not treated
+/// as input-profile evidence: a Fujifilm-look LUT can still consume V-Log.
+public enum LUTInputProfileInference {
+    public static func profile(relativePath: String) -> String {
+        let path = relativePath.localizedLowercase
+        let name = URL(fileURLWithPath: relativePath)
+            .deletingPathExtension().lastPathComponent.localizedLowercase
+
+        if path.contains("flog2") || path.contains("f-log2") { return "Fujifilm F-Log2" }
+        if path.contains("flog") || path.contains("f-log") { return "Fujifilm F-Log" }
+        if path.contains("slog3") || path.contains("s-log3") || name.hasPrefix("sl3") { return "Sony S-Log3" }
+        if path.contains("slog2") || path.contains("s-log2") { return "Sony S-Log2" }
+        if path.contains("slog") || path.contains("s-log") { return "Sony S-Log" }
+        if path.contains("canonlog3") || path.contains("canon log 3") || path.contains("c-log3") { return "Canon C-Log 3" }
+        if path.contains("canonlog2") || path.contains("canon log 2") || path.contains("c-log2") { return "Canon C-Log 2" }
+        if path.contains("canonlog") || path.contains("canon log") || path.contains("c-log") { return "Canon C-Log" }
+        if path.contains("d-log m") || path.contains("dlog-m") || path.contains("dlogm") { return "DJI D-Log M" }
+        if path.contains("d-log") || path.contains("dlog") { return "DJI D-Log" }
+        if path.contains("n-log") || path.contains("nlog") { return "Nikon N-Log" }
+        if path.contains("logc4") || path.contains("log c4") { return "ARRI LogC4" }
+        if path.contains("logc3") || path.contains("log c3") { return "ARRI LogC3" }
+        if path.contains("arri logc") || path.contains("logc") { return "ARRI LogC" }
+        if path.contains("log3g10") || path.contains("rg4") { return "RED Log3G10" }
+        if path.contains("redlogfilm") || path.contains("rlf") { return "REDlogFilm" }
+        if path.contains("blackmagic gen 5 film") { return "Blackmagic Film Gen 5" }
+        if path.contains("bmdfilm") || path.contains("blackmagic") && path.contains(" film") { return "Blackmagic Film" }
+        if path.contains("gplog") || path.contains("gp-log") { return "GoPro GP-Log" }
+        if path.contains("protune") { return "GoPro Protune" }
+        if path.contains("l-log") { return "Leica L-Log" }
+        if path.contains("apple log") || path.contains("applelog") { return "Apple Log" }
+        if name.hasPrefix("cineon") || name.contains("cineon to") { return "Cineon Log" }
+
+        // A package-level folder is valid evidence even when its individual
+        // filenames are creative look names with no profile token.
+        if path.contains("rec.709 to color grading luts")
+            || path.contains("rec709 to color grading luts") {
+            return "Display / Rec.709"
+        }
+
+        // Only infer a display/linear profile from the source side of an
+        // explicit transform name. A destination named Rec.709 proves nothing.
+        if name.hasPrefix("rec.709 to") || name.hasPrefix("rec709 to")
+            || name.hasPrefix("srgb to") || name.hasPrefix("gamma 2") {
+            return "Display / Rec.709"
+        }
+        if name.hasPrefix("linear to") || name.hasPrefix("dci to") {
+            return "Display / Linear"
+        }
+        return "Unknown"
+    }
+}
+
 /// Repository-side metadata that travels with a curated LUT corpus without
 /// rewriting third-party CUBE bytes. The immutable content fingerprint is the
 /// join, so import-time renames and later Manager moves do not break it.
@@ -26,6 +79,9 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
     struct Entry: Codable, Sendable, Equatable {
         let relativePath: String
         let sha256: String
+        /// SHA-256 of the exact CUBE file bytes. Optional for old manifests;
+        /// current manifests use it to validate a fast, header-only scan.
+        let fileSHA256: String?
         let brand: String
         /// Human-facing encoded input contract (for example Panasonic V-Log,
         /// Sony S-Log3, or Unknown). Optional keeps version-1 sidecars written
@@ -105,10 +161,44 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
         return result
     }
 
+    struct ScanHint: Sendable, Equatable {
+        let fingerprint: String
+        let fileSHA256: String
+    }
+
+    /// Resolve current sidecars to exact file paths. A hint is usable only
+    /// when it carries the raw-byte digest added by the curator; older
+    /// manifests safely fall back to a full parse.
+    static func scanHintsUnder(_ root: URL) -> [String: ScanHint] {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(
+            at: root, includingPropertiesForKeys: [.isRegularFileKey], options: []
+        ) else { return [:] }
+        var manifests: [URL] = []
+        while let url = enumerator.nextObject() as? URL {
+            if url.lastPathComponent == fileName { manifests.append(url) }
+        }
+        var result: [String: ScanHint] = [:]
+        for url in manifests.sorted(by: { $0.path < $1.path }) {
+            guard let manifest = try? load(from: url) else { continue }
+            let base = url.deletingLastPathComponent()
+            for entry in manifest.entries {
+                guard let fileHash = entry.fileSHA256?.lowercased() else { continue }
+                let path = base.appendingPathComponent(entry.relativePath)
+                    .standardizedFileURL.resolvingSymlinksInPath().path
+                result[path] = ScanHint(
+                    fingerprint: entry.sha256.lowercased(), fileSHA256: fileHash
+                )
+            }
+        }
+        return result
+    }
+
     var metadataByFingerprint: [String: CuratedLUTMetadata] {
         var result: [String: CuratedLUTMetadata] = [:]
         for entry in entries.sorted(by: { $0.relativePath < $1.relativePath }) {
-            guard result[entry.sha256] == nil, let source = sources[entry.sourceID] else { continue }
+            let fingerprint = entry.sha256.lowercased()
+            guard result[fingerprint] == nil, let source = sources[entry.sourceID] else { continue }
             let explicit = entry.description?.trimmingCharacters(in: .whitespacesAndNewlines)
             let sourceDescription = source.description.trimmingCharacters(in: .whitespacesAndNewlines)
             let description = explicit?.isEmpty == false ? explicit! : sourceDescription
@@ -118,9 +208,9 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
                 guard cleaned.isEmpty == false, cleaned.hasPrefix("input:") == false else { return nil }
                 return cleaned
             })).sorted()
-            result[entry.sha256] = CuratedLUTMetadata(
-                seedID: "manifest-v\(version):\(entry.sha256)",
-                fingerprint: entry.sha256,
+            result[fingerprint] = CuratedLUTMetadata(
+                seedID: "manifest-v\(version):\(fingerprint)",
+                fingerprint: fingerprint,
                 origin: .vendor(entry.brand.trimmingCharacters(in: .whitespacesAndNewlines)),
                 inputProfile: input?.isEmpty == false ? input! : "Unknown",
                 tags: tags,
@@ -138,6 +228,7 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
             let path = entry.relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
             let brand = entry.brand.trimmingCharacters(in: .whitespacesAndNewlines)
             let hash = entry.sha256.lowercased()
+            let fileHash = entry.fileSHA256?.lowercased()
             guard path.isEmpty == false,
                   path.hasPrefix("/") == false,
                   path.split(separator: "/").contains("..") == false,
@@ -147,6 +238,10 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
                   paths.insert(path).inserted,
                   fingerprints.insert(hash).inserted
             else { throw ManifestError.invalidEntry(entry.relativePath) }
+            if let fileHash,
+               fileHash.count != 64 || fileHash.allSatisfy({ $0.isHexDigit }) == false {
+                throw ManifestError.invalidEntry(entry.relativePath)
+            }
             guard sources[entry.sourceID] != nil else { throw ManifestError.missingSource(entry.sourceID) }
         }
     }

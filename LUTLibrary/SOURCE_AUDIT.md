@@ -16,8 +16,7 @@
 - Canon C-Log 3: 33
 - DJI D-Log: 20
 - DJI D-Log M: 1
-- Display / Linear: 2
-- Display / Rec.709: 287
+- Display / Rec.709: 300
 - Fujifilm F-Log: 20
 - Fujifilm F-Log2: 16
 - GoPro GP-Log: 4
@@ -29,7 +28,7 @@
 - Sony S-Log: 17
 - Sony S-Log2: 9
 - Sony S-Log3: 54
-- Unknown: 911
+- Unknown: 900
 
 ## Sources
 
