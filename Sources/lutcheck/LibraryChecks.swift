@@ -34,6 +34,59 @@ func runLibraryBootstrapCheck() -> Bool {
     }
 }
 
+func runCuratedCorpusPolicyCheck() -> Bool {
+    let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+    let manifestURL = root
+        .appendingPathComponent("LUTLibrary/LUTs", isDirectory: true)
+        .appendingPathComponent(CuratedLUTManifest.fileName)
+
+    do {
+        let manifest = try CuratedLUTManifest.load(from: manifestURL)
+        let activeSources = Set(manifest.entries.map(\.sourceID))
+        let clusterValues = Set(LUTVisualCluster.allCases.map(\.rawValue))
+        let clustered = manifest.entries.filter {
+            guard let value = $0.visualCluster else { return false }
+            return clusterValues.contains(value)
+        }
+        let ok = manifest.sources["codex-generated"] == nil
+            && activeSources.contains("codex-generated") == false
+            && manifest.sources["claude-generated"] != nil
+            && activeSources.contains("claude-generated")
+            && manifest.entries.count == 1_876
+            && clustered.count == manifest.entries.count
+        print("curated corpus removes Codex and clusters all 1,876 LUTs -> \(ok ? "PASS" : "FAIL")")
+        return ok
+    } catch {
+        print("curated corpus removes Codex and clusters all 1,876 LUTs -> FAIL (\(error))")
+        return false
+    }
+}
+
+func runVisualClusterClassificationCheck() -> Bool {
+    func metrics(chroma: Double, hue: Double, mono: Double = 0.1) -> LUTMetrics {
+        LUTMetrics(
+            contrast: 1, saturation: 1, monoSpread: mono,
+            blackLevel: 0, whiteLevel: 1,
+            shadowChroma: chroma, highlightChroma: chroma,
+            shadowHue: hue, highlightHue: hue,
+            splitAngle: 0, skinRatio: 1
+        )
+    }
+    let cases: [(LUTMetrics, LUTVisualCluster)] = [
+        (metrics(chroma: 0.02, hue: 45), .warmBrown),
+        (metrics(chroma: 0.02, hue: 120), .yellowGreen),
+        (metrics(chroma: 0.02, hue: 190), .cyanGreen),
+        (metrics(chroma: 0.02, hue: 250), .coolBlue),
+        (metrics(chroma: 0.02, hue: 320), .purpleMagenta),
+        (metrics(chroma: 0.02, hue: 5), .warmRed),
+        (metrics(chroma: 0.001, hue: 45), .nearNeutral),
+        (metrics(chroma: 0.02, hue: 45, mono: 0), .monochrome),
+    ]
+    let ok = cases.allSatisfy { LUTVisualCluster.classify($0.0) == $0.1 }
+    print("visual cluster boundaries are deterministic -> \(ok ? "PASS" : "FAIL")")
+    return ok
+}
+
 @MainActor
 func runLibrarySourceMetadataCheck() -> Bool {
     let root = FileManager.default.temporaryDirectory
@@ -50,9 +103,9 @@ func runLibrarySourceMetadataCheck() -> Bool {
         {
           "version": 1,
           "sources": {
-            "codex": {
-              "label": "Codex Generated",
-              "description": "Codex source",
+            "claude": {
+              "label": "Claude Generated",
+              "description": "Claude source",
               "reference": null,
               "license": "project-owned"
             }
@@ -63,7 +116,8 @@ func runLibrarySourceMetadataCheck() -> Bool {
             "brand": "Fujifilm",
             "inputProfile": "Panasonic V-Log",
             "tags": ["相機風格"],
-            "sourceID": "codex",
+            "sourceID": "claude",
+            "visualCluster": "暖褐／咖啡",
             "description": null
           }],
           "duplicates": [],
@@ -75,11 +129,24 @@ func runLibrarySourceMetadataCheck() -> Bool {
         let catalogURL = root.appendingPathComponent("catalog.json")
         let catalog = LUTCatalog(fileURL: catalogURL)
         guard let id = catalog.adoptSavedLUT(cube) else { return false }
+        guard let firstCluster = catalog.createCollection(named: "色調 · 暖褐／咖啡"),
+              let duplicateCluster = catalog.createCollection(named: "色調 · 暖褐／咖啡")
+        else { return false }
         let durable = cube.withRecordID(id)
         catalog.seedCuratedMetadata(manifest.metadataByFingerprint, for: [durable])
         let relaunched = LUTCatalog(fileURL: catalogURL)
-        let ok = catalog.sourceLabel(for: durable) == "Codex Generated"
-            && relaunched.sourceLabel(for: durable) == "Codex Generated"
+        let seededMembership = catalog.members(of: firstCluster.id) == [id]
+            && catalog.members(of: duplicateCluster.id).isEmpty
+        let seededMembershipPersists = relaunched.collections.contains(where: { $0.id == firstCluster.id })
+            && relaunched.members(of: firstCluster.id) == [id]
+        catalog.setMembership(false, collectionID: firstCluster.id, recordIDs: [id])
+        catalog.seedCuratedMetadata(manifest.metadataByFingerprint, for: [durable])
+        let userRemovalSurvivesRescan = catalog.members(of: firstCluster.id).isEmpty
+        let ok = catalog.sourceLabel(for: durable) == "Claude Generated"
+            && relaunched.sourceLabel(for: durable) == "Claude Generated"
+            && seededMembership
+            && seededMembershipPersists
+            && userRemovalSurvivesRescan
         print("curated Source distinguishes same-named LUTs after relaunch -> \(ok ? "PASS" : "FAIL")")
         return ok
     } catch {

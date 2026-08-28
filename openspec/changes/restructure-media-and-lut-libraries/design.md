@@ -21,7 +21,7 @@ The requested screenshots demonstrate useful relationships—media beside the wo
 
 - Reproducing the supplied reference screenshots pixel for pixel.
 - Adding video playback, scrubbing, export, or video LUT rendering in this change.
-- Adding rule-based or condition-builder Smart Collections.
+- Adding user-authored rule-based or condition-builder Smart Collections. A repository curator may seed a static measured colour-family Collection once; it is not live-evaluated and becomes ordinary editable Collection metadata afterwards.
 - Nesting Collections or making them physical folders.
 - Letting users add or manage custom visual-Library sample images in this change.
 - Changing LUT interpolation, V-Log conversion, colour-space policy, or export rendering.
@@ -173,6 +173,13 @@ Folder mirrors the recursively nested filesystem and remains the only place wher
 
 Collections are manual in this change. The condition-builder shown in one reference would be a separate Smart Collection capability because it needs predicates, live evaluation, and explainable matching.
 
+The curated repository is allowed one bounded exception at ingestion: each
+retained LUT receives a versioned, measured colour-family value and is added
+once to the matching `色調 · …` Collection. The seed marker persists separately
+from membership. Removing a member or deleting the Collection is therefore a
+user edit that later scans do not reverse. No live predicate or condition UI is
+introduced.
+
 ### Ingest a real LUT corpus without flattening it
 
 The supplied acceptance corpus contains four materially different sources, so source folders remain the provenance boundary:
@@ -204,7 +211,7 @@ LUT Library discovery has three explicit navigation levels. Its home is a vertic
 
 Opening a shelf heading or View All replaces the home with a complete searchable Grid for that shelf. Card activation from either home or Grid opens the same LUT Library detail rather than switching to Viewer or Manager. Detail owns a persistent full-width navigation header whose leading Back action names the originating facet or shelf and also responds to Escape; Back is not buried inside the metadata Inspector. It returns to the exact originating home or Grid context, restores the originating card/control selection, and returns keyboard and assistive-technology focus rather than dropping it when the Back control disappears. This adopts the reference's catalogue rhythm without copying its styling and without adding marketplace, creator, download, or remote content concepts.
 
-Curated Source is separate from Brand and descriptive Tags. A card uses `Brand · Source` when Source adds information, while detail presents Source as its own field. This disambiguates equally named Codex, Claude, V-Log-Alchemy, and downloaded implementations without renaming LUT files or pretending Source is the visual Brand.
+Curated Source is separate from Brand and descriptive Tags. A card uses `Brand · Source` when Source adds information, while detail presents Source as its own field. This disambiguates equally named Claude, V-Log-Alchemy, and downloaded implementations without renaming LUT files or pretending Source is the visual Brand. Codex is not an active retained Source after the 2026-08-28 corpus decision.
 
 ### Use shared sample images and the production render path
 

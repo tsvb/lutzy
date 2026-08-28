@@ -62,6 +62,9 @@ struct LUTRecord: Identifiable, Codable, Sendable, Equatable {
     /// A repository manifest is an initial seed, not a live policy engine.
     /// Once considered, rescans must not put metadata back after a user edit.
     var curatedMetadataSeed: String? = nil
+    /// A separate one-time seed marker lets a user remove a LUT from its
+    /// measured hue Collection without a later rescan adding it back.
+    var curatedVisualClusterSeed: String? = nil
     /// A one-time compatibility repair for catalogs created before Brand was
     /// persisted. Optional keeps legacy snapshots decode-compatible.
     var legacyBrandInferenceVersion: Int? = nil
@@ -248,6 +251,17 @@ final class LUTCatalog: ObservableObject {
         for luts: [CubeLUT]
     ) {
         var changed = false
+        // User Collections are allowed to share a name. Pick the earliest
+        // deterministically instead of using `uniqueKeysWithValues`, which
+        // would fatal-trap during every later scan when duplicates exist.
+        var clusterIDs: [String: UUID] = [:]
+        let orderedCollections = collections.sorted {
+            if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+        for collection in orderedCollections where clusterIDs[collection.name] == nil {
+            clusterIDs[collection.name] = collection.id
+        }
         for lut in luts {
             guard let metadata = metadataByFingerprint[lut.contentHash],
                   var record = records[lut.lutID]
@@ -276,10 +290,32 @@ final class LUTCatalog: ObservableObject {
                 record.sourceLabel = metadata.sourceLabel
                 recordChanged = true
             }
+            if record.curatedVisualClusterSeed == nil,
+               let cluster = metadata.visualCluster {
+                let collectionName = cluster.collectionName
+                let collectionID: UUID
+                if let existing = clusterIDs[collectionName] {
+                    collectionID = existing
+                } else {
+                    let now = Date()
+                    let collection = LUTCollectionRecord(
+                        id: UUID(), name: collectionName, createdAt: now, updatedAt: now
+                    )
+                    collections.append(collection)
+                    clusterIDs[collectionName] = collection.id
+                    collectionID = collection.id
+                }
+                record.collectionIDs.insert(collectionID)
+                record.curatedVisualClusterSeed = "visual-cluster-v\(LUTVisualCluster.seedVersion):\(cluster.rawValue)"
+                recordChanged = true
+            }
             if recordChanged {
                 records[lut.lutID] = record
                 changed = true
             }
+        }
+        if changed {
+            collections.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
         if changed { persist() }
     }

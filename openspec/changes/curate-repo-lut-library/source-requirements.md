@@ -11,6 +11,17 @@ Recorded from the user's 2026-08-27 request. Referenced screenshots are design c
 - `/Users/world4jason/Douctments/luts` (resolved from the previously supplied existing path `/Users/world4jason/Documents/luts`)
 - `/Users/world4jason/Downloads/Downloaded Luts/lut unzip`
 
+## 2026-08-28 superseding curation decision
+
+The user later removed `code_ground/lut` from the retained corpus. Its 52
+Codex-generated canonical LUTs are no longer active or listed as a manifest
+Source. `code_ground/claude lut` remains. After that removal, all 1,876 active
+LUTs receive one measured, mutually exclusive colour-family classification.
+Those classifications seed editable metadata Collections named `色調 · …`;
+they do not change Brand, Source, descriptive Tags, Input Profile, or physical
+Folder. This supersedes requested-behaviour items 3 and the Codex portion of
+items 19 and 23 below while preserving them as the original requirement log.
+
 ## Requested behaviour
 
 1. Put LUTs from these roots under the current project and organise them once.
@@ -37,6 +48,10 @@ Recorded from the user's 2026-08-27 request. Referenced screenshots are design c
 22. Starred state must survive an application relaunch.
 23. Keep Source independently visible so equally named Codex, Claude, V-Log-Alchemy, and downloaded implementations can be distinguished even when their Brand and LUT name are the same.
 24. Remove meaningless folder wrappers from browsing where they only repeat provenance or packaging format, without rewriting the physical corpus or flattening arbitrary authored nesting.
+25. Remove Codex-generated LUTs from the active corpus and keep Claude-generated LUTs.
+26. Classify every remaining active LUT into exactly one measured colour family, including cyan/green and warm-brown/coffee families.
+27. Expose those families as editable Collections rather than physical folders, Brand, Source, or ordinary Tags.
+28. Seed each measured Collection once. If the user later removes membership or deletes a seeded Collection, rescanning must not recreate that authored choice.
 
 Reference screenshot: `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8b3bb8db-be22-4d9c-95f5-bebf66cec92e.png`.
 

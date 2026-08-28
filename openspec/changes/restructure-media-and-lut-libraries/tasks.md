@@ -51,6 +51,7 @@
 - [x] 5.3 Add Manager create, rename, delete, add-member, and remove-member workflows with no filesystem side effects
 - [x] 5.4 Preserve many-to-many membership across moves, renames, rescans, relaunches, temporary unavailability, and identical-content records
 - [x] 5.5 Keep Starred record-level and separate from user Collections
+- [x] 5.6 Seed versioned static colour-family Collections from curated manifest metadata exactly once, preserving later user membership edits
 
 ## 6. LUT Manager metadata
 

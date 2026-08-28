@@ -59,6 +59,7 @@ public enum LUTCorpusCurator {
     public struct Verification: Sendable, Equatable {
         public let active: Int
         public let profiles: [String: Int]
+        public let visualClusters: [String: Int]
     }
 
     public enum CuratorError: LocalizedError {
@@ -90,6 +91,7 @@ public enum LUTCorpusCurator {
         let metadata = manifest.metadataByFingerprint
         var fingerprints: Set<String> = []
         var profiles: [String: Int] = [:]
+        var visualClusters: [String: Int] = [:]
         for entry in manifest.entries {
             let file = activeRoot.appendingPathComponent(entry.relativePath)
             guard FileManager.default.fileExists(atPath: file.path) else {
@@ -115,6 +117,10 @@ public enum LUTCorpusCurator {
                 throw CuratorError.verificationFailed("incomplete metadata for \(entry.relativePath)")
             }
             profiles[seeded.inputProfile, default: 0] += 1
+            guard let cluster = seeded.visualCluster else {
+                throw CuratorError.verificationFailed("missing visual cluster for \(entry.relativePath)")
+            }
+            visualClusters[cluster.rawValue, default: 0] += 1
         }
 
         guard let enumerator = FileManager.default.enumerator(
@@ -129,7 +135,9 @@ public enum LUTCorpusCurator {
                 "manifest has \(manifest.entries.count) entries but disk has \(activeFiles) CUBE files"
             )
         }
-        return Verification(active: activeFiles, profiles: profiles)
+        return Verification(
+            active: activeFiles, profiles: profiles, visualClusters: visualClusters
+        )
     }
 
     public static func curate(
@@ -191,6 +199,12 @@ public enum LUTCorpusCurator {
                     requestedPath, fingerprint: lut.contentHash,
                     used: &activeDestinations
                 )
+                guard let metrics = LUTProfiler.measureIfAvailable(lut) else {
+                    throw CuratorError.verificationFailed(
+                        "could not measure visual cluster for \(candidate.sourcePath)"
+                    )
+                }
+                let visualCluster = LUTVisualCluster.classify(metrics)
                 let destination = activeRoot.appendingPathComponent(relative)
                 try copy(candidate.url, to: destination)
                 canonicalByFingerprint[lut.contentHash] = relative
@@ -205,6 +219,7 @@ public enum LUTCorpusCurator {
                             && $0.hasPrefix("input:") == false
                     })).sorted(),
                     sourceID: candidate.sourceID,
+                    visualCluster: visualCluster.rawValue,
                     description: nil
                 ))
             } catch {
@@ -316,7 +331,8 @@ public enum LUTCorpusCurator {
 
         `LUTs/` contains unique 3D LUTs that LUTzy can render. Files are grouped as
         `<Brand>/<Source>/…`; `.lutzy-library.json` carries Brand, Input Profile,
-        Tags, Description, provenance, and content fingerprints without changing CUBE bytes.
+        Tags, Description, provenance, measured visual cluster, and content fingerprints
+        without changing CUBE bytes.
 
         `Unsupported/` retains 1D or unreadable CUBE inputs outside the active scan root.
         See `SOURCE_AUDIT.md` before publishing. The initial local corpus can be large and
@@ -349,6 +365,17 @@ public enum LUTCorpusCurator {
         }).mapValues(\.count)
         for (profile, count) in profileCounts.sorted(by: { $0.key < $1.key }) {
             lines.append("- \(profile): \(count)")
+        }
+        lines += [
+            "",
+            "## Visual clusters",
+            "",
+        ]
+        let clusterCounts = Dictionary(grouping: entries, by: {
+            $0.visualCluster ?? "Missing"
+        }).mapValues(\.count)
+        for (cluster, count) in clusterCounts.sorted(by: { $0.key < $1.key }) {
+            lines.append("- \(cluster): \(count)")
         }
         lines += [
             "",

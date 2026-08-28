@@ -18,9 +18,9 @@ LUTLibrary/
 
 The physical hierarchy answers where a transform belongs and where it came from. Brand remains a dedicated catalog namespace and does not become an ordinary Tag. A source subfolder prevents two independently generated looks with the same target brand from being conflated.
 
-Source also travels into the catalog as its own read-only curated provenance value. Gallery cards present `Brand · Source` when those values differ, and detail exposes Source separately. This keeps identically named Codex, Claude, V-Log-Alchemy, and downloaded implementations distinguishable without polluting ordinary Tags or changing their filenames.
+Source also travels into the catalog as its own read-only curated provenance value. Gallery cards present `Brand · Source` when those values differ, and detail exposes Source separately. This keeps identically named Claude, V-Log-Alchemy, and downloaded implementations distinguishable without polluting ordinary Tags or changing their filenames. The earlier Codex-generated source was removed by the user's 2026-08-28 curation decision.
 
-Downloaded packs keep the same separation. `CINECOLOR_*`, plus packages carrying CINECOLOR's own installation document, use Brand `CINECOLOR`. Other packages use an evidenced maker or a stable pack-family label rather than pretending an input-camera folder is the maker. For example, SmallHD's multi-camera Movie Looks stay Brand `SmallHD`, Source `SmallHD Movie Looks 2`, while Canon/Sony/Panasonic folder names become precise Input Profiles. A Fujifilm visual family may therefore contain separately sourced Codex, Claude, and V-Log-Alchemy implementations without flattening Source into Brand or ordinary Tags.
+Downloaded packs keep the same separation. `CINECOLOR_*`, plus packages carrying CINECOLOR's own installation document, use Brand `CINECOLOR`. Other packages use an evidenced maker or a stable pack-family label rather than pretending an input-camera folder is the maker. For example, SmallHD's multi-camera Movie Looks stay Brand `SmallHD`, Source `SmallHD Movie Looks 2`, while Canon/Sony/Panasonic folder names become precise Input Profiles. A Fujifilm visual family may therefore contain separately sourced Claude and V-Log-Alchemy implementations without flattening Source into Brand or ordinary Tags.
 
 ## Canonicalisation
 
@@ -37,7 +37,7 @@ The curation operation is reproducible and does not mutate or delete any supplie
 `.lutzy-library.json` is versioned and contains:
 
 - source definitions with stable IDs, labels, descriptions, reference URLs or local-reference status, and license status;
-- one entry per active canonical LUT with relative path, SHA-256 fingerprint, Brand value, Input Profile, descriptive Tags, and a source ID;
+- one entry per active canonical LUT with relative path, SHA-256 fingerprint, Brand value, Input Profile, descriptive Tags, one measured visual cluster, and a source ID;
 - audit information for duplicates and unsupported candidates.
 
 The SHA-256 fingerprint is the durable join. Import may rename a file to avoid a basename collision, and the user may later move it between physical folders, without losing the seed metadata.
@@ -54,6 +54,11 @@ After a scan reconciles physical LUTs, the library loads any valid `.lutzy-libra
 - Tags are seeded into record-level typed Tags, excluding internal `input:*` values.
 - A seed marker records that the manifest was considered.
 
+Visual cluster uses a second one-time marker. It seeds exactly one editable
+`色調 · …` Collection per record without changing Brand, Source, Input, Tags,
+or physical location. The marker remains after membership is removed, so a
+later scan does not reverse the user's Collection edit.
+
 Once seeded, later scans never overwrite user changes. A malformed or unsupported manifest cannot prevent ordinary LUT scanning.
 
 ## Launch ownership
@@ -66,7 +71,7 @@ A distributed build may not have a source checkout or redistribution-ready binar
 
 The curator records the most specific defensible input profile, using evidence in this order: an explicit CUBE photo-style/header declaration, an upstream per-file or package contract, then an unambiguous filename or containing folder. Conflicting or absent evidence becomes `Unknown`. The profile vocabulary is human-readable and extensible because vendor generations such as C-Log 1/2/3, F-Log/F-Log2, and S-Log2/S-Log3 are operationally distinct.
 
-Brand describes the maker or visual family being organised. Input Profile describes the encoded pixels the transform accepts. For example, Codex/Claude Fujifilm-look files remain Brand `Fujifilm` with Input Profile `Panasonic V-Log`; V-Log-Alchemy `*S2V` adapters are Brand `Panasonic` with Input Profile `Panasonic STD`.
+Brand describes the maker or visual family being organised. Input Profile describes the encoded pixels the transform accepts. For example, Claude Fujifilm-look files remain Brand `Fujifilm` with Input Profile `Panasonic V-Log`; V-Log-Alchemy `*S2V` adapters are Brand `Panasonic` with Input Profile `Panasonic STD`.
 
 `CubeLUT.inputSpace` remains the rendering pipeline's current coarse adapter choice. Manifest Input Profile is truthful catalog metadata and does not silently pretend LUTzy implements every vendor log-to-display adapter. Panasonic V-Log keeps the existing automatic V-Log route; other camera-log profiles are presented explicitly instead of being mislabeled as Display.
 

@@ -41,6 +41,22 @@ A LUT SHALL be able to belong to multiple Collections, and adding or removing me
 - **WHEN** the user removes a LUT from a Collection
 - **THEN** the LUT disappears from that Collection but remains in the library, its folder, other Collections, and Starred state
 
+### Requirement: Curated colour-family Collections seed once
+
+The repository corpus SHALL seed one static `色調 · …` Collection membership
+per active LUT from its measured manifest cluster without turning Collections
+into live rules or changing physical organisation.
+
+#### Scenario: Open the retained curated corpus
+
+- **WHEN** the catalog first reconciles the 1,876 clustered manifest entries
+- **THEN** every available LUT belongs to exactly one of the eight colour-family Collections and remains in its original Folder with unchanged Brand, Source, Input Profile, and Tags
+
+#### Scenario: Override curated membership
+
+- **WHEN** the user removes a LUT from its seeded colour-family Collection or deletes that Collection
+- **THEN** later scans do not re-add or recreate the authored removal for records already considered by that seed version
+
 ### Requirement: Safe collection deletion
 Deleting a Collection SHALL delete only the Collection definition and membership metadata.
 

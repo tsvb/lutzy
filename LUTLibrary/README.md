@@ -2,7 +2,8 @@
 
 `LUTs/` contains unique 3D LUTs that LUTzy can render. Files are grouped as
 `<Brand>/<Source>/…`; `.lutzy-library.json` carries Brand, Input Profile,
-Tags, Description, provenance, and content fingerprints without changing CUBE bytes.
+Tags, Description, provenance, measured visual cluster, and content fingerprints
+without changing CUBE bytes.
 
 `Unsupported/` retains 1D or unreadable CUBE inputs outside the active scan root.
 See `SOURCE_AUDIT.md` before publishing. The initial local corpus can be large and

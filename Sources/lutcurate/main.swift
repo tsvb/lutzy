@@ -5,7 +5,6 @@ private struct Arguments {
     var output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent("LUTLibrary", isDirectory: true)
     var film = URL(fileURLWithPath: "/Users/world4jason/code_ground/Film-Luts", isDirectory: true)
-    var codex = URL(fileURLWithPath: "/Users/world4jason/code_ground/lut", isDirectory: true)
     var claude = URL(fileURLWithPath: "/Users/world4jason/code_ground/claude lut", isDirectory: true)
     var alchemy = URL(fileURLWithPath: "/Users/world4jason/code_ground/V-Log-Alchemy", isDirectory: true)
     var documents = URL(fileURLWithPath: "/Users/world4jason/Documents/luts", isDirectory: true)
@@ -24,7 +23,6 @@ private struct Arguments {
             switch key {
             case "--output": output = url
             case "--film-luts": film = url
-            case "--codex": codex = url
             case "--claude": claude = url
             case "--vlog-alchemy": alchemy = url
             case "--documents": documents = url
@@ -52,13 +50,6 @@ private enum CLIError: LocalizedError {
 }
 
 private let sources: [LUTCorpusCurator.SourceDefinition] = [
-    .init(
-        id: "codex-generated",
-        label: "Codex-generated LUTs",
-        description: "Codex 產生；為 LUMIX S9 建立的 V-Log/V-Gamut 完成色 LUT，包含 Sony、RICOH 與 Fujifilm 方向性風格及中性技術檢查。",
-        reference: "local project: code_ground/lut",
-        license: "Project-generated; publication status to be confirmed"
-    ),
     .init(
         id: "claude-generated",
         label: "Claude-generated LUTs",
@@ -263,21 +254,11 @@ private func documentedInputProfile(for url: URL, relativePath: String) -> Strin
     return LUTInputProfileInference.profile(relativePath: relativePath)
 }
 
-private func generatedCandidates(
-    root: URL, sourceID: String, sourceFolder: String, priority: Int
-) throws -> [LUTCorpusCurator.Candidate] {
+private func claudeCandidates(root: URL) throws -> [LUTCorpusCurator.Candidate] {
     var result: [LUTCorpusCurator.Candidate] = []
-    let lutsRoot: URL
-    let toolsRoot: URL
-    if sourceID == "codex-generated" {
-        let release = root.appendingPathComponent("releases/vlog-luts.staging", isDirectory: true)
-        lutsRoot = release.appendingPathComponent("luts/vlog", isDirectory: true)
-        toolsRoot = release.appendingPathComponent("tools", isDirectory: true)
-    } else {
-        let release = root.appendingPathComponent("out/lumix-s9-vlog", isDirectory: true)
-        lutsRoot = release.appendingPathComponent("luts", isDirectory: true)
-        toolsRoot = release.appendingPathComponent("tools", isDirectory: true)
-    }
+    let release = root.appendingPathComponent("out/lumix-s9-vlog", isDirectory: true)
+    let lutsRoot = release.appendingPathComponent("luts", isDirectory: true)
+    let toolsRoot = release.appendingPathComponent("tools", isDirectory: true)
     for url in try cubeFiles(under: lutsRoot) {
         let rel = relative(url, to: lutsRoot)
         let components = rel.split(separator: "/").map(String.init)
@@ -286,25 +267,25 @@ private func generatedCandidates(
         let rest = components.dropFirst().joined(separator: "/")
         result.append(.init(
             url: url,
-            sourceID: sourceID,
+            sourceID: "claude-generated",
             sourcePath: "\(root.lastPathComponent)/\(relative(url, to: root))",
-            destinationRelativePath: "\(brand)/\(sourceFolder)/\(rest)",
+            destinationRelativePath: "\(brand)/Claude Generated/\(rest)",
             brand: brand,
             inputProfile: lumixInputProfile(url) ?? "Panasonic V-Log",
             tags: semanticTags(path: rel, base: ["完成色", "相機風格"]),
-            priority: priority
+            priority: 10
         ))
     }
     for url in try cubeFiles(under: toolsRoot) {
         result.append(.init(
             url: url,
-            sourceID: sourceID,
+            sourceID: "claude-generated",
             sourcePath: "\(root.lastPathComponent)/\(relative(url, to: root))",
-            destinationRelativePath: "Panasonic/\(sourceFolder)/Technical/\(url.lastPathComponent)",
+            destinationRelativePath: "Panasonic/Claude Generated/Technical/\(url.lastPathComponent)",
             brand: "Panasonic",
             inputProfile: lumixInputProfile(url) ?? "Panasonic V-Log",
             tags: semanticTags(path: url.lastPathComponent, base: ["技術轉換", "中性"]),
-            priority: priority
+            priority: 10
         ))
     }
     return result
@@ -420,10 +401,14 @@ do {
         for (profile, count) in result.profiles.sorted(by: { $0.key < $1.key }) {
             print("\(profile): \(count)")
         }
+        print("Visual clusters:")
+        for (cluster, count) in result.visualClusters.sorted(by: { $0.key < $1.key }) {
+            print("\(cluster): \(count)")
+        }
         exit(0)
     }
     for root in [
-        arguments.film, arguments.codex, arguments.claude,
+        arguments.film, arguments.claude,
         arguments.alchemy, arguments.documents, arguments.downloads,
     ]
         where FileManager.default.fileExists(atPath: root.path) == false {
@@ -431,14 +416,7 @@ do {
     }
 
     var candidates: [LUTCorpusCurator.Candidate] = []
-    candidates += try generatedCandidates(
-        root: arguments.codex,
-        sourceID: "codex-generated", sourceFolder: "Codex Generated", priority: 0
-    )
-    candidates += try generatedCandidates(
-        root: arguments.claude,
-        sourceID: "claude-generated", sourceFolder: "Claude Generated", priority: 10
-    )
+    candidates += try claudeCandidates(root: arguments.claude)
     candidates += try alchemyCandidates(root: arguments.alchemy)
     candidates += try filmCandidates(root: arguments.film)
     candidates += try documentCandidates(root: arguments.documents)

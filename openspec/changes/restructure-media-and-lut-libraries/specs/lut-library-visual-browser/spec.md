@@ -96,7 +96,7 @@ Each LUT Library Gallery card SHALL show a rendered sample preview, LUT name, ex
 
 #### Scenario: Same name and Brand have different Sources
 
-- **WHEN** Codex and Claude provide distinct LUT records with the same effective name and Brand
+- **WHEN** Claude and V-Log-Alchemy provide distinct retained LUT records with the same effective name and Brand
 - **THEN** each card identifies its Source beside the Brand so the records remain distinguishable without opening their physical folders
 
 #### Scenario: LUT has confirmed vendor and many tags

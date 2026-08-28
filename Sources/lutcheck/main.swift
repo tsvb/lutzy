@@ -8,6 +8,8 @@ import Foundation
 
 if CommandLine.arguments.contains("--library-bootstrap-only") {
     let ok = runLibraryBootstrapCheck()
+        && runCuratedCorpusPolicyCheck()
+        && runVisualClusterClassificationCheck()
         && runLibrarySourceMetadataCheck()
         && runFolderNavigationNoiseCheck()
     Foundation.exit(ok ? EXIT_SUCCESS : EXIT_FAILURE)

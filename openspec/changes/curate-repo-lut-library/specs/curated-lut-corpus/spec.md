@@ -4,9 +4,9 @@
 
 The project SHALL provide a reproducible repository-local LUT corpus whose active LUTs are renderable unique 3D transforms physically grouped by Brand and Source, without modifying the supplied source directories or third-party LUT bytes.
 
-#### Scenario: Curate generated and third-party sources
+#### Scenario: Curate retained generated and third-party sources
 
-- **WHEN** the curator processes the six supplied source roots
+- **WHEN** the curator processes the five retained source roots after the Codex project is removed
 - **THEN** it selects documented canonical outputs, groups active LUTs under `<Brand>/<Source>`, and records the source path and provenance of every canonical LUT
 
 #### Scenario: Curate downloaded multi-site packs
@@ -26,8 +26,13 @@ The project SHALL provide a reproducible repository-local LUT corpus whose activ
 
 #### Scenario: Preserve separately authored versions
 
-- **WHEN** Codex, Claude, V-Log-Alchemy, or another source provides a similarly named Look with a different transform fingerprint
+- **WHEN** Claude, V-Log-Alchemy, or another retained source provides a similarly named Look with a different transform fingerprint
 - **THEN** every distinct implementation remains active under its own Source path
+
+#### Scenario: Remove the Codex-generated source
+
+- **WHEN** the repository corpus is regenerated after the user's 2026-08-28 curation decision
+- **THEN** no active entry or Source definition is `codex-generated`, Claude-generated entries remain, and the active count is 1,876
 
 #### Scenario: Encounter an exact duplicate
 
@@ -41,12 +46,28 @@ The project SHALL provide a reproducible repository-local LUT corpus whose activ
 
 ### Requirement: Curated metadata travels beside LUT bytes
 
-The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed by SHA-256 fingerprint with source, Brand, Input Profile, Tags, Description provenance, and relative path metadata.
+The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed by SHA-256 fingerprint with source, Brand, Input Profile, Tags, Description provenance, measured visual cluster, and relative path metadata.
 
 #### Scenario: Distinguish independently authored same-name LUTs
 
-- **WHEN** two LUTs share a display name and Brand but originate from different curated Sources such as Codex and Claude
+- **WHEN** two LUTs share a display name and Brand but originate from different retained curated Sources such as Claude and V-Log-Alchemy
 - **THEN** Source persists as a dedicated catalog value and LUT Library presents it independently from Brand and ordinary Tags after relaunch
+
+### Requirement: Every retained LUT receives one explainable visual cluster
+
+Every active LUT SHALL be assigned exactly one measured colour family from the
+versioned vocabulary `近中性`, `暖褐／咖啡`, `黃綠`, `青綠`, `藍冷`, `紫洋紅`,
+`紅暖`, and `黑白`.
+
+#### Scenario: Classify the retained corpus
+
+- **WHEN** the curator measures all 1,876 active transforms
+- **THEN** every manifest entry contains one valid visual cluster and the cluster totals sum to 1,876
+
+#### Scenario: Keep authored dimensions independent
+
+- **WHEN** a LUT is assigned a measured visual cluster
+- **THEN** its Brand, Source, Input Profile, descriptive Tags, filename, and physical Folder remain unchanged
 
 #### Scenario: File is renamed during import
 
@@ -87,7 +108,7 @@ Every active manifest entry SHALL record the most specific defensible Input Prof
 
 #### Scenario: Emulated brand differs from input encoding
 
-- **WHEN** a Fujifilm-look Codex or Claude LUT is authored for Panasonic V-Log/V-Gamut pixels
+- **WHEN** a Fujifilm-look Claude LUT is authored for Panasonic V-Log/V-Gamut pixels
 - **THEN** Brand is `Fujifilm` and Input Profile is `Panasonic V-Log`
 
 #### Scenario: Panasonic Standard adapter

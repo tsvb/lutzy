@@ -20,7 +20,11 @@
 - [x] 18. Extend deterministic curation for CINECOLOR, SmallHD, FilterGrade, PremiumBeat, film-emulation, Hollywood, and otherwise named downloaded packs.
 - [x] 19. Add downloaded-pack classification checks, rebuild the complete corpus, and verify parseability, tags, fingerprints, duplicates, and unsupported counts.
 - [x] 20. Run the scoped OpenSpec, build, corpus, and diff acceptance gates for the expanded library.
-- [x] 21. Make repository builds open the curated 1,928-LUT corpus by default, retain the Application Support fallback, and verify the running app count.
+- [x] 21. Make repository builds open the curated corpus by default, retain the Application Support fallback, and verify the running app count.
 - [x] 22. Export the current 79 Starred LUTs into a dated Brand/Source evaluation snapshot outside the active scan root, with a durable identity index.
 - [x] 23. Persist curated Source independently from Brand/Tags and show it on Gallery cards and LUT detail to distinguish same-name implementations.
 - [x] 24. Verify Source after catalog relaunch and verify the actual 79-item Starred state after an application relaunch.
+- [x] 25. Add failing acceptance checks for Codex removal, Claude retention, complete 1,876-entry cluster coverage, deterministic boundaries, and one-time Collection seeding.
+- [x] 26. Remove the Codex source from deterministic curation and regenerate the 1,876-LUT repository corpus while retaining Claude.
+- [x] 27. Measure one exclusive visual cluster per active transform and persist it in the curated manifest.
+- [x] 28. Seed versioned `色調 · …` Collections once per durable record without overwriting later membership edits.

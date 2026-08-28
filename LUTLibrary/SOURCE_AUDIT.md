@@ -1,7 +1,7 @@
 # LUT corpus source audit
 
-- Active renderable LUTs: 1928
-- Exact transform duplicates skipped: 116
+- Active renderable LUTs: 1876
+- Exact transform duplicates skipped: 115
 - Unsupported inputs retained outside the active root: 115
 
 ## Input profiles
@@ -23,12 +23,23 @@
 - GoPro Protune: 1
 - Nikon N-Log: 12
 - Panasonic STD: 8
-- Panasonic V-Log: 157
+- Panasonic V-Log: 105
 - RED Log3G10: 9
 - Sony S-Log: 24
 - Sony S-Log2: 16
 - Sony S-Log3: 61
 - Unknown: 1115
+
+## Visual clusters
+
+- 暖褐／咖啡: 229
+- 紅暖: 31
+- 紫洋紅: 90
+- 藍冷: 323
+- 近中性: 506
+- 青綠: 247
+- 黃綠: 356
+- 黑白: 94
 
 ## Sources
 
@@ -51,13 +62,6 @@ Cine LUTs Free 創意套件；隨附說明僅確認一般剪輯軟體使用方�
 Claude 產生；為 LUMIX S9 建立的 V-Log/V-Gamut 至 Rec.709/sRGB 完成色 LUT。
 
 - Reference: local project: code_ground/claude lut
-- License/status: Project-generated; publication status to be confirmed
-
-### Codex-generated LUTs (`codex-generated`)
-
-Codex 產生；為 LUMIX S9 建立的 V-Log/V-Gamut 完成色 LUT，包含 Sony、RICOH 與 Fujifilm 方向性風格及中性技術檢查。
-
-- Reference: local project: code_ground/lut
 - License/status: Project-generated; publication status to be confirmed
 
 ### Documents LUT collection (`documents-collection`)
@@ -153,7 +157,6 @@ Super 8 Footage 日光／夜間創意套件；保留底片與時段標籤，Inpu
 
 ## Skipped duplicate paths
 
-- `lut/releases/vlog-luts.staging/tools/lumix-s9-vlog-neutral-check.cube` → `LUTs/Sony/Codex Generated/sony-vlog-st.cube`
 - `V-Log-Alchemy/Luts/Panasonic-Standard/Conversion/GH7S2V.cube` → `LUTs/Panasonic/V-Log Alchemy/Panasonic-Standard/Conversion/G9IIS2V.cube`
 - `V-Log-Alchemy/Luts/Panasonic-Standard/Conversion/S5IIXS2V.cube` → `LUTs/Panasonic/V-Log Alchemy/Panasonic-Standard/Conversion/S5IIS2V.cube`
 - `Film-Luts/luts/bw/ilford_hps_800.cube` → `LUTs/G-MIC Film LUTs/Film-Luts/bw/ilford_hp_5_plus_400.cube`
@@ -387,4 +390,3 @@ Super 8 Footage 日光／夜間創意套件；保留底片與時段標籤，Inpu
 - `Documents/luts/test/Nikon/RED/Resolve12RLFtoRG3V3FR.cube` → `Unsupported/Nikon/Documents Collection/RED/Resolve12RLFtoRG3V3FR.cube`: invalidFormat("LUT_3D_SIZE not found")
 - `Documents/luts/test/Nikon/RED/Resolve12RLFtoRG4_1D.cube` → `Unsupported/Nikon/Documents Collection/RED/Resolve12RLFtoRG4_1D.cube`: invalidFormat("LUT_3D_SIZE not found")
 - `Documents/luts/test/Nikon/RED/Resolve16RLFtoRG3V3FR.cube` → `Unsupported/Nikon/Documents Collection/RED/Resolve16RLFtoRG3V3FR.cube`: invalidFormat("LUT_3D_SIZE not found")
-

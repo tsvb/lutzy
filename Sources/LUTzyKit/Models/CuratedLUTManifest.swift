@@ -72,6 +72,8 @@ struct CuratedLUTMetadata: Sendable, Equatable {
     let sourceLabel: String
     let inputProfile: String
     let tags: [String]
+    /// One measured visual family, seeded into a user-editable Collection.
+    let visualCluster: LUTVisualCluster?
     let description: String
 }
 
@@ -99,6 +101,8 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
         let inputProfile: String?
         let tags: [String]
         let sourceID: String
+        /// Optional keeps pre-clustering version-1 sidecars decodable.
+        let visualCluster: String?
         let description: String?
     }
 
@@ -225,6 +229,7 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
                 sourceLabel: source.label.trimmingCharacters(in: .whitespacesAndNewlines),
                 inputProfile: input?.isEmpty == false ? input! : "Unknown",
                 tags: tags,
+                visualCluster: entry.visualCluster.flatMap(LUTVisualCluster.init(rawValue:)),
                 description: description
             )
         }
@@ -254,6 +259,10 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
                 throw ManifestError.invalidEntry(entry.relativePath)
             }
             guard sources[entry.sourceID] != nil else { throw ManifestError.missingSource(entry.sourceID) }
+            if let cluster = entry.visualCluster,
+               LUTVisualCluster(rawValue: cluster) == nil {
+                throw ManifestError.invalidEntry(entry.relativePath)
+            }
         }
     }
 }
