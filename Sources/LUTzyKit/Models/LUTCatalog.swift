@@ -202,10 +202,16 @@ final class LUTCatalog: ObservableObject {
     }
 
     func effectiveName(for lut: CubeLUT) -> String {
-        guard let override = record(for: lut)?.displayNameOverride?
-            .trimmingCharacters(in: .whitespacesAndNewlines), override.isEmpty == false
-        else { return lut.name }
-        return override
+        let record = record(for: lut)
+        if let override = record?.displayNameOverride?
+            .trimmingCharacters(in: .whitespacesAndNewlines), override.isEmpty == false {
+            return override
+        }
+        return LUTDisplayName.normalized(
+            lut.name,
+            brand: record?.origin.label,
+            source: record?.sourceLabel
+        )
     }
 
     func origin(for lut: CubeLUT) -> LUTOrigin { record(for: lut)?.origin ?? .unknown }
@@ -290,24 +296,37 @@ final class LUTCatalog: ObservableObject {
                 record.sourceLabel = metadata.sourceLabel
                 recordChanged = true
             }
-            if record.curatedVisualClusterSeed == nil,
-               let cluster = metadata.visualCluster {
-                let collectionName = cluster.collectionName
-                let collectionID: UUID
-                if let existing = clusterIDs[collectionName] {
-                    collectionID = existing
-                } else {
-                    let now = Date()
-                    let collection = LUTCollectionRecord(
-                        id: UUID(), name: collectionName, createdAt: now, updatedAt: now
-                    )
-                    collections.append(collection)
-                    clusterIDs[collectionName] = collection.id
-                    collectionID = collection.id
+            // A visual family is a measurement, not an authored value, so a
+            // rule change has to reach a Library that was already seeded.
+            // Reseeding moves the record out of the Collection the previous
+            // rules put it in — that membership was ours, not the user's — and
+            // leaves every other Collection it belongs to alone.
+            if let cluster = metadata.visualCluster {
+                let seeded = record.curatedVisualClusterSeed.flatMap(LUTVisualCluster.parseSeed)
+                let isStale = seeded.map { $0.version < LUTVisualCluster.seedVersion } ?? true
+                if isStale {
+                    if let previous = seeded,
+                       previous.family != cluster.rawValue,
+                       let staleID = clusterIDs[LUTVisualCluster.collectionName(family: previous.family)] {
+                        record.collectionIDs.remove(staleID)
+                    }
+                    let collectionName = cluster.collectionName
+                    let collectionID: UUID
+                    if let existing = clusterIDs[collectionName] {
+                        collectionID = existing
+                    } else {
+                        let now = Date()
+                        let collection = LUTCollectionRecord(
+                            id: UUID(), name: collectionName, createdAt: now, updatedAt: now
+                        )
+                        collections.append(collection)
+                        clusterIDs[collectionName] = collection.id
+                        collectionID = collection.id
+                    }
+                    record.collectionIDs.insert(collectionID)
+                    record.curatedVisualClusterSeed = LUTVisualCluster.seedMarker(cluster)
+                    recordChanged = true
                 }
-                record.collectionIDs.insert(collectionID)
-                record.curatedVisualClusterSeed = "visual-cluster-v\(LUTVisualCluster.seedVersion):\(cluster.rawValue)"
-                recordChanged = true
             }
             if recordChanged {
                 records[lut.lutID] = record
@@ -315,6 +334,10 @@ final class LUTCatalog: ObservableObject {
             }
         }
         if changed {
+            // Keep obsolete seeded Collections until the user explicitly
+            // reviews and deletes them. A taxonomy revision may move every LUT
+            // out of an old family, but that is not permission to delete a
+            // Collection from the user's catalog.
             collections.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
         if changed { persist() }

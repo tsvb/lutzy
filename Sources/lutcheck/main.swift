@@ -6,12 +6,25 @@ import UniformTypeIdentifiers
 import Foundation
 @testable import LUTzyKit
 
+if CommandLine.arguments.contains("--viewer-performance-only") {
+    let searchOK = await runGallerySearchCoalescingCheck()
+    let gridOK = await runGridSelectionRenderScopeCheck()
+    Foundation.exit(searchOK && gridOK ? EXIT_SUCCESS : EXIT_FAILURE)
+}
+
+if CommandLine.arguments.contains("--import-review-preview-only") {
+    let ok = await runImportReviewVisualComparisonCheck()
+    Foundation.exit(ok ? EXIT_SUCCESS : EXIT_FAILURE)
+}
+
 if CommandLine.arguments.contains("--library-bootstrap-only") {
     let ok = runLibraryBootstrapCheck()
         && runCuratedCorpusPolicyCheck()
         && runVisualClusterClassificationCheck()
+        && runVisualClusterReseedCheck()
         && runLibrarySourceMetadataCheck()
         && runFolderNavigationNoiseCheck()
+        && runCuratedPathCompactionCheck()
     Foundation.exit(ok ? EXIT_SUCCESS : EXIT_FAILURE)
 }
 
@@ -1492,6 +1505,18 @@ let differenceGenerationOK = hadCompleteDifference
 layoutOK = layoutOK && differenceGenerationOK
 print("difference waits for the current A/B render pair -> \(differenceGenerationOK ? "PASS" : "FAIL")")
 
+// Restoring the chosen base can publish its stable LUT ID before the current
+// frame has allocated a parallel raster slot. Rendering must repair that
+// transient shape rather than indexing the shorter image array.
+let comparisonStorageVM = AppViewModel()
+comparisonStorageVM.comparisonLayout = .diff
+comparisonStorageVM.cellLUTIDs = [nil]
+comparisonStorageVM.cellImages = []
+comparisonStorageVM.synchronizeComparisonCellStorage()
+let comparisonStorageOK = comparisonStorageVM.cellImages.count == comparisonStorageVM.cellLUTIDs.count
+layoutOK = layoutOK && comparisonStorageOK
+print("comparison render storage follows restored LUT slots -> \(comparisonStorageOK ? "PASS" : "FAIL")")
+
 let focusVM = AppViewModel()
 focusVM.section = .viewer
 focusVM.setLayout(.wipe)
@@ -1728,6 +1753,9 @@ if FileManager.default.fileExists(atPath: lutFolder), writeJPEG(description: nil
 }
 print("grid -> \(gridOK ? "PASS" : "FAIL")")
 
+let searchPerformanceOK = await runGallerySearchCoalescingCheck()
+let gridPerformanceOK = await runGridSelectionRenderScopeCheck()
+let importReviewPreviewOK = await runImportReviewVisualComparisonCheck()
 let durableLibraryOK = await runDurableLibraryChecks()
 
-exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && completeTagsOK && corpusTagsOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && navigationOwnershipOK && viewerCompositionOK && folderHierarchyOK && deepFolderOK && durableLibraryOK ? 0 : 1)
+exit(inverseOK && switchOK && subsetOK && editorOK && projectOK && bulkOK && starOK && importOK && removeOK && diffOK && storeOK && completeTagsOK && corpusTagsOK && tagsMatchOK && colourOK && gridOK && layoutOK && adapterOK && tagsOK && detectionOK && pipelineOK && metadataOK && navigationOwnershipOK && viewerCompositionOK && folderHierarchyOK && deepFolderOK && searchPerformanceOK && gridPerformanceOK && importReviewPreviewOK && durableLibraryOK ? 0 : 1)

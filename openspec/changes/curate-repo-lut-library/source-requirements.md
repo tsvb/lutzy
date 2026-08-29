@@ -52,6 +52,13 @@ items 19 and 23 below while preserving them as the original requirement log.
 26. Classify every remaining active LUT into exactly one measured colour family, including cyan/green and warm-brown/coffee families.
 27. Expose those families as editable Collections rather than physical folders, Brand, Source, or ordinary Tags.
 28. Seed each measured Collection once. If the user later removes membership or deletes a seeded Collection, rescanning must not recreate that authored choice.
+29. Visual acceptance must launch the freshly built bundle from the current checkout by absolute path, must not reuse an already-running LUTzy process, and must expose branch/commit identity in the running window.
+30. Use the Panasonic DC-S9 reference as LUT Library's default comparison sample without removing the existing fixed samples.
+31. Clean filename-derived display labels non-destructively; preserve physical filenames and meaningful technical tokens, and qualify otherwise numeric labels with Brand or Source.
+32. Hue angles are circular. No measured split angle may exceed 180 degrees, and changing the measurement rule must invalidate stale measured tags.
+33. Do not delete the seeded colour Collections merely because the current coarse grouping needs review; relaunch with the Panasonic sample and let the user assess the corrected, current build first.
+34. Superseding item 24 for the repository corpus: remove generic provenance and packaging wrappers from the actual physical `LUTLibrary/LUTs` tree, including `Documents Collection`, repeated Brand/Source names, `3dlut`, grid-size, range, and export-tool-only layers. Preserve meaningful authored pack/family nesting and every CUBE byte.
+35. Treat the manifest/catalog as the durable metadata database for Source, Description, Brand, Input Profile, Tags, provenance, and duplicate identity. LUT Manager is the table/Inspector surface for that metadata; physical folders do not need to repeat it.
 
 Reference screenshot: `/var/folders/pt/8st82qw57rs05k145xw2_5w40000gn/T/codex-clipboard-8b3bb8db-be22-4d9c-95f5-bebf66cec92e.png`.
 

@@ -129,11 +129,23 @@ The result previews live on your current image immediately and stays a scratch L
 
 LUTzy is a Swift Package — no `.xcodeproj` to manage.
 
-**Quickest (CLI):**
+**Visual acceptance (recommended):**
+```bash
+./scripts/launch-acceptance.sh debug
+```
+This builds the current checkout, closes any already-running LUTzy copy, opens
+that exact bundle by absolute path, and verifies the launched executable. The
+window title includes `branch @ commit · configuration`; an app labelled
+`unverified build` is not an acceptance build. Do not use `open -a LUTzy` for
+acceptance because LaunchServices may activate a same-ID copy from another
+worktree.
+
+**Quickest development loop (CLI):**
 ```bash
 swift run
 ```
 Builds and launches the app for fast iteration. Note: the SwiftUI executable target runs without the bundled asset catalog or sandbox entitlements, so the app icon and security-scoped bookmark persistence won't be active in this mode.
+It is intentionally labelled `unverified build` and must not be used for visual acceptance.
 
 **Recommended (Xcode) — full app behavior, icon, and App Sandbox:**
 ```bash

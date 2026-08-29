@@ -41,7 +41,7 @@ final class LUTTagStore: ObservableObject {
 
     /// Bump when `LUTProfiler`'s metrics or thresholds change. Every entry below
     /// this is re-measured on the next scan; typed tags are unaffected.
-    static let taggerVersion = 2
+    static let taggerVersion = 3
 
     /// Everything known, by content hash.
     @Published private(set) var entries: [String: Entry] = [:]

@@ -5,24 +5,34 @@ import SwiftUI
 /// an automatic rename, move, Tag, or Collection mutation.
 struct LUTImportReviewView: View {
     let review: LUTImportReview
+    @ObservedObject var viewModel: AppViewModel
     let onInspect: (LUTID) -> Void
     let onDismiss: () -> Void
 
     @State private var selection: LUTID?
+    @State private var matchSelection: LUTID?
 
     init(
         review: LUTImportReview,
+        viewModel: AppViewModel,
         onInspect: @escaping (LUTID) -> Void,
         onDismiss: @escaping () -> Void
     ) {
         self.review = review
+        self.viewModel = viewModel
         self.onInspect = onInspect
         self.onDismiss = onDismiss
         _selection = State(initialValue: review.recommendations.first?.id)
+        _matchSelection = State(initialValue: review.recommendations.first?.matches.first?.id)
     }
 
     private var selected: LUTImportRecommendation? {
         review.recommendations.first { $0.id == selection } ?? review.recommendations.first
+    }
+
+    private var selectedMatch: LUTImportMatch? {
+        guard let selected else { return nil }
+        return selected.matches.first { $0.id == matchSelection } ?? selected.matches.first
     }
 
     var body: some View {
@@ -38,7 +48,10 @@ struct LUTImportReviewView: View {
             Divider()
             footer
         }
-        .frame(minWidth: 760, idealWidth: 860, minHeight: 500, idealHeight: 580)
+        .frame(minWidth: 900, idealWidth: 1080, minHeight: 620, idealHeight: 720)
+        .onChange(of: selection) { _, _ in
+            matchSelection = selected?.matches.first?.id
+        }
     }
 
     private var header: some View {
@@ -119,6 +132,9 @@ struct LUTImportReviewView: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: 210)
                     } else {
+                        if let selectedMatch {
+                            visualComparison(imported: selected, match: selectedMatch)
+                        }
                         ForEach(selected.matches) { match in
                             matchRow(match)
                         }
@@ -128,6 +144,35 @@ struct LUTImportReviewView: View {
             }
         } else {
             ContentUnavailableView("Nothing imported", systemImage: "cube.transparent")
+        }
+    }
+
+    private func visualComparison(
+        imported: LUTImportRecommendation,
+        match: LUTImportMatch
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(
+                "Panasonic S9 · same sample and input handling",
+                systemImage: "photo.on.rectangle.angled"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            HStack(alignment: .top, spacing: 10) {
+                LUTImportPreviewPanel(
+                    title: "Imported",
+                    name: imported.name,
+                    lutID: imported.id,
+                    viewModel: viewModel
+                )
+                LUTImportPreviewPanel(
+                    title: "Library · \(Int((match.similarity * 100).rounded()))% similar",
+                    name: match.name,
+                    lutID: match.id,
+                    viewModel: viewModel
+                )
+            }
         }
     }
 
@@ -149,11 +194,19 @@ struct LUTImportReviewView: View {
                 }
             }
             Spacer(minLength: 8)
+            Button(matchSelection == match.id ? "Comparing" : "Compare") {
+                matchSelection = match.id
+            }
+            .buttonStyle(.bordered)
+            .disabled(matchSelection == match.id)
             Button("Inspect") { onInspect(match.id) }
                 .buttonStyle(.bordered)
         }
         .padding(12)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
+        .background(
+            matchSelection == match.id ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 9)
+        )
     }
 
     private var footer: some View {
@@ -173,5 +226,60 @@ struct LUTImportReviewView: View {
         if review.duplicates > 0 { parts.append("\(review.duplicates) duplicate") }
         if review.failed > 0 { parts.append("\(review.failed) failed") }
         return parts.joined(separator: " · ")
+    }
+}
+
+private struct LUTImportPreviewPanel: View {
+    let title: String
+    let name: String
+    let lutID: LUTID
+    @ObservedObject var viewModel: AppViewModel
+
+    @State private var preview: NSImage?
+    @State private var finished = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                Color(nsColor: NSColor(red: 0.06, green: 0.06, blue: 0.07, alpha: 1))
+                if let preview {
+                    Image(nsImage: preview)
+                        .resizable()
+                        .scaledToFit()
+                } else if finished {
+                    Label("Preview unavailable", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .aspectRatio(16 / 10, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(name)")
+        .task(id: lutID, priority: .userInitiated) {
+            let requestedID = lutID
+            preview = nil
+            finished = false
+            let rendered = await viewModel.makeLUTImportReviewPreview(
+                for: requestedID,
+                maxSize: CGSize(width: 720, height: 450)
+            )
+            guard Task.isCancelled == false, requestedID == lutID else { return }
+            preview = rendered
+            finished = true
+        }
     }
 }

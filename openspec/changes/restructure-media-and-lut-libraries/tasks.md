@@ -93,3 +93,4 @@
 - [x] 8.10 Add same-input-space post-import similarity review with confidence floor, explanations, exact-duplicate exclusion, and no metadata side effects
 - [x] 8.11 Serialize process-wide Library writes and each window's complete import-to-review pipeline, with concurrent same-name coverage
 - [x] 8.12 Coalesce duplicate card renders in a bounded preview cache and cancel hidden-level render interest
+- [x] 8.13 Render imported and recommended LUTs side by side on the fixed Panasonic sample with one identical neutral request, unavailable states, and a regression check

@@ -8,7 +8,7 @@ The application also has no durable Description field. LUT Manager can edit Name
 
 ## What changes
 
-- Add a repository-local `LUTLibrary` corpus with an active 3D library grouped as `<Brand>/<Source>/…`.
+- Add a repository-local `LUTLibrary` corpus with an active 3D library grouped as `<Brand>/<meaningful pack>/…`; keep Source and provenance in the sidecar/catalog metadata rather than generic physical wrappers.
 - Preserve source-relative provenance while deduplicating exact content and keeping unsupported transforms outside the active scan root.
 - Add a versioned `.lutzy-library.json` sidecar manifest keyed by SHA-256 rather than mutable filenames.
 - Seed Brand, precise Input Profile, descriptive Tags, and Description when a manifest-backed LUT first becomes a catalog record.

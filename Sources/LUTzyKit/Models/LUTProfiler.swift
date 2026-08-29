@@ -85,7 +85,7 @@ enum LUTProfiler {
         let highlightChroma = Double(hypot(highlight[1], highlight[2]))
         let shadowHue = degrees(shadow[2], shadow[1])
         let highlightHue = degrees(highlight[2], highlight[1])
-        let split = abs((shadowHue - highlightHue + 180).truncatingRemainder(dividingBy: 360) - 180)
+        let split = LUTSimilarity.circularHueDistance(shadowHue, highlightHue)
 
         // Black is asked for at the LUT's own black point: V-Log black sits at
         // 0.125, and asking below it says nothing about lifted shadows.
@@ -295,7 +295,7 @@ enum LUTSimilarity {
         }.prefix(max(limit, 0)))
     }
 
-    private static func circularHueDistance(_ lhs: Double, _ rhs: Double) -> Double {
+    static func circularHueDistance(_ lhs: Double, _ rhs: Double) -> Double {
         let raw = abs(lhs - rhs).truncatingRemainder(dividingBy: 360)
         return min(raw, 360 - raw)
     }

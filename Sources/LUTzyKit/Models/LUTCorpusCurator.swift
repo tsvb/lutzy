@@ -62,6 +62,20 @@ public enum LUTCorpusCurator {
         public let visualClusters: [String: Int]
     }
 
+    public struct Reclassification: Sendable, Equatable {
+        public let total: Int
+        /// How many entries the current rules put in a different family than
+        /// the manifest recorded. Zero means the shipped corpus was current.
+        public let moved: Int
+        public let visualClusters: [String: Int]
+    }
+
+    public struct HierarchyCompaction: Sendable, Equatable {
+        public let total: Int
+        public let moved: Int
+        public let collisions: Int
+    }
+
     public enum CuratorError: LocalizedError {
         case outputExists(URL)
         case missingSource(String)
@@ -78,6 +92,180 @@ public enum LUTCorpusCurator {
             case .verificationFailed(let detail): return "Curated corpus verification failed: \(detail)"
             }
         }
+    }
+
+    /// Project a curated destination into the physical hierarchy users manage.
+    /// Brand remains the top-level folder; provenance stays in the manifest's
+    /// Source metadata instead of becoming `Documents Collection`-style nodes.
+    public static func compactRelativePath(
+        _ relativePath: String, brand: String, sourceID: String
+    ) -> String {
+        let components = relativePath.split(separator: "/").map(String.init)
+        guard let fileName = components.last else { return relativePath }
+
+        let cleanedBrand = brand.trimmingCharacters(in: .whitespacesAndNewlines)
+        let root = cleanedBrand.isEmpty ? (components.first ?? "Unclassified") : cleanedBrand
+        var folders = Array(components.dropLast())
+        if let first = folders.first, equalFolder(first, root) {
+            folders.removeFirst()
+        }
+
+        var result = [root]
+        for rawFolder in folders {
+            let folder = rawFolder.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard folder.isEmpty == false,
+                  isPackagingWrapper(folder, brand: root, sourceID: sourceID) == false,
+                  equalFolder(folder, root) == false
+            else { continue }
+
+            let compacted: String
+            let prefix = root + " "
+            if folder.lowercased().hasPrefix(prefix.lowercased()) {
+                compacted = String(folder.dropFirst(prefix.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                compacted = folder
+            }
+            guard compacted.isEmpty == false,
+                  result.last.map({ equalFolder($0, compacted) }) != true
+            else { continue }
+            result.append(compacted)
+        }
+        result.append(fileName)
+        return result.joined(separator: "/")
+    }
+
+    /// Transactionally rewrite an existing repository corpus into the compact
+    /// hierarchy while keeping every CUBE byte and manifest metadata field.
+    public static func compactHierarchy(outputRoot: URL) throws -> HierarchyCompaction {
+        let fm = FileManager.default
+        let activeRoot = outputRoot.appendingPathComponent("LUTs", isDirectory: true)
+        let manifestURL = activeRoot.appendingPathComponent(CuratedLUTManifest.fileName)
+        let manifest = try CuratedLUTManifest.load(from: manifestURL)
+        let stagingOutput = outputRoot.deletingLastPathComponent().appendingPathComponent(
+            ".\(outputRoot.lastPathComponent).compacting-\(UUID().uuidString)", isDirectory: true
+        )
+        let stagingActive = stagingOutput.appendingPathComponent("LUTs", isDirectory: true)
+        var completed = false
+        defer { if completed == false { try? fm.removeItem(at: stagingOutput) } }
+        try fm.createDirectory(at: stagingActive, withIntermediateDirectories: true)
+
+        var used: Set<String> = []
+        var pathMap: [String: String] = [:]
+        var updatedEntries: [CuratedLUTManifest.Entry] = []
+        var moved = 0
+        var collisions = 0
+        for entry in manifest.entries.sorted(by: { $0.relativePath < $1.relativePath }) {
+            let requested = try safeRelativePath(compactRelativePath(
+                entry.relativePath, brand: entry.brand, sourceID: entry.sourceID
+            ))
+            let destinationPath = uniqueRelativePath(
+                requested, fingerprint: entry.sha256, used: &used
+            )
+            if destinationPath != requested { collisions += 1 }
+            if destinationPath != entry.relativePath { moved += 1 }
+            pathMap[entry.relativePath] = destinationPath
+
+            let source = activeRoot.appendingPathComponent(entry.relativePath)
+            guard fm.fileExists(atPath: source.path) else {
+                throw CuratorError.verificationFailed("missing \(entry.relativePath)")
+            }
+            let destination = stagingActive.appendingPathComponent(destinationPath)
+            try copy(source, to: destination)
+            if let expected = entry.fileSHA256,
+               try CubeLUT.fileSHA256(at: destination) != expected.lowercased() {
+                throw CuratorError.verificationFailed("file-byte mismatch for \(entry.relativePath)")
+            }
+            updatedEntries.append(.init(
+                relativePath: destinationPath,
+                sha256: entry.sha256,
+                fileSHA256: entry.fileSHA256,
+                brand: entry.brand,
+                inputProfile: entry.inputProfile,
+                tags: entry.tags,
+                sourceID: entry.sourceID,
+                visualCluster: entry.visualCluster,
+                description: entry.description
+            ))
+        }
+
+        let updatedDuplicates = manifest.duplicates.map { duplicate in
+            CuratedLUTManifest.Duplicate(
+                sourcePath: duplicate.sourcePath,
+                canonicalRelativePath: pathMap[duplicate.canonicalRelativePath]
+                    ?? duplicate.canonicalRelativePath,
+                sha256: duplicate.sha256
+            )
+        }
+        let updated = CuratedLUTManifest(
+            version: manifest.version,
+            sources: manifest.sources,
+            entries: updatedEntries.sorted { $0.relativePath < $1.relativePath },
+            duplicates: updatedDuplicates.sorted { $0.sourcePath < $1.sourcePath },
+            unsupported: manifest.unsupported
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(updated).write(
+            to: stagingActive.appendingPathComponent(CuratedLUTManifest.fileName), options: .atomic
+        )
+        _ = try CuratedLUTManifest.load(
+            from: stagingActive.appendingPathComponent(CuratedLUTManifest.fileName)
+        )
+
+        let readmeURL = outputRoot.appendingPathComponent("README.md")
+        let auditURL = outputRoot.appendingPathComponent("SOURCE_AUDIT.md")
+        let previousReadme = try? Data(contentsOf: readmeURL)
+        let previousAudit = try? Data(contentsOf: auditURL)
+
+        let backup = outputRoot.appendingPathComponent(
+            ".LUTs.pre-compact-\(UUID().uuidString)", isDirectory: true
+        )
+        try fm.moveItem(at: activeRoot, to: backup)
+        do {
+            try fm.moveItem(at: stagingActive, to: activeRoot)
+            try Data(readme().utf8).write(to: readmeURL, options: .atomic)
+            try Data(audit(manifest: updated).utf8).write(to: auditURL, options: .atomic)
+        } catch {
+            try? fm.removeItem(at: activeRoot)
+            try? fm.moveItem(at: backup, to: activeRoot)
+            restore(previousReadme, at: readmeURL)
+            restore(previousAudit, at: auditURL)
+            throw error
+        }
+        try? fm.removeItem(at: backup)
+        try? fm.removeItem(at: stagingOutput)
+        completed = true
+        return HierarchyCompaction(
+            total: updatedEntries.count, moved: moved, collisions: collisions
+        )
+    }
+
+    private static func equalFolder(_ lhs: String, _ rhs: String) -> Bool {
+        folderIdentity(lhs) == folderIdentity(rhs)
+    }
+
+    private static func folderIdentity(_ value: String) -> String {
+        value.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
+
+    private static func isPackagingWrapper(
+        _ folder: String, brand: String, sourceID: String
+    ) -> Bool {
+        let lower = folder.lowercased()
+        if lower == "documents collection" || lower == "3dlut"
+            || lower == "full-to-full-range" || lower == "film-luts" {
+            return true
+        }
+        if sourceID == "documents-collection" && lower == "davinci resolve" {
+            return true
+        }
+        let gridSuffix = "grid-3dlut"
+        if lower.hasSuffix(gridSuffix) {
+            let prefix = lower.dropLast(gridSuffix.count)
+            if prefix.isEmpty == false && prefix.allSatisfy(\.isNumber) { return true }
+        }
+        return false
     }
 
     /// Verify the committed sidecar against the exact bytes the application
@@ -140,6 +328,61 @@ public enum LUTCorpusCurator {
         )
     }
 
+    /// Rewrite each manifest entry's visual cluster from the current
+    /// `LUTVisualCluster.classify` rules, leaving every other field alone.
+    ///
+    /// The cluster is a measurement, not authored metadata, so a rule change
+    /// makes the shipped manifest stale — `CuratedLUTManifest.load` rejects a
+    /// family name the enum no longer has. Re-running the full curation to fix
+    /// that would need every original source tree present and would rewrite
+    /// paths and dedup decisions too; this re-measures the corpus in place and
+    /// keeps Swift's `classify` the single definition of a family.
+    public static func reclassify(outputRoot: URL) throws -> Reclassification {
+        let activeRoot = outputRoot.appendingPathComponent("LUTs", isDirectory: true)
+        let manifestURL = activeRoot.appendingPathComponent(CuratedLUTManifest.fileName)
+        let manifest = try CuratedLUTManifest.loadIgnoringClusterNames(from: manifestURL)
+
+        var counts: [String: Int] = [:]
+        var moved = 0
+        var entries: [CuratedLUTManifest.Entry] = []
+        entries.reserveCapacity(manifest.entries.count)
+        for entry in manifest.entries {
+            let file = activeRoot.appendingPathComponent(entry.relativePath)
+            let lut = try CubeLUT(url: file)
+            guard let metrics = LUTProfiler.measureIfAvailable(lut) else {
+                throw CuratorError.verificationFailed(
+                    "could not measure visual cluster for \(entry.relativePath)"
+                )
+            }
+            let cluster = LUTVisualCluster.classify(metrics)
+            counts[cluster.rawValue, default: 0] += 1
+            if entry.visualCluster != cluster.rawValue { moved += 1 }
+            entries.append(.init(
+                relativePath: entry.relativePath,
+                sha256: entry.sha256,
+                fileSHA256: entry.fileSHA256,
+                brand: entry.brand,
+                inputProfile: entry.inputProfile,
+                tags: entry.tags,
+                sourceID: entry.sourceID,
+                visualCluster: cluster.rawValue,
+                description: entry.description
+            ))
+        }
+
+        let updated = CuratedLUTManifest(
+            version: manifest.version,
+            sources: manifest.sources,
+            entries: entries,
+            duplicates: manifest.duplicates,
+            unsupported: manifest.unsupported
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(updated).write(to: manifestURL, options: .atomic)
+        return Reclassification(total: entries.count, moved: moved, visualClusters: counts)
+    }
+
     public static func curate(
         sources: [SourceDefinition],
         candidates: [Candidate],
@@ -182,7 +425,11 @@ public enum LUTCorpusCurator {
             guard fm.fileExists(atPath: candidate.url.path) else {
                 throw CuratorError.missingCandidate(candidate.url)
             }
-            let requestedPath = try safeRelativePath(candidate.destinationRelativePath)
+            let requestedPath = try safeRelativePath(compactRelativePath(
+                candidate.destinationRelativePath,
+                brand: candidate.brand,
+                sourceID: candidate.sourceID
+            ))
 
             do {
                 let lut = try CubeLUT(url: candidate.url)
@@ -316,6 +563,14 @@ public enum LUTCorpusCurator {
         try FileManager.default.copyItem(at: source, to: destination)
     }
 
+    private static func restore(_ data: Data?, at url: URL) {
+        if let data {
+            try? data.write(to: url, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     private static func stablePathFingerprint(_ value: String) -> String {
         var hash: UInt64 = 14_695_981_039_346_656_037
         for byte in value.utf8 {
@@ -330,9 +585,10 @@ public enum LUTCorpusCurator {
         # Curated LUT Library
 
         `LUTs/` contains unique 3D LUTs that LUTzy can render. Files are grouped as
-        `<Brand>/<Source>/…`; `.lutzy-library.json` carries Brand, Input Profile,
-        Tags, Description, provenance, measured visual cluster, and content fingerprints
-        without changing CUBE bytes.
+        `<Brand>/<meaningful pack>/…`; provenance and source identity live in
+        `.lutzy-library.json` beside Brand, Input Profile, Tags, Description,
+        measured visual cluster, and content fingerprints. Generic download and
+        format wrappers are not physical folders, and CUBE bytes remain unchanged.
 
         `Unsupported/` retains 1D or unreadable CUBE inputs outside the active scan root.
         See `SOURCE_AUDIT.md` before publishing. The initial local corpus can be large and
@@ -408,5 +664,23 @@ public enum LUTCorpusCurator {
             lines.append("")
         }
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    private static func audit(manifest: CuratedLUTManifest) -> String {
+        let sources = manifest.sources.map { id, source in
+            SourceDefinition(
+                id: id,
+                label: source.label,
+                description: source.description,
+                reference: source.reference,
+                license: source.license
+            )
+        }
+        return audit(
+            sources: sources,
+            entries: manifest.entries,
+            duplicates: manifest.duplicates,
+            unsupported: manifest.unsupported
+        )
     }
 }

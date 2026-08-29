@@ -10,6 +10,63 @@ import simd
 @MainActor
 final class AppViewModelTests: TempDirectoryTestCase {
 
+    func testGallerySearchCoalescesContinuousTypingAndClearsImmediately() async throws {
+        let search = LUTGallerySearchState(debounce: .milliseconds(40))
+
+        search.submit("c")
+        search.submit("cl")
+        search.submit("classic")
+
+        XCTAssertEqual(search.query, "", "typing must not invalidate the LUT grid on every key")
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(search.query, "", "only the settled query should reach the LUT grid")
+        try await Task.sleep(for: .milliseconds(40))
+        XCTAssertEqual(search.query, "classic")
+
+        search.submit("")
+        XCTAssertEqual(search.query, "", "clearing search should update results immediately")
+    }
+
+    func testAssigningLUTInGridRendersOnlyTheTargetCell() async throws {
+        let catalog = LUTCatalog(fileURL: tempDirectory.appendingPathComponent("grid-catalog.json"))
+        let library = LUTLibrary(catalog: catalog)
+        let lutRoot = tempDirectory.appendingPathComponent("grid-luts", isDirectory: true)
+        try FileManager.default.createDirectory(at: lutRoot, withIntermediateDirectories: true)
+        _ = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 2), named: "A.cube", in: lutRoot
+        )
+        _ = try Fixtures.writeCube(
+            Fixtures.identityCubeText(size: 3), named: "B.cube", in: lutRoot
+        )
+        library.scan(lutRoot)
+        while library.isScanning { try await Task.sleep(for: .milliseconds(10)) }
+
+        let fake = FakeRenderEngine()
+        let viewModel = AppViewModel(engine: fake, library: library)
+        let imageURL = try Fixtures.writeGradientPNG(
+            width: 32, height: 24, named: "grid-source.png", in: tempDirectory
+        )
+        viewModel.openImage(url: imageURL)
+        while viewModel.imageSource == nil { try await Task.sleep(for: .milliseconds(10)) }
+        viewModel.setLayout(.grid2x2)
+        for task in Array(viewModel.cellTasks.values) { await task.value }
+
+        let current = try XCTUnwrap(viewModel.cellLUTIDs[0])
+        let replacement = try XCTUnwrap(library.allLUTs.first { $0.lutID != current })
+        let before = await fake.previewRequests.count
+
+        viewModel.activateGridCell(0)
+        viewModel.chooseLUTFromGallery(replacement)
+        if let task = viewModel.cellTasks[0] { await task.value }
+        try await Task.sleep(for: .milliseconds(20))
+
+        let issued = await fake.previewRequests.count - before
+        XCTAssertEqual(
+            issued, 1,
+            "a grid assignment must not also render the hidden full-size main preview"
+        )
+    }
+
     func testWorkspaceSourcesStayIndependentAndTransientOriginalClearsOnExit() {
         let viewModel = AppViewModel()
         let collectionID = UUID()

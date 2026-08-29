@@ -207,6 +207,13 @@ After a successful local import, the application may recommend existing LUTs who
 > 1. 不是所有都有標籤 先補上  
 > 2. 匯入lut的時候 是不是可以有類似推薦或是匹配的系統 說這跟哪一個比較像
 
+### 2026-08-29 — Import recommendation visual comparison
+
+Similarity text and a score are not sufficient for human review. The import review must render the newly imported LUT and the selected recommended LUT on the same fixed Panasonic sample with identical input handling and rendering parameters, so the user can judge the actual colour result by eye. A missing preview remains a local unavailable state and must not mutate metadata or discard the review.
+
+> 另外 import的時候有看到你推薦相似的lut  
+> 但沒有rendering出來 人類怎樣eyeball看到結果來對比？
+
 ### 2026-08-26 — Media thumbnail Grid clarification
 
 The Media Library presentation previously specified as Finder-like Columns is replaced by Grid. Grid shows a responsive field of uncropped natural-aspect-ratio media thumbnails with visible filenames, while List remains the information-dense alternative. Folder hierarchy stays in the Media Library sidebar. The control is labelled `Grid`, not `Gallery`, so it is not confused with LUT Library's sample-based visual Gallery.

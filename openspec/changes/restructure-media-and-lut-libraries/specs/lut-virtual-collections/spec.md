@@ -50,7 +50,7 @@ into live rules or changing physical organisation.
 #### Scenario: Open the retained curated corpus
 
 - **WHEN** the catalog first reconciles the 1,876 clustered manifest entries
-- **THEN** every available LUT belongs to exactly one of the eight colour-family Collections and remains in its original Folder with unchanged Brand, Source, Input Profile, and Tags
+- **THEN** every available LUT belongs to exactly one of the ten colour-family Collections and remains in its original Folder with unchanged Brand, Source, Input Profile, and Tags
 
 #### Scenario: Override curated membership
 

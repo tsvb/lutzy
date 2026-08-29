@@ -24,7 +24,6 @@ public struct ContentView: View {
 
     public var body: some View {
         mainContent
-            .navigationTitle("")
             .toolbar {
                 if viewModel.section == .viewer {
                     ToolbarItemGroup(placement: .primaryAction) {
@@ -52,6 +51,7 @@ public struct ContentView: View {
             .sheet(item: $viewModel.lutImportReview) { review in
                 LUTImportReviewView(
                     review: review,
+                    viewModel: viewModel,
                     onInspect: viewModel.inspectLUTFromImportReview,
                     onDismiss: { viewModel.lutImportReview = nil }
                 )

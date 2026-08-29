@@ -2,12 +2,12 @@
 
 ### Requirement: Repository-local corpus preserves honest organisation and provenance
 
-The project SHALL provide a reproducible repository-local LUT corpus whose active LUTs are renderable unique 3D transforms physically grouped by Brand and Source, without modifying the supplied source directories or third-party LUT bytes.
+The project SHALL provide a reproducible repository-local LUT corpus whose active LUTs are renderable unique 3D transforms physically grouped by Brand and meaningful pack/family folders, without modifying the supplied source directories or third-party LUT bytes. Source, Description, Input Profile, Tags, and provenance SHALL remain durable manifest/catalog metadata and SHALL NOT require generic physical wrapper folders.
 
 #### Scenario: Curate retained generated and third-party sources
 
 - **WHEN** the curator processes the five retained source roots after the Codex project is removed
-- **THEN** it selects documented canonical outputs, groups active LUTs under `<Brand>/<Source>`, and records the source path and provenance of every canonical LUT
+- **THEN** it selects documented canonical outputs, groups active LUTs under `<Brand>/<meaningful pack>`, and records Source and provenance metadata for every canonical LUT
 
 #### Scenario: Curate downloaded multi-site packs
 
@@ -27,7 +27,7 @@ The project SHALL provide a reproducible repository-local LUT corpus whose activ
 #### Scenario: Preserve separately authored versions
 
 - **WHEN** Claude, V-Log-Alchemy, or another retained source provides a similarly named Look with a different transform fingerprint
-- **THEN** every distinct implementation remains active under its own Source path
+- **THEN** every distinct implementation remains active with its own Source metadata and remains distinguishable even if its physical hierarchy is compacted
 
 #### Scenario: Remove the Codex-generated source
 
@@ -44,6 +44,16 @@ The project SHALL provide a reproducible repository-local LUT corpus whose activ
 - **WHEN** a candidate is a 1D LUT or cannot be rendered by `CubeLUT`
 - **THEN** it does not enter the active scan root and its exclusion reason remains visible in the corpus audit
 
+#### Scenario: Remove generic physical wrappers
+
+- **WHEN** an active path contains `Documents Collection`, a repeated Brand/Source name, `3dlut`, a grid-size/range wrapper, or another layer that only describes import provenance or packaging
+- **THEN** the repository corpus removes that physical layer while preserving Brand, Source, Description, Input Profile, Tags, relative pack meaning, and the exact CUBE bytes
+
+#### Scenario: Compact an existing curated corpus
+
+- **WHEN** hierarchy compaction runs against an existing manifest-backed corpus
+- **THEN** it verifies every staged CUBE digest, rewrites entry and duplicate canonical paths plus generated documentation, validates the staged manifest, and either swaps the complete active tree or restores the previous tree without a partial migration
+
 ### Requirement: Curated metadata travels beside LUT bytes
 
 The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed by SHA-256 fingerprint with source, Brand, Input Profile, Tags, Description provenance, measured visual cluster, and relative path metadata.
@@ -56,8 +66,8 @@ The active corpus SHALL contain a versioned `.lutzy-library.json` manifest keyed
 ### Requirement: Every retained LUT receives one explainable visual cluster
 
 Every active LUT SHALL be assigned exactly one measured colour family from the
-versioned vocabulary `近中性`, `暖褐／咖啡`, `黃綠`, `青綠`, `藍冷`, `紫洋紅`,
-`紅暖`, and `黑白`.
+versioned vocabulary `中性濃豔`, `中性自然`, `中性平淡`, `暖褐／咖啡`, `黃綠`,
+`青綠`, `藍冷`, `紫洋紅`, `紅暖`, and `黑白`.
 
 #### Scenario: Classify the retained corpus
 
@@ -101,6 +111,20 @@ A development or acceptance build launched from this repository SHALL use `LUTLi
 
 - **WHEN** a distributed build cannot find the repository curated manifest
 - **THEN** it falls back to the app-owned Application Support Library without failing launch
+
+### Requirement: Acceptance launches identify the exact current build
+
+Visual acceptance SHALL build the current checkout, terminate any already-running LUTzy process, launch the newly built bundle by absolute path, and verify that the running executable resolves to that bundle. The acceptance window SHALL expose its branch, commit, configuration, and dirty-worktree state; current bare SwiftPM runs or bundles without injected identity metadata SHALL identify themselves as unverified rather than appearing to be the current acceptance build.
+
+#### Scenario: Another LUTzy build is already running
+
+- **WHEN** acceptance is launched while a LUTzy process from another checkout or earlier build is open
+- **THEN** the stale process exits before the current checkout's exact bundle is launched and verified
+
+#### Scenario: User inspects the acceptance window
+
+- **WHEN** the packaged acceptance build becomes visible
+- **THEN** its title identifies the source branch, commit, build configuration, and whether uncommitted content was included
 
 ### Requirement: Input Profile is classified independently and conservatively
 

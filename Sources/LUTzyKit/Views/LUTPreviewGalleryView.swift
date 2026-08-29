@@ -15,7 +15,7 @@ struct LUTPreviewGalleryView: View {
     let onLibraryActivate: ((CubeLUT, LUTLibraryFocusTarget) -> Void)?
     let onLibraryContentMutation: ((LUTLibraryFocusTarget) -> Void)?
 
-    @State private var searchText = ""
+    @StateObject private var search = LUTGallerySearchState()
     @AppStorage("lutzy.viewerLUTCardWidth") private var cardWidth = 220.0
 
     init(
@@ -45,8 +45,8 @@ struct LUTPreviewGalleryView: View {
     private var baseLUTs: [CubeLUT] { suppliedLUTs ?? viewModel.galleryLUTs }
 
     private var visibleLUTs: [CubeLUT] {
-        guard searchText.isEmpty == false else { return baseLUTs }
-        let query = searchText.localizedLowercase
+        guard search.query.isEmpty == false else { return baseLUTs }
+        let query = search.query.localizedLowercase
         return baseLUTs.filter {
             viewModel.catalog.effectiveName(for: $0).localizedLowercase.contains(query)
         }
@@ -102,26 +102,10 @@ struct LUTPreviewGalleryView: View {
 
             Spacer(minLength: 12)
 
-            HStack(spacing: 5) {
-                Image(systemName: "magnifyingglass")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField(suppliedLUTs == nil ? "Search this folder" : "Search this shelf", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .frame(width: 150)
-                if searchText.isEmpty == false {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+            LUTGallerySearchField(
+                state: search,
+                placeholder: suppliedLUTs == nil ? "Search this folder" : "Search this shelf"
+            )
 
             Image(systemName: "rectangle.grid.3x2")
                 .font(.caption)
@@ -171,14 +155,14 @@ struct LUTPreviewGalleryView: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Spacer()
-            Image(systemName: searchText.isEmpty ? "folder" : "magnifyingglass")
+            Image(systemName: search.query.isEmpty ? "folder" : "magnifyingglass")
                 .font(.system(size: 26, weight: .light))
                 .foregroundStyle(.tertiary)
-            Text(searchText.isEmpty ? "No LUTs in this folder" : "No matching LUTs")
+            Text(search.query.isEmpty ? "No LUTs in this folder" : "No matching LUTs")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            if searchText.isEmpty == false {
-                Button("Clear Search") { searchText = "" }
+            if search.query.isEmpty == false {
+                Button("Clear Search") { search.submit("") }
                     .buttonStyle(.borderless)
             }
             Spacer()
@@ -192,6 +176,44 @@ struct LUTPreviewGalleryView: View {
     ) -> (() -> Void)? {
         guard let target, let onLibraryActivate else { return nil }
         return { onLibraryActivate(lut, target) }
+    }
+}
+
+/// Owns the draft text so each keystroke invalidates only this small control,
+/// not the gallery that contains thousands of cards.
+private struct LUTGallerySearchField: View {
+    @ObservedObject var state: LUTGallerySearchState
+    let placeholder: String
+
+    @State private var draft = ""
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(placeholder, text: $draft)
+                .textFieldStyle(.plain)
+                .frame(width: 150)
+                .onChange(of: draft) { _, value in
+                    state.submit(value)
+                }
+            if draft.isEmpty == false {
+                Button {
+                    draft = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+        .onChange(of: state.query) { _, value in
+            if value.isEmpty, draft.isEmpty == false { draft = "" }
+        }
     }
 }
 
@@ -366,7 +388,7 @@ struct LUTPreviewCard: View {
         .accessibilityAction {
             activate()
         }
-        .task(id: renderIdentity) {
+        .task(id: renderIdentity, priority: .utility) {
             preview = nil
             guard renderingActive else { return }
             guard viewModel.sourceImage != nil || viewModel.section == .lutLibrary else { return }

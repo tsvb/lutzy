@@ -29,7 +29,16 @@ struct LUTLibrarySample: Identifiable, Hashable, Sendable {
         return ImageSource(url: url, nativeExtent: CGSize(width: width, height: height))
     }
 
+    static let `default` = LUTLibrarySample(
+        id: "panasonic-s9", name: "Panasonic S9", note: "White masonry, foliage, and deep shade",
+        filename: "panasonic-s9-street.png",
+        colorProfile: "Assumed sRGB; source has no embedded ICC profile",
+        provenance: "Panasonic DC-S9 reference frame; bundled acceptance asset",
+        sourceSpace: .display
+    )
+
     static let all: [LUTLibrarySample] = [
+        .default,
         LUTLibrarySample(
             id: "portrait", name: "Skin Tone", note: "Portrait and neutral fabric",
             filename: "portrait-skin.png", colorProfile: "Embedded sRGB IEC61966-2.1",

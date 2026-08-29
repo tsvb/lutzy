@@ -182,7 +182,10 @@ introduced.
 
 ### Ingest a real LUT corpus without flattening it
 
-The supplied acceptance corpus contains four materially different sources, so source folders remain the provenance boundary:
+The supplied acceptance corpus contains materially different sources, but the
+manifest/catalog is the provenance boundary. Physical folders are reserved for
+Brand and meaningful pack, look-family, camera-family, or deliberately authored
+variant navigation:
 
 - V-Log-ready creative looks: LUTcraft and the current non-Archive V-Log Alchemy sets, grouped by producer and then target look family.
 - Display-referred creative looks: G'MIC Film LUTs, retaining its film-process folders.
@@ -191,7 +194,14 @@ The supplied acceptance corpus contains four materially different sources, so so
 
 Generated aliases and historical material are not separate visual records: LUTcraft `sd-card` short names, virtual-environment fixtures, comparison pairs, and V-Log Alchemy `Archive` are excluded when their canonical/current file is present. FreshLUTs remains an Inbox/Unclassified source because filenames and input assumptions are inconsistent; it must not silently become a confirmed vendor or camera folder.
 
-Folder hierarchy answers “where did this LUT come from and what input family does it belong to?” Tags and Collections answer cross-folder questions such as low saturation, monochrome, portrait, or favourites. This keeps physical moves meaningful and avoids encoding subjective style in the filesystem.
+Folder hierarchy answers “where is this LUT usefully organised?” Source,
+Description, Brand, Input Profile, and Tags answer provenance and classification
+in the Manager table/Inspector and manifest. Generic layers such as `Documents
+Collection`, repeated producer folders, export-tool names, `3dlut`, grid-size,
+and range wrappers do not belong in the active physical tree. Tags and
+Collections answer cross-folder questions such as low saturation, monochrome,
+portrait, or favourites. This keeps physical moves meaningful and avoids
+encoding metadata or subjective style in the filesystem.
 
 Import validates each candidate through the production 3D LUT parser before copying. A `.cube` extension alone is insufficient: 1D shapers, malformed files, and 3D dimensions outside Core Image's supported 2...128 range increment the failed count and never enter the managed folder. The dimension is range-checked before cubing it, so a hostile size header cannot trigger integer overflow. Content-identical supported 3D LUTs retain the existing duplicate-by-fingerprint behaviour.
 
@@ -271,7 +281,7 @@ The first tagger only emitted outlier traits. A colour LUT with ordinary saturat
 
 Optional measured traits such as `暖調`, `冷調`, `分離調色`, `霧面`, `高光收斂`, and skin behaviour remain additive. The input-space tag remains available for filtering but is not a visible card chip. A tagger-version bump remeasures existing content records while preserving record-level user Tags.
 
-Import similarity is a post-import review, not an automatic filing system. It compares the new LUT's persisted perceptual metrics with pre-existing local LUTs only when both declare the same input space and colour mode. Distance normalises contrast, saturation, endpoints, neutral chroma/hue, split angle, and skin response by perceptually useful ranges; circular hue differences are weighted down when neutral chroma is too weak for hue to be meaningful. The UI presents at most the three closest results above a documented confidence floor and explains shared measured traits. Exact fingerprints remain the import deduplicator's responsibility and never appear as recommendations.
+Import similarity is a post-import review, not an automatic filing system. It compares the new LUT's persisted perceptual metrics with pre-existing local LUTs only when both declare the same input space and colour mode. Distance normalises contrast, saturation, endpoints, neutral chroma/hue, split angle, and skin response by perceptually useful ranges; circular hue differences are weighted down when neutral chroma is too weak for hue to be meaningful. The UI presents at most the three closest results above a documented confidence floor and explains shared measured traits. Selecting a recommendation renders it beside the imported LUT using the fixed Panasonic S9 sample and one explicit neutral request: identical declared input handling, full intensity, no adjustments, and one shared render scale. This makes the recommendation visually judgeable without conflating it with Viewer state. Exact fingerprints remain the import deduplicator's responsibility and never appear as recommendations.
 
 This v1 intentionally does not use filenames, vendors, folders, typed Tags, remote catalogues, or learned embeddings. Recommendations are read-only: the user may inspect them, but import does not mutate names, Tags, Collections, Stars, or physical location from a match.
 

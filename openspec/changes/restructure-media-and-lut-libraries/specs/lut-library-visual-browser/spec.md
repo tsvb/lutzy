@@ -154,11 +154,11 @@ LUT Library SHALL render every sample from its own immutable baseline with neutr
 - **THEN** output RGB agrees within the renderer's existing documented tolerance
 
 ### Requirement: Fixed built-in sample set
-LUT Library SHALL use exactly four fixed, licensed sample images bundled with the application: a skin-tone portrait, an outdoor sky-and-foliage scene, an indoor mixed-light scene, and a saturated-object scene with neutral references. It SHALL NOT import, add, remove, reorder, or replace samples through Media Library.
+LUT Library SHALL use exactly five fixed sample images bundled with the application: the Panasonic DC-S9 outdoor street reference, a skin-tone portrait, an outdoor sky-and-foliage scene, an indoor mixed-light scene, and a saturated-object scene with neutral references. The Panasonic reference SHALL be the initial Gallery and detail sample. LUT Library SHALL NOT import, add, remove, reorder, or replace samples through Media Library.
 
 #### Scenario: Open on a fresh installation
 - **WHEN** the user opens LUT Library before importing personal media
-- **THEN** all four built-in scene types are available for Gallery and LUT detail
+- **THEN** all five built-in scene types are available for Gallery and LUT detail and the Panasonic DC-S9 reference is selected
 
 #### Scenario: Validate sample assets
 - **WHEN** the app bundles or updates the four samples
@@ -167,6 +167,21 @@ LUT Library SHALL use exactly four fixed, licensed sample images bundled with th
 #### Scenario: Look for custom sample management
 - **WHEN** the user browses LUT Library or Media Library
 - **THEN** no Add Sample, Remove Sample, or Replace Sample action is offered for the LUT Library sample set
+
+### Requirement: Readable non-destructive LUT labels
+When no user-authored Name override exists, LUT Library and LUT Manager SHALL derive a readable display label without renaming the LUT file or changing its physical path. The derivation MAY remove download-order prefixes, redundant separators, and camera-export clip identifiers, but SHALL preserve meaningful technical tokens such as colour-space names, film gauges, standards, and version numbers. A name that otherwise contains only an ordinal SHALL be qualified with its confirmed Brand or Source when available. A user-authored Name SHALL always win unchanged.
+
+#### Scenario: Display a camera-export filename
+- **WHEN** a LUT filename is `Warm_18.A049_12291747_S.cube` and no Name override exists
+- **THEN** its display label is `Warm 18` while the physical filename remains unchanged
+
+#### Scenario: Display an ordinal-only filename
+- **WHEN** a LUT is named `1.cube`, its confirmed Brand is `FreshLUTs`, and no Name override exists
+- **THEN** its display label is `FreshLUTs Look 1` while Brand remains a separate metadata field
+
+#### Scenario: Respect a managed Name
+- **WHEN** the user sets a Name in LUT Manager
+- **THEN** Gallery, Manager, Inspector, search, and sorting use that exact Name without automatic normalization
 
 ### Requirement: LUT detail with multiple samples
 Activating a Gallery LUT SHALL open a LUT Library detail that offers multiple fixed sample images, full metadata, and an original-versus-LUT comparison for the selected sample.
@@ -211,7 +226,7 @@ LUT detail SHALL compare the original and LUT-rendered result in one aligned lar
 - **THEN** the preview temporarily shows the complete original image and restores the prior LUT comparison and split position on release
 
 #### Scenario: Select another sample
-- **WHEN** the user chooses one of the four sample thumbnails below the preview
+- **WHEN** the user chooses one of the five sample thumbnails below the preview
 - **THEN** both Before and After update to the new sample while the selected LUT remains unchanged
 
 ### Requirement: Workspace-owned keyboard shortcuts
@@ -271,11 +286,19 @@ Every renderable LUT SHALL receive a visible measured colour-mode tag and contra
 - **THEN** every existing LUT is remeasured and its user-authored Tags remain unchanged
 
 ### Requirement: Local post-import similarity review
-After importing one or more new LUTs, the application SHALL offer a local review that lists up to three sufficiently similar pre-existing LUTs per imported LUT using measured transform behaviour rather than names or locations.
+After importing one or more new LUTs, the application SHALL offer a local review that lists up to three sufficiently similar pre-existing LUTs per imported LUT using measured transform behaviour rather than names or locations. The review SHALL let the user visually compare the imported LUT with any recommendation rendered on the same fixed sample, declared input handling, intensity, render scale, and adjustment state.
 
 #### Scenario: Find a strong same-space match
 - **WHEN** a newly imported LUT has a pre-existing LUT with sufficiently close perceptual metrics, the same declared input space, and the same colour mode
 - **THEN** the review identifies that LUT, shows a bounded similarity score, and explains shared measured traits
+
+#### Scenario: Eyeball an imported LUT against a recommendation
+- **WHEN** the user selects one of the recommended existing LUTs in the import review
+- **THEN** the review renders the imported LUT and the selected recommendation side by side using the fixed Panasonic sample and identical input handling, full intensity, neutral development, no adjustments, and the same render scale
+
+#### Scenario: A comparison preview cannot render
+- **WHEN** either LUT or the fixed sample cannot be resolved or rendered
+- **THEN** that comparison panel reports that its preview is unavailable without dismissing the review or changing LUT metadata
 
 #### Scenario: Do not force a weak match
 - **WHEN** no pre-existing same-space LUT meets the confidence floor

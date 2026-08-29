@@ -2,6 +2,192 @@ import AppKit
 import Foundation
 @testable import LUTzyKit
 
+@MainActor
+func runGallerySearchCoalescingCheck() async -> Bool {
+    let search = LUTGallerySearchState(debounce: .milliseconds(40))
+    search.submit("c")
+    search.submit("cl")
+    search.submit("classic")
+    let immediateOK = search.query.isEmpty
+    try? await Task.sleep(for: .milliseconds(20))
+    let midBurstOK = search.query.isEmpty
+    try? await Task.sleep(for: .milliseconds(40))
+    let settledOK = search.query == "classic"
+    search.submit("")
+    let clearOK = search.query.isEmpty
+    let ok = immediateOK && midBurstOK && settledOK && clearOK
+    print("gallery search publishes one settled query per typing burst -> \(ok ? "PASS" : "FAIL")")
+    return ok
+}
+
+private actor ViewerPerformanceRenderEngine: RenderEngining {
+    struct Request {
+        let source: ImageSource
+        let document: EditDocument
+        let lutID: LUTID?
+        let scale: RenderScale
+    }
+
+    private(set) var requests: [Request] = []
+    var previewCount: Int { requests.count }
+
+    func makeCGImage(
+        source: ImageSource,
+        document: EditDocument,
+        lut: CubeLUT?,
+        scale: RenderScale,
+        space: WorkingSpace
+    ) -> sending CGImage? {
+        requests.append(Request(
+            source: source, document: document, lutID: lut?.lutID, scale: scale
+        ))
+        let colourSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil, width: 2, height: 2,
+            bitsPerComponent: 8, bytesPerRow: 8,
+            space: colourSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.setFillColor(red: 0.4, green: 0.5, blue: 0.6, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        return context.makeImage()
+    }
+
+    func encode(
+        source: ImageSource,
+        document: EditDocument,
+        lut: CubeLUT?,
+        scale: RenderScale,
+        format: ExportFormat,
+        quality: CGFloat,
+        space: WorkingSpace
+    ) throws -> Data { Data() }
+
+    func histogram(
+        source: ImageSource,
+        document: EditDocument,
+        lut: CubeLUT?,
+        scale: RenderScale,
+        space: WorkingSpace,
+        maxDimension: Int
+    ) -> HistogramData? { nil }
+
+    func invalidateLUTCache() {}
+    func rawCapabilities(for source: ImageSource) -> RAWCapabilities? { nil }
+}
+
+@MainActor
+func runImportReviewVisualComparisonCheck() async -> Bool {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("lutcheck-import-review-preview-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    do {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try identityCube(size: 2).write(
+            to: root.appendingPathComponent("Imported.cube"), atomically: true, encoding: .utf8
+        )
+        try identityCube(size: 3).write(
+            to: root.appendingPathComponent("Similar.cube"), atomically: true, encoding: .utf8
+        )
+        let catalog = LUTCatalog(fileURL: root.appendingPathComponent("catalog.json"))
+        let library = LUTLibrary(catalog: catalog)
+        library.scan(root)
+        while library.isScanning { try? await Task.sleep(for: .milliseconds(10)) }
+        guard library.allLUTs.count == 2 else { return false }
+
+        let engine = ViewerPerformanceRenderEngine()
+        let viewModel = AppViewModel(engine: engine, library: library)
+        let importedID = library.allLUTs[0].lutID
+        let matchID = library.allLUTs[1].lutID
+        let size = CGSize(width: 640, height: 400)
+        let imported = await viewModel.makeLUTImportReviewPreview(for: importedID, maxSize: size)
+        let match = await viewModel.makeLUTImportReviewPreview(for: matchID, maxSize: size)
+        let requests = await engine.requests
+        let sameSample = requests.count == 2 && requests[0].source == requests[1].source
+        let samePipeline = requests.count == 2
+            && requests.allSatisfy {
+                $0.document.rawDevelop == .neutral
+                    && $0.document.adjustments.isEmpty
+                    && $0.document.lut.intensity == 1
+                    && $0.document.sourceSpace == LUTLibrarySample.default.sourceSpace
+                    && $0.scale == .preview(maxSize: size)
+            }
+        let correctLUTs = requests.map(\.lutID) == [importedID, matchID]
+        let ok = imported != nil && match != nil && sameSample && samePipeline && correctLUTs
+        print("import recommendations render both LUTs on one fixed sample -> \(ok ? "PASS" : "FAIL")")
+        return ok
+    } catch {
+        print("import recommendation visual comparison -> FAIL (\(error))")
+        return false
+    }
+}
+
+@MainActor
+func runGridSelectionRenderScopeCheck() async -> Bool {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("lutcheck-grid-performance-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    do {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let lutRoot = root.appendingPathComponent("LUTs", isDirectory: true)
+        try FileManager.default.createDirectory(at: lutRoot, withIntermediateDirectories: true)
+        try identityCube(size: 2).write(
+            to: lutRoot.appendingPathComponent("A.cube"), atomically: true, encoding: .utf8
+        )
+        try identityCube(size: 3).write(
+            to: lutRoot.appendingPathComponent("B.cube"), atomically: true, encoding: .utf8
+        )
+
+        let catalog = LUTCatalog(fileURL: root.appendingPathComponent("catalog.json"))
+        let library = LUTLibrary(catalog: catalog)
+        library.scan(lutRoot)
+        while library.isScanning { try? await Task.sleep(for: .milliseconds(10)) }
+        guard library.allLUTs.count == 2 else { return false }
+
+        let imageURL = root.appendingPathComponent("source.jpg")
+        guard writeJPEG(description: nil, to: imageURL, colourful: true) else { return false }
+        let engine = ViewerPerformanceRenderEngine()
+        let viewModel = AppViewModel(
+            engine: engine,
+            projects: ProjectStore(root: root.appendingPathComponent("Projects")),
+            tags: LUTTagStore(fileURL: root.appendingPathComponent("tags.json")),
+            media: MediaLibrary(
+                root: root.appendingPathComponent("Media"),
+                manifestURL: root.appendingPathComponent("media.json")
+            ),
+            library: library
+        )
+        viewModel.openImage(url: imageURL)
+        while viewModel.imageSource == nil { try? await Task.sleep(for: .milliseconds(10)) }
+        viewModel.setLayout(.grid2x2)
+        for task in Array(viewModel.cellTasks.values) { await task.value }
+
+        let current = viewModel.cellLUTIDs[0]
+        guard let replacement = library.allLUTs.first(where: { $0.lutID != current }) else {
+            return false
+        }
+        let before = await engine.previewCount
+        viewModel.activateGridCell(0)
+        viewModel.chooseLUTFromGallery(replacement)
+        if let task = viewModel.cellTasks[0] { await task.value }
+        try? await Task.sleep(for: .milliseconds(20))
+        let assignmentCount = await engine.previewCount - before
+
+        let beforeExit = await engine.previewCount
+        viewModel.setLayout(.single)
+        try? await Task.sleep(for: .milliseconds(20))
+        let exitCount = await engine.previewCount - beforeExit
+        let ok = assignmentCount == 1 && exitCount == 1
+        print("grid LUT assignment renders one cell; exiting grid renders main once -> \(ok ? "PASS" : "FAIL")")
+        return ok
+    } catch {
+        print("grid LUT assignment render scope -> FAIL (\(error))")
+        return false
+    }
+}
+
 func runLibraryBootstrapCheck() -> Bool {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("lutcheck-library-bootstrap-\(UUID().uuidString)", isDirectory: true)
@@ -63,12 +249,19 @@ func runCuratedCorpusPolicyCheck() -> Bool {
 }
 
 func runVisualClusterClassificationCheck() -> Bool {
-    func metrics(chroma: Double, hue: Double, mono: Double = 0.1) -> LUTMetrics {
+    func metrics(
+        chroma: Double,
+        hue: Double,
+        mono: Double = 0.1,
+        saturation: Double = 1,
+        highlightChroma: Double? = nil,
+        highlightHue: Double? = nil
+    ) -> LUTMetrics {
         LUTMetrics(
-            contrast: 1, saturation: 1, monoSpread: mono,
+            contrast: 1, saturation: saturation, monoSpread: mono,
             blackLevel: 0, whiteLevel: 1,
-            shadowChroma: chroma, highlightChroma: chroma,
-            shadowHue: hue, highlightHue: hue,
+            shadowChroma: chroma, highlightChroma: highlightChroma ?? chroma,
+            shadowHue: hue, highlightHue: highlightHue ?? hue,
             splitAngle: 0, skinRatio: 1
         )
     }
@@ -79,10 +272,41 @@ func runVisualClusterClassificationCheck() -> Bool {
         (metrics(chroma: 0.02, hue: 250), .coolBlue),
         (metrics(chroma: 0.02, hue: 320), .purpleMagenta),
         (metrics(chroma: 0.02, hue: 5), .warmRed),
-        (metrics(chroma: 0.001, hue: 45), .nearNeutral),
         (metrics(chroma: 0.02, hue: 45, mono: 0), .monochrome),
+
+        // An untinted neutral is not one visual family: the corpus spreads it
+        // evenly across every saturation class, so saturation — which stays
+        // measurable when the neutral axis carries no chroma — names it.
+        (metrics(chroma: 0.001, hue: 45, saturation: 1.4), .neutralVivid),
+        (metrics(chroma: 0.001, hue: 45, saturation: 1.0), .neutralNatural),
+        (metrics(chroma: 0.001, hue: 45, saturation: 0.6), .neutralFlat),
+
+        // Both ends of the ramp are evidence for one tint. Deciding the family
+        // on whichever end happens to be stronger puts a family boundary on a
+        // hairline chroma comparison: these two differ by 0.0002 and must not
+        // land in different families.
+        (
+            metrics(chroma: 0.0061, hue: 15, highlightChroma: 0.0060, highlightHue: 45),
+            .warmBrown
+        ),
+        (
+            metrics(chroma: 0.0060, hue: 15, highlightChroma: 0.0062, highlightHue: 45),
+            .warmBrown
+        ),
+
+        // Opposed ends are a split tone, not a cancelled one. Summing them
+        // would read a visible teal/orange grade as untinted grey, so the
+        // stronger end still decides.
+        (
+            metrics(chroma: 0.012, hue: 220, highlightChroma: 0.011, highlightHue: 40),
+            .coolBlue
+        ),
     ]
-    let ok = cases.allSatisfy { LUTVisualCluster.classify($0.0) == $0.1 }
+    let failures = cases.filter { LUTVisualCluster.classify($0.0) != $0.1 }
+    for (m, expected) in failures {
+        print("  cluster mismatch: expected \(expected.rawValue), got \(LUTVisualCluster.classify(m).rawValue)")
+    }
+    let ok = failures.isEmpty
     print("visual cluster boundaries are deterministic -> \(ok ? "PASS" : "FAIL")")
     return ok
 }
@@ -192,6 +416,134 @@ func runFolderNavigationNoiseCheck() -> Bool {
         && shelfTitles == ["17grid-3dlut", "33grid-3dlut"]
         && preserved == authoredLevels
     print("Folder navigation hides provenance/format wrappers -> \(ok ? "PASS" : "FAIL")")
+    return ok
+}
+
+func runCuratedPathCompactionCheck() -> Bool {
+    let cases: [(path: String, brand: String, source: String, expected: String)] = [
+        (
+            "Apple/Documents Collection/AppleLogToRec709-v1.0.cube",
+            "Apple", "documents-collection",
+            "Apple/AppleLogToRec709-v1.0.cube"
+        ),
+        (
+            "Blackmagic Design/Documents Collection/DaVinci Resolve/Blackmagic Design/Blackmagic Film to Rec709.cube",
+            "Blackmagic Design", "documents-collection",
+            "Blackmagic Design/Blackmagic Film to Rec709.cube"
+        ),
+        (
+            "Canon/Documents Collection/3dlut/17grid-3dlut/full-to-full-range/Canon Log.cube",
+            "Canon", "documents-collection",
+            "Canon/Canon Log.cube"
+        ),
+        (
+            "ARRI/V-Log Alchemy/Arri/Classic.cube",
+            "ARRI", "vlog-alchemy",
+            "ARRI/V-Log Alchemy/Classic.cube"
+        ),
+        (
+            "CINECOLOR/CINECOLOR/A24/Florida.cube",
+            "CINECOLOR", "cinecolor",
+            "CINECOLOR/A24/Florida.cube"
+        ),
+        (
+            "FilterGrade/FilterGrade Free Cine v2/Warm.cube",
+            "FilterGrade", "filtergrade-free-cine-v2",
+            "FilterGrade/Free Cine v2/Warm.cube"
+        ),
+        (
+            "G-MIC Film LUTs/Film-Luts/negative_new/Film.cube",
+            "G'MIC Film LUTs", "gmic-film-luts",
+            "G'MIC Film LUTs/negative_new/Film.cube"
+        ),
+    ]
+    let failures = cases.filter { item in
+        LUTCorpusCurator.compactRelativePath(
+            item.path, brand: item.brand, sourceID: item.source
+        ) != item.expected
+    }
+    let rulesOK = failures.isEmpty
+    if rulesOK == false {
+        for item in failures {
+            let actual = LUTCorpusCurator.compactRelativePath(
+                item.path, brand: item.brand, sourceID: item.source
+            )
+            print("  \(item.path) -> \(actual), expected \(item.expected)")
+        }
+    }
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("lutcheck-path-compact-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    var transactionOK = false
+    do {
+        let oldFolder = root.appendingPathComponent(
+            "LUTs/Apple/Documents Collection", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: oldFolder, withIntermediateDirectories: true)
+        let oldFile = oldFolder.appendingPathComponent("AppleLogToRec709-v1.0.cube")
+        try identityCube(size: 2).write(to: oldFile, atomically: true, encoding: .utf8)
+        let lut = try CubeLUT(url: oldFile)
+        let fileHash = try CubeLUT.fileSHA256(at: oldFile)
+        let manifest = """
+        {
+          "version": 1,
+          "sources": {
+            "documents-collection": {
+              "label": "Documents LUT collection",
+              "description": "Local source",
+              "license": "Local only"
+            }
+          },
+          "entries": [{
+            "relativePath": "Apple/Documents Collection/AppleLogToRec709-v1.0.cube",
+            "sha256": "\(lut.contentHash)",
+            "fileSHA256": "\(fileHash)",
+            "brand": "Apple",
+            "inputProfile": "Apple Log",
+            "tags": ["技術轉換"],
+            "sourceID": "documents-collection",
+            "visualCluster": "中性自然",
+            "description": "Apple Log transform"
+          }],
+          "duplicates": [{
+            "sourcePath": "Original/duplicate.cube",
+            "canonicalRelativePath": "Apple/Documents Collection/AppleLogToRec709-v1.0.cube",
+            "sha256": "\(lut.contentHash)"
+          }],
+          "unsupported": []
+        }
+        """
+        try manifest.write(
+            to: root.appendingPathComponent("LUTs/.lutzy-library.json"),
+            atomically: true, encoding: .utf8
+        )
+
+        let result = try LUTCorpusCurator.compactHierarchy(outputRoot: root)
+        let newFile = root.appendingPathComponent("LUTs/Apple/AppleLogToRec709-v1.0.cube")
+        let savedManifest = try String(
+            contentsOf: root.appendingPathComponent("LUTs/.lutzy-library.json"), encoding: .utf8
+        )
+        let savedReadme = try String(
+            contentsOf: root.appendingPathComponent("README.md"), encoding: .utf8
+        )
+        let savedAudit = try String(
+            contentsOf: root.appendingPathComponent("SOURCE_AUDIT.md"), encoding: .utf8
+        )
+        let compactedFileHash = try CubeLUT.fileSHA256(at: newFile)
+        transactionOK = result == .init(total: 1, moved: 1, collisions: 0)
+            && FileManager.default.fileExists(atPath: oldFile.path) == false
+            && FileManager.default.fileExists(atPath: newFile.path)
+            && compactedFileHash == fileHash
+            && savedManifest.contains("Apple/AppleLogToRec709-v1.0.cube")
+            && savedManifest.contains("Documents Collection") == false
+            && savedReadme.contains("<Brand>/<meaningful pack>/")
+            && savedAudit.contains("`LUTs/Apple/AppleLogToRec709-v1.0.cube`")
+            && savedAudit.contains("LUTs/Apple/Documents Collection") == false
+    } catch {
+        print("  compact transaction failed: \(error)")
+    }
+    let ok = rulesOK && transactionOK
+    print("curated physical paths remove metadata and packaging wrappers -> \(ok ? "PASS" : "FAIL")")
     return ok
 }
 
@@ -871,4 +1223,80 @@ private func identityCube(size: Int) -> String {
         }
     }
     return lines.joined(separator: "\n") + "\n"
+}
+
+/// A visual family is a measurement, so changing the rules has to move an
+/// already-seeded Library. This proves the reseed moves the record, preserves
+/// the old Collection for explicit user review, and then stops doing anything.
+@MainActor
+func runVisualClusterReseedCheck() -> Bool {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("lutcheck-cluster-reseed-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    do {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let cubeURL = root.appendingPathComponent("look.cube")
+        try identityCube(size: 2).write(to: cubeURL, atomically: true, encoding: .utf8)
+        let cube = try CubeLUT(url: cubeURL)
+        let catalogURL = root.appendingPathComponent("catalog.json")
+
+        let metadata: [String: CuratedLUTMetadata] = [
+            cube.contentHash: CuratedLUTMetadata(
+                seedID: "manifest-v1:\(cube.contentHash)",
+                fingerprint: cube.contentHash,
+                origin: .vendor("Fujifilm"),
+                sourceLabel: "Test",
+                inputProfile: "Panasonic V-Log",
+                tags: ["完成色"],
+                visualCluster: .cyanGreen,
+                description: "測試用"
+            ),
+        ]
+
+        let catalog = LUTCatalog(fileURL: catalogURL)
+        guard let recordID = catalog.adoptSavedLUT(cube) else { return false }
+        catalog.seedCuratedMetadata(metadata, for: [cube.withRecordID(recordID)])
+        let freshSeedOK = catalog.record(for: recordID)?.curatedVisualClusterSeed
+            == "visual-cluster-v2:青綠"
+
+        // Rewrite the persisted catalog into what an install seeded by the
+        // previous rules looks like: a v1 marker and the Collection that
+        // version's family name created.
+        let staleJSON = try String(contentsOf: catalogURL, encoding: .utf8)
+            .replacingOccurrences(of: "visual-cluster-v2:青綠", with: "visual-cluster-v1:近中性")
+            .replacingOccurrences(of: "色調 · 青綠", with: "色調 · 近中性")
+        try staleJSON.write(to: catalogURL, atomically: true, encoding: .utf8)
+
+        let reopened = LUTCatalog(fileURL: catalogURL)
+        let staleOK = reopened.record(for: recordID)?.curatedVisualClusterSeed
+            == "visual-cluster-v1:近中性"
+            && reopened.collections.contains { $0.name == "色調 · 近中性" }
+
+        reopened.seedCuratedMetadata(metadata, for: [cube.withRecordID(recordID)])
+        guard let moved = reopened.record(for: recordID),
+              let currentID = reopened.collections.first(where: { $0.name == "色調 · 青綠" })?.id
+        else { return false }
+        let reseedOK = moved.curatedVisualClusterSeed == "visual-cluster-v2:青綠"
+            && moved.collectionIDs.contains(currentID)
+            && moved.collectionIDs.count == 1
+            && reopened.collections.contains { $0.name == "色調 · 近中性" }
+
+        // Seeding is idempotent once current: a rescan must not keep churning
+        // Collections or rewriting the catalog.
+        let before = reopened.collections.map(\.id)
+        reopened.seedCuratedMetadata(metadata, for: [cube.withRecordID(recordID)])
+        let idempotentOK = reopened.collections.map(\.id) == before
+            && reopened.record(for: recordID)?.collectionIDs == moved.collectionIDs
+
+        let ok = freshSeedOK && staleOK && reseedOK && idempotentOK
+        if ok == false {
+            print("  fresh=\(freshSeedOK) stale=\(staleOK) reseed=\(reseedOK) idempotent=\(idempotentOK)")
+        }
+        print("visual cluster reseed moves a stale Library and preserves the old Collection -> \(ok ? "PASS" : "FAIL")")
+        return ok
+    } catch {
+        print("visual cluster reseed moves a stale Library and preserves the old Collection -> FAIL (\(error))")
+        return false
+    }
 }

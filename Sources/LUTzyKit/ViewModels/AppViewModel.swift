@@ -331,7 +331,7 @@ final class AppViewModel: ObservableObject {
     @Published var managerSelection: Set<LUTRecordID> = []
     @Published var selectedMediaFolder: String?
     @Published var selectedLibraryLUTID: LUTRecordID?
-    @Published var selectedLibrarySampleID: String = LUTLibrarySample.all[0].id {
+    @Published var selectedLibrarySampleID: String = LUTLibrarySample.default.id {
         didSet { lutGalleryRevision &+= 1 }
     }
     @Published var isShowingLibraryOriginal = false
@@ -340,7 +340,7 @@ final class AppViewModel: ObservableObject {
 
     var librarySamples: [LUTLibrarySample] { LUTLibrarySample.all }
     var selectedLibrarySample: LUTLibrarySample {
-        librarySamples.first(where: { $0.id == selectedLibrarySampleID }) ?? librarySamples[0]
+        librarySamples.first(where: { $0.id == selectedLibrarySampleID }) ?? LUTLibrarySample.default
     }
 
     var selectedLibraryLUT: CubeLUT? {
@@ -828,13 +828,17 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - LUT selection
 
-    func selectLUT(_ lut: CubeLUT?, renderGridCells: Bool = true) {
+    func selectLUT(
+        _ lut: CubeLUT?,
+        renderPreview: Bool = true,
+        renderGridCells: Bool = true
+    ) {
         // A derived LUT is in no library, so nothing but the registry can resolve it later. Remember
         // it rather than replacing the last one: a document made now must still resolve after the
         // user derives again.
         if let lut, lut.lutID.isDerived { derivedRegistry.register(lut) }
         document.lut.lutID = lut?.lutID
-        applyLUT(renderGridCells: renderGridCells)
+        if renderPreview { applyLUT(renderGridCells: renderGridCells) }
         scheduleSessionSave()
     }
 
@@ -933,6 +937,13 @@ final class AppViewModel: ObservableObject {
 
     private func applyLUT(renderGridCells: Bool = true) {
         schedulePreview(refreshGallery: false, renderGridCells: renderGridCells)
+    }
+
+    /// Grid mode keeps the full-size preview lazy because it is not visible.
+    /// When a single/paired layout becomes visible again, render the current
+    /// document once through this narrow cross-file seam.
+    func refreshMainPreviewAfterGrid() {
+        schedulePreview(refreshGallery: false, renderGridCells: false)
     }
 
     /// What space the open image is treated as, for a V-Log LUT.
@@ -1330,8 +1341,49 @@ final class AppViewModel: ObservableObject {
         )
         let engine = self.engine
         return await lutGalleryPreviewCache.image(for: key) {
+            guard Task.isCancelled == false else { return nil }
             let cgImage = await engine.makeCGImage(
                 source: renderSource,
+                document: request,
+                lut: lut,
+                scale: .preview(maxSize: maxSize),
+                space: .current
+            )
+            guard Task.isCancelled == false, let cgImage else { return nil }
+            return NSImage(
+                cgImage: cgImage,
+                size: NSSize(width: cgImage.width, height: cgImage.height)
+            )
+        }
+    }
+
+    /// Render either side of an import recommendation on one fixed reference
+    /// frame. Similarity numbers are useful for ranking, but the decision is
+    /// visual: both the newly imported LUT and an existing match must use the
+    /// same pixels, neutral adjustments, intensity, and source-space handling.
+    func makeLUTImportReviewPreview(for id: LUTID, maxSize: CGSize) async -> NSImage? {
+        guard let lut = library.allLUTs.first(matching: id) ?? resolvedLUT(id) else { return nil }
+        let sample = LUTLibrarySample.default
+        guard let source = sample.imageSource else { return nil }
+        let request = EditDocument(
+            rawDevelop: .neutral,
+            adjustments: [],
+            lut: LUTSettings(lutID: id, intensity: 1),
+            sourceSpace: sample.sourceSpace
+        )
+        let key = LUTGalleryPreviewCacheKey(
+            lutID: id,
+            revision: lutGalleryRevision,
+            sampleID: sample.id,
+            context: "import-review",
+            width: Int(maxSize.width.rounded()),
+            height: Int(maxSize.height.rounded())
+        )
+        let engine = self.engine
+        return await lutGalleryPreviewCache.image(for: key) {
+            guard Task.isCancelled == false else { return nil }
+            let cgImage = await engine.makeCGImage(
+                source: source,
                 document: request,
                 lut: lut,
                 scale: .preview(maxSize: maxSize),
@@ -1512,7 +1564,7 @@ final class AppViewModel: ObservableObject {
         let (requested, lut) = displayRequest
         let box = maxPreview
 
-        previewTask = Task { [engine] in
+        previewTask = Task(priority: .userInitiated) { [engine] in
             let cgImage = await engine.makeCGImage(
                 source: imageSource, document: requested, lut: lut,
                 scale: .preview(maxSize: box), space: .current

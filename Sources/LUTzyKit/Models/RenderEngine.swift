@@ -135,7 +135,12 @@ actor RenderEngine: RenderEngining {
         scale: RenderScale,
         space: WorkingSpace = .current
     ) -> sending CGImage? {
+        // A gallery search can retire many queued thumbnail requests at once.
+        // Actor serialization is still desirable for the shared CIContext,
+        // but a cancelled request must not consume its turn doing GPU work.
+        guard Task.isCancelled == false else { return nil }
         guard let image = buildImage(source, document, lut, scale, space) else { return nil }
+        guard Task.isCancelled == false else { return nil }
         let rect = image.extent.integral
         guard rect.isRasterizable else { return nil }
 

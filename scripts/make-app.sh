@@ -11,12 +11,28 @@ configuration=${1:-release}
 root=${0:a:h:h}
 cd "$root"
 
+case "$configuration" in
+    debug|release) ;;
+    *)
+        echo "usage: $0 [debug|release]" >&2
+        exit 64
+        ;;
+esac
+
+commit=$(git rev-parse --short=12 HEAD)
+branch=$(git branch --show-current)
+[[ -n "$branch" ]] || branch="detached"
+built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+dirty=false
+[[ -n "$(git status --porcelain --untracked-files=normal)" ]] && dirty=true
+
 swift build -c "$configuration" --product LUTzy
+bin_dir=$(swift build -c "$configuration" --show-bin-path)
 
 app="$root/build/LUTzy.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp ".build/$configuration/LUTzy" "$app/Contents/MacOS/LUTzy"
+cp "$bin_dir/LUTzy" "$app/Contents/MacOS/LUTzy"
 
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +63,18 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# These keys make an acceptance build self-identifying without changing the
+# production preferences domain.  Keeping the bundle identifier stable means
+# Starred LUTs, Collections, and other persisted state remain representative.
+plutil -insert LUTzyBuildCommit -string "$commit" "$app/Contents/Info.plist"
+plutil -insert LUTzyBuildBranch -string "$branch" "$app/Contents/Info.plist"
+plutil -insert LUTzyBuildRoot -string "$root" "$app/Contents/Info.plist"
+plutil -insert LUTzyBuildConfiguration -string "$configuration" "$app/Contents/Info.plist"
+plutil -insert LUTzyBuildTimestamp -string "$built_at" "$app/Contents/Info.plist"
+plutil -insert LUTzyBuildDirty -bool "$dirty" "$app/Contents/Info.plist"
+
 # Ad-hoc signature: unsigned bundles are refused outright on Apple silicon.
 codesign --force --deep --sign - "$app" >/dev/null 2>&1 || true
-echo "built $app"
+dirty_suffix=""
+$dirty && dirty_suffix="+dirty"
+echo "built $app ($branch@$commit$dirty_suffix, $configuration)"

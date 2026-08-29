@@ -13,6 +13,8 @@ private struct Arguments {
         isDirectory: true
     )
     var verify: URL?
+    var reclassify: URL?
+    var compact: URL?
 
     init(_ values: [String]) throws {
         var index = 1
@@ -28,6 +30,8 @@ private struct Arguments {
             case "--documents": documents = url
             case "--downloads": downloads = url
             case "--verify": verify = url
+            case "--reclassify": reclassify = url
+            case "--compact": compact = url
             default: throw CLIError.unknownArgument(key)
             }
             index += 2
@@ -395,6 +399,20 @@ private func downloadedCandidates(root: URL) throws -> [LUTCorpusCurator.Candida
 
 do {
     let arguments = try Arguments(CommandLine.arguments)
+    if let root = arguments.reclassify {
+        let result = try LUTCorpusCurator.reclassify(outputRoot: root)
+        print("Reclassified \(result.total) LUTs; \(result.moved) changed family")
+        print("Visual clusters:")
+        for (cluster, count) in result.visualClusters.sorted(by: { $0.key < $1.key }) {
+            print("\(cluster): \(count)")
+        }
+        exit(0)
+    }
+    if let root = arguments.compact {
+        let result = try LUTCorpusCurator.compactHierarchy(outputRoot: root)
+        print("Compacted \(result.total) LUTs; \(result.moved) moved; \(result.collisions) filename collisions resolved")
+        exit(0)
+    }
     if let root = arguments.verify {
         let result = try LUTCorpusCurator.verify(outputRoot: root)
         print("Verified \(result.active) active LUTs")

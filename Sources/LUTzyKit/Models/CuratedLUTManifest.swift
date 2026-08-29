@@ -144,7 +144,18 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
     static func load(from url: URL) throws -> CuratedLUTManifest {
         let data = try Data(contentsOf: url)
         let manifest = try JSONDecoder().decode(CuratedLUTManifest.self, from: data)
-        try manifest.validate()
+        try manifest.validate(checkingClusterNames: true)
+        return manifest
+    }
+
+    /// The one reader allowed to see a manifest whose recorded visual families
+    /// predate the current rules: `LUTCorpusCurator.reclassify`, whose whole
+    /// job is to replace them. Every other reader gets the strict `load`, so a
+    /// stale family name still fails loudly everywhere it would be believed.
+    static func loadIgnoringClusterNames(from url: URL) throws -> CuratedLUTManifest {
+        let data = try Data(contentsOf: url)
+        let manifest = try JSONDecoder().decode(CuratedLUTManifest.self, from: data)
+        try manifest.validate(checkingClusterNames: false)
         return manifest
     }
 
@@ -236,7 +247,7 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
         return result
     }
 
-    private func validate() throws {
+    private func validate(checkingClusterNames: Bool) throws {
         guard version == Self.supportedVersion else { throw ManifestError.unsupportedVersion(version) }
         var paths: Set<String> = []
         var fingerprints: Set<String> = []
@@ -259,7 +270,8 @@ struct CuratedLUTManifest: Codable, Sendable, Equatable {
                 throw ManifestError.invalidEntry(entry.relativePath)
             }
             guard sources[entry.sourceID] != nil else { throw ManifestError.missingSource(entry.sourceID) }
-            if let cluster = entry.visualCluster,
+            if checkingClusterNames,
+               let cluster = entry.visualCluster,
                LUTVisualCluster(rawValue: cluster) == nil {
                 throw ManifestError.invalidEntry(entry.relativePath)
             }

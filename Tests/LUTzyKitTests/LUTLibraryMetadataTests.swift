@@ -4,12 +4,16 @@ import CoreImage
 
 final class LUTLibraryMetadataTests: TempDirectoryTestCase {
     func testBuiltInSampleSetIsFixedAndResolvable() throws {
-        XCTAssertEqual(LUTLibrarySample.all.map(\.id), ["portrait", "outdoor", "mixed", "saturated"])
+        XCTAssertEqual(
+            LUTLibrarySample.all.map(\.id),
+            ["panasonic-s9", "portrait", "outdoor", "mixed", "saturated"]
+        )
+        XCTAssertEqual(LUTLibrarySample.default.id, "panasonic-s9")
         XCTAssertTrue(LUTLibrarySample.all.allSatisfy { $0.sourceSpace == .display })
         for sample in LUTLibrarySample.all {
             XCTAssertNotNil(sample.url, "missing bundled sample \(sample.filename)")
             XCTAssertNotNil(sample.imageSource)
-            XCTAssertEqual(sample.colorProfile, "Embedded sRGB IEC61966-2.1")
+            XCTAssertFalse(sample.colorProfile.isEmpty)
         }
     }
 
@@ -42,6 +46,32 @@ final class LUTLibraryMetadataTests: TempDirectoryTestCase {
         XCTAssertEqual(catalog.effectiveName(for: durable), "Soft Portrait")
         catalog.setDisplayName("   ", for: [id])
         XCTAssertEqual(catalog.effectiveName(for: durable), "Filename Look")
+    }
+
+    func testFilenameDerivedDisplayNameRemovesExportNoiseWithoutLosingTechnicalTokens() {
+        XCTAssertEqual(LUTDisplayName.normalized("Warm_18.A049_12291747_S"), "Warm 18")
+        XCTAssertEqual(LUTDisplayName.normalized("WOODEN_GOLD__20.C0021"), "WOODEN GOLD 20")
+        XCTAssertEqual(LUTDisplayName.normalized("00_Gara_CineLut03"), "Gara CineLut03")
+        XCTAssertEqual(
+            LUTDisplayName.normalized("1_25.A002_02161553_C053", brand: "FreshLUTs"),
+            "FreshLUTs Look 1"
+        )
+        XCTAssertEqual(
+            LUTDisplayName.normalized("1_SGamut3CineSLog3_To_LC-709"),
+            "SGamut3CineSLog3 To LC-709"
+        )
+        XCTAssertEqual(LUTDisplayName.normalized("65MM_FILM_01"), "65MM FILM 01")
+        XCTAssertEqual(LUTDisplayName.normalized("12 Years a Slave"), "12 Years a Slave")
+        XCTAssertEqual(LUTDisplayName.normalized("Look.v2024"), "Look.v2024")
+        XCTAssertEqual(LUTDisplayName.normalized("Look.V2024"), "Look.V2024")
+        XCTAssertEqual(LUTDisplayName.normalized("1.1", brand: "FreshLUTs"), "FreshLUTs Look 1.1")
+        XCTAssertEqual(LUTDisplayName.normalized("1.2", brand: "FreshLUTs"), "FreshLUTs Look 1.2")
+    }
+
+    func testSplitToneAngleUsesTheShortArcAroundTheHueCircle() {
+        XCTAssertEqual(LUTSimilarity.circularHueDistance(350, 10), 20, accuracy: 0.0001)
+        XCTAssertEqual(LUTSimilarity.circularHueDistance(10, 350), 20, accuracy: 0.0001)
+        XCTAssertEqual(LUTSimilarity.circularHueDistance(20, 200), 180, accuracy: 0.0001)
     }
 
     func testManagerSelectionSummaryExposesCommonMixedAndTriStateMetadata() {

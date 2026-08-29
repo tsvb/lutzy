@@ -28,3 +28,10 @@
 - [x] 26. Remove the Codex source from deterministic curation and regenerate the 1,876-LUT repository corpus while retaining Claude.
 - [x] 27. Measure one exclusive visual cluster per active transform and persist it in the curated manifest.
 - [x] 28. Seed versioned `色調 · …` Collections once per durable record without overwriting later membership edits.
+- [x] 29. Add a self-identifying current-checkout acceptance launcher that closes stale LUTzy processes, launches the exact built bundle, and verifies the running executable path.
+- [x] 30. Make the Panasonic DC-S9 reference the default fixed Gallery/detail sample while retaining the existing comparison samples.
+- [x] 31. Normalize filename-derived display labels without renaming files, preserving meaningful technical tokens and respecting user-authored Names.
+- [x] 32. Correct circular split-angle measurement, bump the measurement version, and reclassify/verify all 1,876 retained LUTs.
+- [x] 33. Make the acceptance launcher wait for and verify the self-identifying window so a blocked current process cannot masquerade as a successful launch.
+- [x] 34. Add transactional physical-hierarchy compaction, remove generic wrapper folders from all 1,876 active LUT paths, keep meaningful nesting, and regenerate manifest duplicate paths plus corpus documentation.
+- [x] 35. Add regression checks that preserve CUBE bytes and metadata while preventing removed wrappers from returning during future curation.
