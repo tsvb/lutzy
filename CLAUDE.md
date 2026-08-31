@@ -6,7 +6,11 @@ LUTzy is a native **macOS 14+** app (**Swift 6 language mode**, SwiftUI + Core I
 
 - Build: `swift build`
 - Run (fast iteration; no sandbox/icon): `swift run`
-- Full app (icon + App Sandbox): open `Package.swift` in Xcode and Run.
+- In Xcode (better debugger, same executable): open `Package.swift` and Run. **This does not produce
+  an icon or a sandboxed app** — `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`
+  from the target, the appiconset holds no images, and there is no `Info.plist` or bundle identifier,
+  so both paths build a bare SwiftPM executable. Security-scoped bookmark persistence is therefore
+  inactive in both. Wiring it up needs an Xcode app target that does not exist yet.
 - Tests: `swift test`. CI runs debug build → tests → release build.
 
 **SDK and deployment target are different things — don't conflate them.** CI runs on `macos-26`
@@ -43,8 +47,12 @@ stay.
 and `LUTzyKitTests`. Data-race safety is **errors, not warnings** — Phase 2 Step 8 turned it on after
 Steps 4–7 removed the last shared mutable state, and the module compiles with **zero** diagnostics
 and **zero** escape hatches: no `@unchecked Sendable`, no `nonisolated(unsafe)`, no
-`@preconcurrency`. `PackageSettingsTests` fails if any of that changes, because none of it is
-observable at runtime.
+`@preconcurrency`. `PackageSettingsTests` fails if any of that changes **under `Sources/`**, because none of it is
+observable at runtime. Note the scope: the scanner enumerates `Sources/` only, so a hatch added in
+`Tests/LUTzyKitTests` — also `.swiftLanguageMode(.v6)` — would pass unnoticed. That is not a simple
+oversight to fix: `PackageSettingsTests.swift` names all three hatch strings in its own code, so a
+test-target-inclusive scanner would flag itself and needs a self-exemption. Zero hatches exist
+anywhere at HEAD.
 
 Practical consequences when writing code here:
 
