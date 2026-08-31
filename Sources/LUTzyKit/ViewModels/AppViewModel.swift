@@ -54,13 +54,15 @@ final class AppViewModel: ObservableObject {
     /// statement about the file, and because `inspectorTab` is not reset on open it was shown again on
     /// every ←/→ step through a folder of RAWs.
     ///
-    /// Not on *every* open, though: a load that fails or is cancelled never reaches the clear, which is
-    /// harmless because it never publishes a new source either — everything on screen still coherently
-    /// describes the previous image. The exception is a failed or cancelled open landing on top of an
-    /// in-flight probe: `load()` cancels `capabilitiesTask` at `:375`, before it knows whether the new
-    /// file decodes, and only the `.success` branch re-probes (`:427`), so `rawCapabilities` stays
-    /// `nil` with `sourceIsRAW` still true and the panel parks on `.probing` indefinitely. Recorded as **B15 [open]** in `docs/CODE_REVIEW.md`; every
-    /// `developPanelState` test opens exactly one image, which is why it went unseen.
+    /// Not on *every* open, though: a load that fails or is cancelled never reaches the clear. That is
+    /// harmless, because such a load never publishes a new source either — everything on screen still
+    /// coherently describes the previous image, capabilities included.
+    ///
+    /// It was not always harmless. `load()` used to cancel the in-flight probe before knowing whether
+    /// the new file decoded, while only the `.success` branch re-probes, so a failed open inside the
+    /// 25–170 ms probe window stranded this on `.probing` indefinitely. Fixed as **B15**: `load()` no
+    /// longer cancels the probe; `refreshCapabilities()` does, which is the only place that can know a
+    /// replacement is coming. Pinned by `testAFailedOpenDuringTheProbeDoesNotStrandTheDevelopPanel`.
     ///
     /// Deriving the state here rather than in the view is what makes it testable: this repo has no
     /// SwiftUI view tests, so a distinction that lives only in a `ViewBuilder` cannot be asserted.
@@ -112,6 +114,9 @@ final class AppViewModel: ObservableObject {
 
     private var capabilitiesTask: Task<Void, Never>?
     private var developTask: Task<Void, Never>?
+
+    /// Held so a superseded EXIF read can be cancelled before it publishes. See `refreshMetadata`.
+    private var metadataTask: Task<Void, Never>?
 
     /// Whether any call since the last fired render changed `rawDevelop`.
     ///
@@ -167,6 +172,36 @@ final class AppViewModel: ObservableObject {
     /// slider write.
     var isComparisonAvailable: Bool {
         !document.adjustments.allSatisfy(\.isIdentity) || !document.lut.isIdentity
+    }
+
+    /// What the histogram is a histogram **of** — the label above it in the Info panel.
+    ///
+    /// **B14** (`docs/CODE_REVIEW.md`). The label used to read `selectedLUT != nil ? "Graded" :
+    /// "Original"`, which was true when only a LUT could change the picture and became wrong the day
+    /// Step 10b shipped the Adjust panel: an adjustment-only edit tallied a genuinely graded histogram
+    /// and captioned it "Original". `PreviewView`'s split-view caption had the identical defect and was
+    /// fixed in Step 10b's follow-up; this was the one remaining site.
+    ///
+    /// Derived here rather than in the `ViewBuilder` for the reason `developPanelState` gives: this
+    /// repo has no SwiftUI view tests, so a distinction that lives only in a view cannot be asserted,
+    /// and this one has already been wrong once.
+    ///
+    /// Exact at the edges, because it is written in terms of the same predicates as the A/B gate
+    /// rather than in terms of `selectedLUT`:
+    /// - a LUT at **zero intensity** is `lut.isIdentity`, so it reads `.adjusted` beside real
+    ///   adjustments and `.original` on its own — a selected LUT contributing nothing is not "Graded";
+    /// - `rawDevelop` is deliberately not consulted, matching `isComparisonAvailable` and
+    ///   `originalForComparison`: holding Space keeps develop, so a develop-only edit shows the same
+    ///   histogram on both sides and "Original" is the honest caption for it.
+    enum HistogramSource: String, Equatable, Sendable {
+        case original = "Original"
+        case graded = "Graded"
+        case adjusted = "Adjusted"
+    }
+
+    var histogramSource: HistogramSource {
+        if isShowingOriginal || !isComparisonAvailable { return .original }
+        return document.lut.isIdentity ? .adjusted : .graded
     }
 
     @Published var previewNSImage: NSImage?
@@ -372,8 +407,23 @@ final class AppViewModel: ObservableObject {
         previewTask?.cancel()
         originalPreviewTask?.cancel()
         intensityTask?.cancel()
-        capabilitiesTask?.cancel()
         developTask?.cancel()
+        // **`capabilitiesTask` is deliberately NOT cancelled here** — see B15 in `docs/CODE_REVIEW.md`.
+        //
+        // It used to be, and that was a stuck state: this line runs before the decode, so it fired
+        // even for a load that then failed or was cancelled, and only the `.success` branch calls
+        // `refreshCapabilities()`. Stepping onto an unreadable file inside the 25–170 ms probe window
+        // killed the probe for the image that is *still on screen* and never restarted it, leaving
+        // `rawCapabilities == nil` with `sourceIsRAW == true` — `developPanelState`'s `.probing` case,
+        // spinning forever.
+        //
+        // Cancelling belongs at the refresh site, not the load site, and `refreshCapabilities()`
+        // already does it. On a successful open that runs in the same main-actor turn as the decode,
+        // so the behaviour is unchanged; on a failed one the probe simply finishes and describes the
+        // image the user is still looking at, which is correct. At most one probe is ever in flight,
+        // because there is only one handle to hold it.
+        //
+        // `refreshMetadata` takes the same shape for the same reason.
         // A pending develop flag describes the image being left; it must not survive onto whatever
         // opens next, or an unrelated first edit on the new image would render a comparison baseline
         // for develop settings that were never actually touched on it.
@@ -778,8 +828,19 @@ final class AppViewModel: ObservableObject {
     }
 
     /// Read EXIF/TIFF/GPS metadata off the main actor and publish it.
+    /// Read EXIF off the main actor and publish it.
+    ///
+    /// **The task is stored and the previous one cancelled**, which it was not until B15. An unstored
+    /// `Task.detached` has no handle, so nothing could stop image A's read from landing after image
+    /// B's had already been published — the Info panel then described the wrong file, with no way back
+    /// short of reopening. `ImageMetadata.read` on a 30 MB DNG is slow enough to lose that race on a
+    /// ←/→ held down, and B11 was the same shape one layer over.
+    ///
+    /// Cancelled here rather than in `load()` for the reason given there: a load that fails must not
+    /// cancel the read for the image still on screen.
     private func refreshMetadata(url: URL?, data: Data?) {
-        Task.detached {
+        metadataTask?.cancel()
+        metadataTask = Task.detached {
             let meta: ImageMetadata
             if let url {
                 meta = ImageMetadata.read(from: url)
@@ -788,6 +849,7 @@ final class AppViewModel: ObservableObject {
             } else {
                 meta = ImageMetadata()
             }
+            guard !Task.isCancelled else { return }
             await MainActor.run { self.metadata = meta }
         }
     }

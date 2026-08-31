@@ -51,9 +51,18 @@ enum ImageDecoder {
     // MARK: - Loading
 
     /// Load any supported image file as a CIImage, upright.
+    ///
+    /// **The RAW branch checks the extent, not just for `nil`** — see B16 in `docs/CODE_REVIEW.md`.
+    /// `CIRAWFilter(imageURL:)` is far more permissive than `CIImage(contentsOf:)`: handed twelve
+    /// bytes of ASCII text named `.dng` it constructs a filter *and* returns an `outputImage`, whose
+    /// extent is `(inf, inf, 0, 0)`. So the `nil` check alone passed a corrupt, truncated, or simply
+    /// misnamed RAW straight through as a real image — measured, not assumed. Downstream is guarded
+    /// (`isRasterizable` in `RenderEngine`), so the result was not a crash but something quieter: the
+    /// file "opened", the status bar read `0×0`, the preview stayed blank, and nothing said why.
+    /// The non-RAW branch below never had this hole, because `CIImage(contentsOf:)` returns `nil`.
     static func load(from url: URL) throws -> CIImage {
         if rawExtensions.contains(url.pathExtension.lowercased()) {
-            guard let output = developRAWNeutral(at: url) else {
+            guard let output = developRAWNeutral(at: url), output.extent.isRasterizable else {
                 throw ImageError.cannotLoad(url.lastPathComponent)
             }
             return output
