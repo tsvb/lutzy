@@ -9,6 +9,20 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# `--check` dry-runs every mutation's anchor and exits without building. See the note in mutate().
+CHECK_ONLY=0
+[[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+
+# **Run this alone.** It edits tracked sources in place and restores them from `$file.bak`, so
+# anything else that builds, tests, or mutates at the same time can see a half-mutated tree — and the
+# sibling harness and `--check` use the *same* `.bak` path, so two of them running together can clobber
+# each other's backups. A concurrent `swift build`/`swift test` also contends for `.build`, which
+# produced **two false SURVIVED verdicts** during the second opposition pass before the cause was
+# spotted: the mutation was genuinely caught, and re-running it alone proved so both times.
+#
+# A SURVIVED here is worth re-checking by hand before believing it — apply the mutation, run the named
+# filter alone, and read *which* test failed. "N failures" is not evidence that the right test failed.
+
 PASS=0; SURVIVED=0; NOBUILD=0; NORUN=0; SKIPPED=0; CONTROL=0; CONTROL_CAUGHT=0
 declare -a SURVIVOR_NAMES=() NOBUILD_NAMES=() NORUN_NAMES=() CONTROL_CAUGHT_NAMES=()
 
@@ -21,6 +35,23 @@ mutate() {
   if cmp -s "$file" "$file.bak"; then
     echo "NO-OP     $label — the pattern did not match; the mutation never applied"
     NORUN=$((NORUN+1)); NORUN_NAMES+=("$label (pattern did not match)")
+    mv "$file.bak" "$file"; return
+  fi
+
+  # `--check`: verify every mutation still *anchors* to real code, without building anything.
+  #
+  # This exists because ten of `mutate-step10a.sh`'s 36 mutants pointed at a file whose contents had
+  # moved to a sibling, and stayed dead for three weeks (docs/CODE_REVIEW.md B17). A path in a script
+  # is a string; code motion is invisible to it, and the only signal was an exit code nobody read
+  # because nothing runs these harnesses. Anchoring is exactly the part that rots, and it is the part
+  # that costs no build to test: the substitution above either changed the file or it did not.
+  #
+  # Runs in about a second, needs no DNG and no toolchain beyond perl, and would have caught B17 in
+  # the commit that caused it. A green `--check` says the mutations still describe this codebase; it
+  # says nothing about whether the tests catch them, which is what a full run is for.
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    echo "anchored  $label"
+    PASS=$((PASS+1))
     mv "$file.bak" "$file"; return
   fi
 
@@ -57,9 +88,18 @@ mutate() {
   # **A failure is looked for FIRST, and SKIPPED only after.** These two were the other way round
   # until this back-port, and the old skip test — `with N tests skipped and 0 failures`, negated
   # against a loose `with [0-9]* failures` — matched a run that both skipped *and* failed on a
-  # machine without the DNG. The negation could never fire, because xctest prints `and 0 failures`,
-  # not `with 0 failures`. Several filters below name suites that mix RAW-gated tests with ordinary
-  # ones (`PreviewCutoverTests` has two `XCTSkip` sites in nine tests and appears in six of them;
+  # machine without the DNG. **The negation could never read the line it was aimed at**: xctest prints
+  # `with N tests skipped and 0 failures` on a summary line that skipped anything, and plain
+  # `with 0 failures` on one that did not. So `with [0-9]* failures` never matched the skip line it
+  # was guarding, and in a multi-suite run it matched some *other* suite's skip-free line instead —
+  # suppressing the SKIPPED branch in the ordinary case, and failing to suppress it exactly when it
+  # mattered, since a lone failure prints the singular `with 1 failure` that the plural pattern misses.
+  # (An earlier version of this comment said the negation "could never fire, because xctest prints
+  # `and 0 failures`, not `with 0 failures`". That is backwards — a non-skipping suite prints
+  # `with 0 failures`, and the negation fired constantly. The fix below was right; the reason given
+  # for it was not. Verified by reading real summary lines from both kinds of run.)
+  # Several filters below name suites that mix RAW-gated tests with ordinary
+  # ones (`PreviewCutoverTests` has two `XCTSkip` sites in nine tests and appears in seven of them;
   # the derive-gate mutation at the bottom targets `DeriveInvarianceTests`, which skips wholesale),
   # so a genuine survivor in such a suite was reported SKIPPED — and SKIPPED is (correctly) excluded
   # from the `exit 1` at the bottom. **The harness would have exited 0 on an uncaught mutation, on
@@ -76,8 +116,10 @@ mutate() {
   #
   # **Step 9's recorded tally — "19 mutations caught, 1 shown equivalent by inspection"
   # (`docs/PHASE2_SPEC.md` §6) — was produced by the broken classifier**, on a machine where the DNG
-  # in `realworldtest/` was present. It has not been reproduced since the fix. A run reporting any
-  # SKIPPED is a weaker run than that one, whatever its caught count says.
+  # in `realworldtest/` was present. **It was re-measured under the corrected classifier in `55586e6`
+  # and stands exactly**: 19 caught, 1 control survived as designed, 0 SURVIVED / NO-BUILD / NO-TESTS /
+  # SKIPPED, with the DNG present. A run reporting any SKIPPED is a weaker run than that one, whatever
+  # its caught count says.
   # A label beginning with CONTROL marks a **deliberate equivalent mutant** — a change that provably
   # cannot alter behaviour, carried so the harness proves it can still tell a survivor from a kill.
   # It is expected to survive, so it must not count toward SURVIVED.
@@ -223,7 +265,11 @@ mutate "RenderPipeline: derive gate — LUT stage skipped in the pipeline" \
 
 echo
 echo "================ summary ================"
-echo "caught:     $PASS"
+if [[ $CHECK_ONLY -eq 1 ]]; then
+  echo "anchored:   $PASS   (patterns still match real code; says nothing about whether tests catch them)"
+else
+  echo "caught:     $PASS"
+fi
 echo "SURVIVED:   $SURVIVED"
 echo "NO-BUILD:   $NOBUILD   (proves nothing — fix the mutation)"
 echo "NO-TESTS:   $NORUN     (proves nothing — fix the filter/pattern)"

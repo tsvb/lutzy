@@ -18,6 +18,20 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# `--check` dry-runs every mutation's anchor and exits without building. See the note in mutate().
+CHECK_ONLY=0
+[[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+
+# **Run this alone.** It edits tracked sources in place and restores them from `$file.bak`, so
+# anything else that builds, tests, or mutates at the same time can see a half-mutated tree — and the
+# sibling harness and `--check` use the *same* `.bak` path, so two of them running together can clobber
+# each other's backups. A concurrent `swift build`/`swift test` also contends for `.build`, which
+# produced **two false SURVIVED verdicts** during the second opposition pass before the cause was
+# spotted: the mutation was genuinely caught, and re-running it alone proved so both times.
+#
+# A SURVIVED here is worth re-checking by hand before believing it — apply the mutation, run the named
+# filter alone, and read *which* test failed. "N failures" is not evidence that the right test failed.
+
 PASS=0; SURVIVED=0; NOBUILD=0; NORUN=0; SKIPPED=0; CONTROL=0; CONTROL_CAUGHT=0
 declare -a SURVIVOR_NAMES=() NOBUILD_NAMES=() NORUN_NAMES=() CONTROL_CAUGHT_NAMES=()
 
@@ -30,6 +44,23 @@ mutate() {
   if cmp -s "$file" "$file.bak"; then
     echo "NO-OP     $label — the pattern did not match; the mutation never applied"
     NORUN=$((NORUN+1)); NORUN_NAMES+=("$label (pattern did not match)")
+    mv "$file.bak" "$file"; return
+  fi
+
+  # `--check`: verify every mutation still *anchors* to real code, without building anything.
+  #
+  # This exists because ten of `mutate-step10a.sh`'s 36 mutants pointed at a file whose contents had
+  # moved to a sibling, and stayed dead for three weeks (docs/CODE_REVIEW.md B17). A path in a script
+  # is a string; code motion is invisible to it, and the only signal was an exit code nobody read
+  # because nothing runs these harnesses. Anchoring is exactly the part that rots, and it is the part
+  # that costs no build to test: the substitution above either changed the file or it did not.
+  #
+  # Runs in about a second, needs no DNG and no toolchain beyond perl, and would have caught B17 in
+  # the commit that caused it. A green `--check` says the mutations still describe this codebase; it
+  # says nothing about whether the tests catch them, which is what a full run is for.
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    echo "anchored  $label"
+    PASS=$((PASS+1))
     mv "$file.bak" "$file"; return
   fi
 
@@ -123,6 +154,16 @@ mutate() {
 }
 
 VM=Sources/LUTzyKit/ViewModels/AppViewModel.swift
+# The develop bindings live in their own file, and have since `0b7c9bc` ("Split the develop bindings
+# out of AppViewModel") landed the day after this harness was written. Ten mutations below target
+# symbols that moved with them; they kept pointing at $VM, matched nothing, and were reported NO-OP.
+# Ten of this harness's 36 mutants had been inert for three weeks and nothing could tell, because a
+# NO-OP proves nothing rather than proving something false. See docs/CODE_REVIEW.md B17.
+#
+# Do NOT collapse these two back into one variable. Measured by dry-run substitution over all 36
+# mutations: 11 match only AppViewModel.swift and 10 match only AppViewModel+Develop.swift, with zero
+# overlap. Repointing $VM wholesale would kill those 11 exactly as this killed these.
+VMD=Sources/LUTzyKit/ViewModels/AppViewModel+Develop.swift
 RC=Sources/LUTzyKit/Models/RAWCapabilities.swift
 RE=Sources/LUTzyKit/Models/RenderEngine.swift
 RD=Sources/LUTzyKit/Models/RAWDevelopSettings.swift
@@ -195,16 +236,16 @@ mutate "RenderEngine: a seed read behind the wrong flag (sharpness gated on cont
 mutate "RenderEngine: a gated seed not read at all (localToneMap hardcoded 0)" "$RE" \
   's/            localToneMapAmount:\n                filter\.isLocalToneMapSupported \? Double\(filter\.localToneMapAmount\) : 0,/            localToneMapAmount: 0,/' \
   "RAWCapabilitiesTests"
-mutate "AppViewModel: a control displays another control's seed" "$VM" \
+mutate "AppViewModel+Develop: a control displays another control's seed" "$VMD" \
   's/        case \.sharpness: return develop\.sharpnessAmount \?\? seed\?\.sharpnessAmount \?\? 0/        case .sharpness: return develop.sharpnessAmount ?? seed?.contrastAmount ?? 0/' \
   "DevelopInspectorTests"
-mutate "AppViewModel: a control ignores its seed and opens at zero" "$VM" \
+mutate "AppViewModel+Develop: a control ignores its seed and opens at zero" "$VMD" \
   's/            return develop\.colorNoiseReductionAmount \?\? seed\?\.colorNoiseReductionAmount \?\? 0/            return develop.colorNoiseReductionAmount ?? 0/' \
   "DevelopInspectorTests"
-mutate "AppViewModel: the lens-correction toggle ignores its Bool seed" "$VM" \
+mutate "AppViewModel+Develop: the lens-correction toggle ignores its Bool seed" "$VMD" \
   's/return \(develop\.lensCorrectionEnabled \?\? seed\?\.lensCorrectionEnabled \?\? false\) \? 1 : 0/return (develop.lensCorrectionEnabled ?? false) ? 1 : 0/' \
   "DevelopInspectorTests"
-mutate "AppViewModel: the tint binding ignores its seed" "$VM" \
+mutate "AppViewModel+Develop: the tint binding ignores its seed" "$VMD" \
   's/self\.document\.rawDevelop\.neutralTint \?\? self\.rawCapabilities\?\.asShotTint \?\? 0/self.document.rawDevelop.neutralTint ?? 0/' \
   "DevelopInspectorTests"
 
@@ -248,27 +289,34 @@ mutate "AppViewModel: returning to Info never recomputes" "$VM" \
   "DevelopInspectorTests"
 
 echo "=== the toggle immediate-write path ==="
-mutate "AppViewModel: toggles pick up the 60 ms slider debounce" "$VM" \
+mutate "AppViewModel+Develop: toggles pick up the 60 ms slider debounce" "$VMD" \
   's/self\.updateDocument\(debounced: !control\.isToggle\)/self.updateDocument(debounced: true)/' \
   "DevelopInspectorTests"
-mutate "AppViewModel: the debounce decision is inverted" "$VM" \
+mutate "AppViewModel+Develop: the debounce decision is inverted" "$VMD" \
   's/self\.updateDocument\(debounced: !control\.isToggle\)/self.updateDocument(debounced: control.isToggle)/' \
   "DevelopInspectorTests"
 
 echo "=== nil semantics ==="
-mutate "AppViewModel: an unset white balance reads back 0" "$VM" \
+mutate "AppViewModel+Develop: an unset white balance reads back 0" "$VMD" \
   's/case \.whiteBalance: return develop\.neutralTemperature \?\? seed\?\.asShotTemperature \?\? 0/case .whiteBalance: return 0/' \
   "DevelopInspectorTests"
-mutate "AppViewModel: reset writes zero instead of nil" "$VM" \
+mutate "AppViewModel+Develop: reset writes zero instead of nil" "$VMD" \
   's/            case \.exposure: document\.rawDevelop\.exposure = nil/            case .exposure: document.rawDevelop.exposure = 0/' \
   "DevelopInspectorTests"
 # White balance is one control over two settings, and tint has no reset of its own.
-mutate "AppViewModel: resetting white balance strands the tint" "$VM" \
+mutate "AppViewModel+Develop: resetting white balance strands the tint" "$VMD" \
   's/                document\.rawDevelop\.neutralTint = nil\n//' \
   "DevelopInspectorTests"
-mutate "AppViewModel: reading a control writes the seed" "$VM" \
-  's/    func developValue\(for control: DevelopControl\) -> Double \{\n        let develop = document\.rawDevelop/    func developValue(for control: DevelopControl) -> Double {\n        document.rawDevelop.exposure = document.rawDevelop.exposure ?? 0\n        let develop = document.rawDevelop/' \
-  "DevelopInspectorTests"
+# **"reading a control writes the seed" was a mutation here, and it is retired — the defect it models
+# cannot be written.** `AppViewModel.document` is `@Published private(set)` (`AppViewModel.swift:30`),
+# so its setter is file-private and `AppViewModel+Develop.swift` cannot assign to it at all; every
+# write goes through `updateDocument`. The mutation produced
+# `error: cannot assign to property: 'document' setter is inaccessible`, which is the compiler
+# enforcing the property outright rather than a test observing it — a stronger guarantee than any
+# mutation could give, and not something to "fix" by finding a compiling variant.
+#
+# It went undetected as NO-BUILD for three weeks behind the dead `$VM` path (B17); repointing surfaced
+# it. Restore a mutation here if `document` ever gains an accessible setter outside its own file.
 
 echo "=== the is*Supported gates in apply(to:) ==="
 # **The filter here is deliberately NOT the pixel test.** Removing the gate below and rerunning
@@ -289,7 +337,11 @@ mutate "RAWDevelopSettings: highlight recovery keeps #available but loses its fl
 
 echo
 echo "================ summary ================"
-echo "caught:     $PASS"
+if [[ $CHECK_ONLY -eq 1 ]]; then
+  echo "anchored:   $PASS   (patterns still match real code; says nothing about whether tests catch them)"
+else
+  echo "caught:     $PASS"
+fi
 echo "SURVIVED:   $SURVIVED"
 echo "NO-BUILD:   $NOBUILD   (proves nothing — fix the mutation)"
 echo "NO-TESTS:   $NORUN     (proves nothing — fix the filter/pattern)"
