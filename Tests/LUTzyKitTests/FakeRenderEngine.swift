@@ -157,11 +157,24 @@ actor FakeRenderEngine: RenderEngining {
     /// test racing it would be a flake either way it landed. Gating the probe makes that window last
     /// as long as the test needs.
     private var probeIsGated = false
-    private var parkedProbe: CheckedContinuation<Void, Never>?
+
+    /// **All** parked probes, oldest first — not one slot.
+    ///
+    /// It was one slot until the second opposition pass, and that silently broke the only test that
+    /// needed two: a second parked probe overwrote the first's continuation, so the first was never
+    /// resumed. The Swift runtime says so out loud — *"SWIFT TASK CONTINUATION MISUSE:
+    /// rawCapabilities(for:) leaked its continuation without resuming it"* — but XCTest does not fail
+    /// on it, so `testASuccessfulOpenStillReplacesThePreviousProbesAnswer` passed even with
+    /// `refreshCapabilities()`'s cancellation deleted, which is the exact thing its failure message
+    /// claims to pin. Measured, both before and after this fix.
+    private var parkedProbes: [CheckedContinuation<Void, Never>] = []
 
     func gateProbe() { probeIsGated = true }
 
-    /// Let a parked probe finish, and stop parking new ones.
+    /// How many probes are parked right now — lets a test wait for a second one before releasing.
+    var parkedProbeCount: Int { parkedProbes.count }
+
+    /// Let every parked probe finish, and stop parking new ones.
     ///
     /// Ordering note for callers: wait until `capabilityProbeCount` has moved before releasing. The
     /// count is incremented and the continuation stored in the same actor-synchronous run as the
@@ -170,16 +183,33 @@ actor FakeRenderEngine: RenderEngining {
     /// stored, and `releaseProbe()` cannot no-op past a probe that has not parked yet.
     func releaseProbe() {
         probeIsGated = false
-        parkedProbe?.resume()
-        parkedProbe = nil
+        let parked = parkedProbes
+        parkedProbes = []
+        parked.forEach { $0.resume() }
+    }
+
+    /// Resume only the most recently parked probe, leaving older ones suspended.
+    ///
+    /// Ordering control is what makes a superseded-probe test *falsifiable*: release the current
+    /// image's probe first, let its answer land, then release the stale one and assert it did not
+    /// overwrite. Releasing them together makes the outcome depend on resume order, which is a flake
+    /// rather than an assertion.
+    func releaseNewestProbe() {
+        guard let newest = parkedProbes.popLast() else { return }
+        newest.resume()
     }
 
     func rawCapabilities(for source: ImageSource) async -> RAWCapabilities? {
         capabilityProbeCount += 1
+        // **Snapshot the stub before suspending.** Read after the await, every parked probe returns
+        // whatever the stub happens to be at release time, so two probes cannot be told apart and a
+        // test cannot show that the *right* one won. This is the "wrote a value that equals the
+        // default" weakness in its timing form.
+        let answer = stubbedCapabilities
         if probeIsGated {
-            await withCheckedContinuation { parkedProbe = $0 }
+            await withCheckedContinuation { parkedProbes.append($0) }
         }
-        return stubbedCapabilities
+        return answer
     }
 
     func setStubbedCapabilities(_ value: RAWCapabilities?) { stubbedCapabilities = value }

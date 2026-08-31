@@ -420,8 +420,14 @@ final class AppViewModel: ObservableObject {
         // Cancelling belongs at the refresh site, not the load site, and `refreshCapabilities()`
         // already does it. On a successful open that runs in the same main-actor turn as the decode,
         // so the behaviour is unchanged; on a failed one the probe simply finishes and describes the
-        // image the user is still looking at, which is correct. At most one probe is ever in flight,
-        // because there is only one handle to hold it.
+        // image the user is still looking at, which is correct.
+        //
+        // At most one probe's *answer* is ever published — the superseded task's `Task.isCancelled`
+        // guard discards it — but **two probe tasks can be alive at once**, and this comment claimed
+        // otherwise until the second opposition pass. Cancelling the handle cannot resume a task
+        // already suspended inside `rawCapabilities(for:)`, and the guard sits after that `await`.
+        // One handle bounds how many tasks you can still cancel, not how many are unfinished;
+        // `LoadCancellationTests` reaches a `capabilityProbeCount` of 2 on purpose.
         //
         // `refreshMetadata` takes the same shape for the same reason.
         // A pending develop flag describes the image being left; it must not survive onto whatever
@@ -719,7 +725,14 @@ final class AppViewModel: ObservableObject {
     /// `CGImage` comes back, which is wrapped for AppKit on this actor.
     ///
     /// Any in-flight render is cancelled first, so a slider drag drops stale work rather than
-    /// queueing it.
+    /// queueing one full render per tick.
+    ///
+    /// **The mechanism is the 60 ms debounce upstream, not this cancel.** `setLUTIntensity` and the
+    /// develop path cancel a task parked in `Task.sleep`, which is a real cancellation point, so a
+    /// superseded render never starts. Cancelling `previewTask` itself skips the publish and the
+    /// follow-on histogram render — but `RenderEngine.makeCGImage` polls no cancellation flag and an
+    /// actor hop is not a cancellation point, so a render already handed to the engine runs to
+    /// completion and has its result discarded rather than its work stopped.
     private func schedulePreview() {
         previewTask?.cancel()
 

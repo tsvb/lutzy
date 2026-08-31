@@ -107,9 +107,18 @@ final class LoadCancellationTests: TempDirectoryTestCase {
         let second = try Fixtures.writeGradientPNG(width: 16, height: 16, named: "b.png", in: tempDirectory)
         viewModel.openImage(url: second)
         try await waitUntil("the second image to load") { viewModel.sourceName == "b.png" }
+        try await waitUntil("both probes to be parked") { await fake.parkedProbeCount == 2 }
+
+        // **Release the current image's probe first, the stale one second.** Releasing both together
+        // makes the result depend on resume order — a flake, not an assertion. This ordering means a
+        // stale answer that is *not* discarded lands last and overwrites, which is what the assertion
+        // below can then catch. Verified: deleting `capabilitiesTask?.cancel()` from
+        // `refreshCapabilities()` turns this test red.
+        await fake.releaseNewestProbe()
+        try await waitUntil("the second image's probe to answer") { viewModel.rawCapabilities == fresh }
 
         await fake.releaseProbe()
-        try await waitUntil("a probe to answer") { viewModel.rawCapabilities != nil }
+        try await waitUntil("the stale probe to finish") { await fake.parkedProbeCount == 0 }
 
         XCTAssertEqual(
             viewModel.rawCapabilities, fresh,

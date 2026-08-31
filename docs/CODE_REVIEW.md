@@ -40,7 +40,8 @@ Measured on a JPEG with an 800×533 buffer and orientation tag 6:
 The same defect sat in `RecipeExtractor.derive`, where it was worse than cosmetic: a portrait JPG
 compared against an upright RAW render meant the whole derivation was sampling unrelated pixels.
 
-**Fix:** one shared `ImageProcessor.orientedLoadOptions` (`[.applyOrientationProperty: true]`) used by
+**Fix:** one shared `orientedLoadOptions` (`[.applyOrientationProperty: true]`) — on `ImageProcessor`
+at the time, on `ImageDecoder` since Step 7 dissolved that type — used by
 every non-RAW decode, plus orientation-aware dimensions in `ImageMetadata`.
 
 ### B2 — Decode and preview rasterization ran on the main actor · High · [fixed]
@@ -54,10 +55,16 @@ renders that hadn't started, so a slider drag queued one full render per tick.
 The README claimed "Responsive by design… LUT application is cancellable." `PHASE2_SPEC.md` had
 independently flagged the same thing as "a confirmed responsiveness bug."
 
-**Fix:** the filter graph is still assembled on the main actor (Core Image is lazy — that part is nearly
-free), but rasterization moved to `Task.detached` with the result published back. Preview rendering is
-now a single funnel (`schedulePreview`) instead of three call sites that each wrote `previewNSImage`,
-and `setLUTIntensity` debounces at 60 ms.
+**Fix:** rasterization moved off the main actor — as shipped then, into a `Task.detached`, while the
+lazy filter graph was still assembled on the main actor (Core Image is lazy, so that part is nearly
+free). Preview rendering became a single funnel (`schedulePreview`) instead of three call sites that
+each wrote `previewNSImage`, and `setLUTIntensity` debounces at 60 ms.
+
+**Superseded, both halves, by Phase 2 Step 5** — noted here rather than rewritten, following this
+file's convention. Graph assembly *and* rasterization now live inside `actor RenderEngine`, so
+`schedulePreview` is a plain `Task` (not detached) that hands only `Sendable` values across the actor
+boundary, and the main actor builds no filter graph at all — what keeps `createCGImage` off it is the
+actor hop, not the task type. The funnel and the 60 ms debounce are unchanged and still accurate.
 
 ### B3 — Launch blocked on disk I/O · Medium · [fixed]
 
@@ -191,7 +198,13 @@ Narrow, but reachable and unbounded. Found by the opposition pass while checking
 `refreshCapabilities()` already did, and it is the only place that knows a replacement is actually
 coming. On a successful open that runs in the same main-actor turn as the decode, so the behaviour is
 unchanged; on a failed one the probe finishes and describes the image the user is still looking at.
-At most one probe is ever in flight, because there is only one handle to hold it.
+At most one probe's *answer* is ever published — the superseded task's `Task.isCancelled` guard
+discards it — but two probe tasks can be alive at once. Cancelling the handle cannot resume a task
+already suspended inside `rawCapabilities(for:)`, and the guard sits after that `await`. **This
+sentence originally read "at most one probe is ever in flight, because there is only one handle to
+hold it", which is false**, and it was written by the pass that fixed B15. One handle bounds how many
+tasks you can still cancel, not how many are unfinished; `LoadCancellationTests` reaches a
+`capabilityProbeCount` of 2 by design.
 
 **Why no test caught it:** every `developPanelState` test built a fresh `AppViewModel` and opened
 exactly one image. Nothing opened a second image over an in-flight probe, so the whole class of
@@ -231,6 +244,66 @@ same shape in this review: a framework accepting input the code assumed it would
 orientation, B12 degenerate LUT domain). Covered on CI — the fixture is a text file, not a RAW — with
 the converse pinned too, so the fix is not satisfiable by rejecting every RAW.
 
+### B17 — Ten of the Step 10a harness's 36 mutants had been inert for three weeks · Medium · [fixed]
+
+Not an app defect — a defect in the thing that proves the app's tests bite, which is worse in one
+specific way: it is the instrument, and a broken instrument makes every reading it took unreliable.
+
+`scripts/mutate-step10a.sh:125` sets `VM=…/AppViewModel.swift`. `0b7c9bc` ("Split the develop bindings
+out of AppViewModel") moved `developValue(for:)`, the seed fall-throughs, the tint binding,
+`resetDevelop` and the toggle/slider debounce split into `AppViewModel+Develop.swift` — **the day after
+this harness was written**. `$VM` was never repointed.
+
+Measured by dry-run substitution over all 36 mutations (apply each perl expression, compare bytes):
+**10 matched nothing.** Each hits the NO-OP branch, increments `NORUN`, and fails the gate. The split
+is clean — 11 mutations match only `AppViewModel.swift`, 10 only `AppViewModel+Develop.swift`, zero
+overlap — so repointing `$VM` wholesale would have killed the other 11 exactly as this killed these.
+Fixed by adding `$VMD` and repointing precisely those ten.
+
+What was lost is reproducibility: nothing at HEAD proved `DevelopInspectorTests` would fail if the
+seed fall-throughs or the toggle/slider debounce split broke. **Measured after the fix, on an
+untouched run: 35 caught, 0 SURVIVED, 0 NO-BUILD, 0 NO-TESTS, 0 SKIPPED — exit 0.** That is the first
+time this harness has ever exited 0; it has been failing on dead anchors since Step 10b, and every
+one of the ten repointed mutants is caught.
+
+Two earlier runs reported one SURVIVED and were both wrong, in the same way and for the same reason:
+other commands were running. `--check` and the sibling harness mutate tracked sources through the
+*same* `$file.bak` path, and a concurrent `swift build`/`swift test` contends for `.build`. Re-running
+the flagged mutation alone showed `testWritingAToggleThroughTheBindingSkipsTheDebounce` failing with a
+precise message both times. Both scripts now say to run them alone, and to treat a SURVIVED as a
+hypothesis to re-check by hand — **"N failures" is not evidence that the intended test failed**, which
+is the same reasoning error this review keeps finding in the repo's own record.
+
+**This is the sharpest self-indictment in the file.** The failure was *loud*: ten NO-OP lines and a
+non-zero exit, every run, for three weeks. Nobody saw it because nothing runs these harnesses — no CI
+job, no ship gate, one comment referencing them — and because PR #28 armed this script's exit gate,
+arguing at length that "an exit code that is always 1 says nothing", **without ever running it.** It
+verified the sibling harness and assumed the shared classifier meant a shared fate.
+
+The general shape: **a path in a script is a string, and code motion is invisible to it.** The other
+findings in this pass are prose drifting from code; this one is tooling drifting from code, and it is
+the only kind that quietly weakens everything downstream.
+
+**Two things were hiding behind the dead path**, and repointing surfaced both:
+
+- One mutation no longer compiles — `"reading a control writes the seed"` assigns to
+  `document.rawDevelop`, and `document` is `@Published private(set)`, so its setter is file-private
+  and `AppViewModel+Develop.swift` cannot write it. **That is the compiler enforcing the property
+  outright**, which is stronger than any mutation could demonstrate, so the mutation is retired with a
+  note rather than rewritten into a compiling variant.
+- The clean split is 11 mutations anchored in `AppViewModel.swift` and 10 in
+  `AppViewModel+Develop.swift`, zero overlap — so the obvious fix of repointing `$VM` wholesale would
+  have killed the other 11 exactly as this killed these. Measured before choosing.
+
+**The guard: `scripts/mutate-*.sh --check`.** It dry-runs every mutation's anchor — apply the
+substitution, compare bytes — and exits non-zero on any NO-OP, without building anything. It runs in
+**0.4 seconds**, needs no DNG and no toolchain beyond perl, and reverting this fix makes it report the
+nine dead anchors and exit 1. It would have caught B17 in the commit that caused it.
+
+Anchoring is the part that rots and the part that is free to test; whether the tests actually catch a
+mutation still costs a full run. A green `--check` says only that the mutations still describe this
+codebase — which is precisely the claim that was silently false for three weeks.
+
 ---
 
 ## 2. Stubbed, incomplete, and dead
@@ -241,7 +314,8 @@ with no EXIF/ICC survival, and Phase 2's undo and per-image edits, which are Ste
 this section that was a *defect* or a *stale claim* is marked fixed below.
 
 - ~~**No tests, anywhere.**~~ **[fixed]** — the package is now split into `LUTzyKit` plus a thin `@main`
-  executable, with 61 XCTest cases and `swift test` wired into CI. Fixtures are generated, never
+  executable, with `swift test` wired into CI. The split landed **61** XCTest cases; the suite stands
+  at **322** across 32 test classes at HEAD (22 skip without a DNG, 3 with one present). Fixtures are generated, never
   committed. Coverage is deliberately concentrated where the review found real defects: the `.cube`
   parser, the orientation load path, cube assembly, the async scans, and export naming.
 
@@ -349,8 +423,10 @@ review-alignment pass.
 - ~~**`docs/PHASE2_SPEC.md` is 4,180 lines** of raw multi-agent output, self-contradicting, a
   meaningful fraction of it meta-commentary arguing with earlier drafts about bugs that never existed
   ("FABRICATED PRE-EXISTING BUG (verified false)").~~ **[fixed]** — distilled at the time (§5 item 3),
-  and this bullet simply outlived the fix. Measured at HEAD: **534 lines, zero occurrences of
-  "FABRICATED"**. It has grown past the 292 it was distilled to, because Steps 3–10b each recorded
+  and this bullet simply outlived the fix. Measured at `aa86580`: **534 lines, zero occurrences of
+  "FABRICATED"** (the file is edited by most correction waves, so treat the line count as a snapshot
+  with a date on it, not a fact — that is the same failure mode as the 4,180 it replaced, with a
+  shorter fuse; `wc -l docs/PHASE2_SPEC.md` is the only trustworthy answer). It has grown past the 292 it was distilled to, because Steps 3–10b each recorded
   what they measured, which is the point of it.
 - `.gitignore` claimed "Package.resolved is intentionally committed" for a project with zero
   dependencies and no `Package.resolved`. **[fixed]**
@@ -359,8 +435,10 @@ review-alignment pass.
 
 ## 4. README drift
 
-All **[fixed]**. Worth noting how it drifted: the in-app status bar hints were *correct* the whole time,
-so the README was the only wrong copy of the keymap.
+The four below were fixed at the time. **The README then went 71 commits without an edit**, and a
+second wave of drift is recorded at the bottom of this section. Worth noting how the first wave
+drifted: the in-app status bar hints were *correct* the whole time, so the README was the only wrong
+copy of the keymap.
 
 - The shortcut table said `←`/`→` cycled LUTs and `[`/`]` cycled images. The code binds ↑/↓ to LUTs and
   both `←`/`→` and `[`/`]` to images.
@@ -369,6 +447,28 @@ so the README was the only wrong copy of the keymap.
 - The project-structure tree omitted four files: `Models/Histogram.swift`, `Models/ImageMetadata.swift`,
   `Views/InfoInspectorView.swift`, `Views/SourceBrowserView.swift`.
 - "Responsive by design… LUT application is cancellable" described an intention, not the code (B2).
+
+**Second wave, found by the second opposition pass · [fixed].** The README was last edited at
+`773121a` (Phase 2 Step 5) and went **71 commits** without one — Steps 6 through 10b, two inspectors
+and a deleted type all landed behind it. It is the file nobody works in, which is exactly why it rots
+hardest, and pass 1 never opened it.
+
+- The project-structure tree listed `Models/ImageProcessor.swift`, deleted in Step 7 — 9 grep hits at
+  HEAD, all comments describing it in the past tense. It also showed **24 source files against 43 on
+  disk** and 10 test files against 35, while terminating every directory with `└──`, which asserts
+  closure. Regenerated; the test half now says explicitly that it is a selection.
+- `:231` named `ImageProcessor.orientedLoadOptions` in the present tense (it is `ImageDecoder`'s).
+- The Features section and the `⌘I` shortcut row documented a one-tab histogram/EXIF inspector. It has
+  had three tabs since Step 10b. §4b fixed the *in-app* twin of this and left the README, because the
+  README was not on anyone's list.
+- "188 tests" (322 at HEAD), and the skip breakdown was absent.
+- **The build section promised what no build path delivers**: "full app behavior, icon, and App
+  Sandbox" from Xcode. `Package.swift:26` excludes both `Assets.xcassets` and `LUTzy.entitlements`
+  from the target, `AppIcon.appiconset` holds no images, and there is no `Info.plist` or bundle
+  identifier anywhere — so both paths build a bare SwiftPM executable. The knock-on: the Features
+  claim that folder access "survives restarts through App Sandbox security-scoped bookmarks" is
+  unreachable from any documented build. `CLAUDE.md:9` carried the identical line and survived a
+  commit that edited that same file. Both now say what is actually true.
 
 ---
 
@@ -416,6 +516,58 @@ It strips whole-line `//` and `///` comments only: not trailing comments, not `/
 parser, so a `//` inside a string literal stays. Deliberate, and the script says so. Over-stripping
 would let a real change hide, which is the failure it exists to prevent; under-stripping costs a false
 alarm you can read.
+
+---
+
+## 4c. What the correction passes got wrong · [fixed]
+
+Two opposition passes have run over this repo. The second one's most useful output was not the drift
+it found in old code — it was the drift the **first pass introduced while correcting other drift**.
+Recorded here in full, because a correction process that cannot audit itself is just a slower way of
+being wrong.
+
+- **It wrote a false invariant.** "At most one probe is ever in flight, because there is only one
+  handle to hold it" (`AppViewModel`, and copied into B15 above). One handle bounds how many tasks you
+  can still *cancel*, not how many are unfinished: cancelling cannot resume a task already suspended
+  inside `rawCapabilities(for:)`, and the guard sits after that `await`. `LoadCancellationTests`
+  reaches two live probes by design. The safety argument was sound; the mechanism offered to justify
+  it was not.
+- **Its own guard had the hole it was written to close.** `DeriveBaselineImmunityTests` claimed *any*
+  new parameter on `derive` would fail it. Its parser read one label per line, so
+  `isCancelled: (() -> Bool)? = nil, exposureBias: Double = 0` parsed to the same five labels and
+  passed with a sixth parameter present — in the test that exists specifically because the previous
+  coverage claim was vacuous.
+- **A test that could not fail.** `FakeRenderEngine` held one continuation slot, so a second parked
+  probe overwrote the first and the first was never resumed — the runtime prints
+  `SWIFT TASK CONTINUATION MISUSE` and XCTest does not fail on it. It also read `stubbedCapabilities`
+  *after* the suspension, so two probes could not be told apart. Measured: deleting
+  `refreshCapabilities()`'s cancellation left `testASuccessfulOpenStillReplacesThePreviousProbesAnswer`
+  green, which is the exact thing its failure message claims to pin.
+- **It armed a gate it never ran.** PR #28 added `SKIPPED` to both harnesses' exit gates, arguing that
+  "an exit code that is always 1 says nothing" — and did not run `mutate-step10a.sh`, which had been
+  exiting 1 on ten dead anchors since Step 10b. It verified the sibling harness and assumed a shared
+  classifier meant a shared fate. See B17.
+- **Its diagnosis was inverted.** The `xctest` explanation in `mutate-step9.sh` and the PR #27 body
+  said the negation "could never fire, because xctest prints `and 0 failures`, not `with 0 failures`".
+  A non-skipping suite prints exactly `with 0 failures`, so the negation fired constantly. The fix was
+  right; the reason recorded beside it taught the opposite of the truth.
+- **It fixed the doc and left the code twin, twice.** The header comment and README learned that derive
+  scales *both* images while the user-facing progress string kept saying "Scaling RAW to JPG
+  resolution". `PHASE2_SPEC` learned the mutation tally had been re-measured while the harness four
+  lines above the rewritten paragraph still said it never had.
+- **It replaced one hardcoded measurement with another.** §3's "4,180 lines" became "534 lines" — the
+  same failure mode with a shorter fuse. It was already 541 by the next commit.
+- **It updated a number and left its sibling.** `PHASE2_SPEC` §6 read "22 skip without a DNG… the
+  other 17 are the RAW-gated ones". 3 + 17 = 20. The 17 was right when the total was 20, and the
+  sentence containing it was itself correcting an earlier miscount.
+- **It never opened the README.** Findings across §4's second wave are one omission: 71 commits of
+  drift in the file nobody works in, invisible to a process that greps for claims in the files people
+  do work in.
+
+The through-line: **every one of these is a sentence that was true when written.** None was careless
+at the time. That is what makes prose an unreliable place to keep a fact, and why the fixes that
+matter in both passes were the mechanical ones — `DocumentedTestNamesTests`, `code-diff-gate.sh`,
+`--check` — rather than the corrected sentences.
 
 ---
 
