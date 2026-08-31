@@ -104,7 +104,10 @@ struct RecipeReportView: View {
                 label: "Sharpening",
                 value: String(format: "%.1f×", report.sharpeningRatio),
                 tint: .purple,
-                hint: "applied separately, not in LUT"
+                // "applied separately, not in LUT" promised a second stage that does not exist:
+                // `sharpeningRatio` is measured, carried on the report and shown here, and has no
+                // consumer anywhere in the render path. It is a diagnostic about the pair.
+                hint: "measured, not applied"
             )
             StatBadge(
                 label: "Coverage",
@@ -116,7 +119,31 @@ struct RecipeReportView: View {
                 value: shortCount(report.sampleCount),
                 tint: .blue
             )
+            // Shown rather than dropped (docs/CODE_REVIEW.md §2): of everything on this report it is
+            // the one number that says the *pair* was wrong rather than the fit. Every other stat
+            // stays plausible under a mis-registered pair — the cube still fits, just to the wrong
+            // pixels — so a silent non-zero shift here was the failure nothing on screen could
+            // explain. Tinted on magnitude for that reason: 0 is the expected reading.
+            StatBadge(
+                label: "Alignment",
+                value: alignmentText,
+                tint: isWellAligned ? .green : .yellow,
+                hint: isWellAligned ? nil : "the pair may be mis-registered"
+            )
         }
+    }
+
+    /// A shift of (0, 0) is the common case and reads better as a word than as coordinates.
+    private var alignmentText: String {
+        let (dx, dy) = report.alignmentShift
+        return dx == 0 && dy == 0 ? "aligned" : "\(dx > 0 ? "+" : "")\(dx), \(dy > 0 ? "+" : "")\(dy)"
+    }
+
+    /// One pixel of play: the search is integer-pixel and a ±1 result on a real pair is rounding,
+    /// not a crop difference.
+    private var isWellAligned: Bool {
+        let (dx, dy) = report.alignmentShift
+        return abs(dx) <= 1 && abs(dy) <= 1
     }
 
     private func shortCount(_ n: Int) -> String {

@@ -184,6 +184,48 @@ final class ImageLoadingTests: TempDirectoryTestCase {
         XCTAssertEqual(identifiers.count, Set(identifiers).count, "open panel types should not repeat")
     }
 
+    // MARK: - B16: a RAW that does not decode must not open
+
+    /// `CIRAWFilter` is far more permissive than `CIImage(contentsOf:)`, and the decoder's `nil` check
+    /// was written as though they behaved alike.
+    ///
+    /// Measured: handed twelve bytes of ASCII text named `.dng`, `CIRAWFilter(imageURL:)` constructs a
+    /// filter **and** returns an `outputImage` — extent `(inf, inf, 0.0, 0.0)`. Nothing was `nil`, so
+    /// `ImageDecoder.load` returned it as a valid image. The failure was quiet rather than loud,
+    /// because the render paths guard on `isRasterizable` downstream: the file "opened", the status
+    /// bar read `0×0`, the preview stayed blank, and no error was ever shown.
+    ///
+    /// This is the same decoder-leniency shape as B1 (orientation) and B12 (degenerate LUT domain):
+    /// a framework accepting input that the code assumed it would reject.
+    ///
+    /// Runs on CI — the fixture is a text file, not a RAW.
+    func testAnUndecodableRAWThrowsRatherThanOpeningAtZeroSize() throws {
+        let url = tempDirectory.appendingPathComponent("truncated.dng")
+        try Data("not an image".utf8).write(to: url)
+
+        // The precondition that makes this test necessary: the nil check alone does not catch it.
+        let lenient = ImageDecoder.developRAWNeutral(at: url)
+        XCTAssertNotNil(lenient, "if CIRAWFilter ever starts returning nil here, this test still holds "
+                        + "but its reason for existing has changed — check before simplifying it")
+        XCTAssertFalse(lenient?.extent.isRasterizable ?? true, "the lenient decode is the degenerate one")
+
+        XCTAssertThrowsError(try ImageDecoder.load(from: url)) { error in
+            guard case ImageError.cannotLoad = error else {
+                return XCTFail("expected .cannotLoad, got \(error)")
+            }
+        }
+    }
+
+    /// The other half: a real RAW must still load. Without this, B16's fix is satisfiable by
+    /// rejecting every RAW.
+    func testARealRAWStillLoads() throws {
+        guard let rawURL = Fixtures.localRAWURL else {
+            throw XCTSkip("no local RAW; see Fixtures.localRAWURL")
+        }
+        let image = try ImageDecoder.load(from: rawURL)
+        XCTAssertTrue(image.extent.isRasterizable, "a real RAW must survive the B16 extent check")
+    }
+
     // MARK: - Where the preview-scaling tests went
     //
     // `testRenderPreviewCapsSizeAndPreservesAspect` and `testRenderPreviewDoesNotUpscale` drove

@@ -378,4 +378,71 @@ extension AdjustInspectorTests {
         XCTAssertNotNil(viewModel.document.lut.lutID, "the LUT is still selected, just at zero strength")
         XCTAssertFalse(viewModel.isComparisonAvailable)
     }
+
+    // MARK: - B14: the histogram's caption
+
+    /// The defect, stated as the row that was wrong: an adjustment-only edit captioned "Original".
+    ///
+    /// `InfoInspectorView` read `selectedLUT != nil ? "Graded" : "Original"`, which was a correct
+    /// reading of the world until Step 10b shipped a second way to change the picture.
+    func testAnAdjustmentOnlyEditIsNotCaptionedOriginal() async throws {
+        let viewModel = AppViewModel(engine: FakeRenderEngine())
+        try await openStandardImage(viewModel)
+
+        viewModel.adjustmentBinding(for: .exposure).wrappedValue = 2.0
+
+        XCTAssertNil(viewModel.selectedLUT, "no LUT — this is the case the old label got wrong")
+        XCTAssertEqual(
+            viewModel.histogramSource, .adjusted,
+            "the histogram is tallied from a genuinely graded render; captioning it \"Original\" "
+                + "tells the user the opposite of what they are looking at (B14)"
+        )
+    }
+
+    /// The whole mapping in one table, so a change has to be deliberate rather than incidental.
+    ///
+    /// Written as a table for the same reason `DevelopInspectorTests` writes its state mapping as
+    /// one: the interesting content is the *combinations*, and a per-case test hides which ones were
+    /// never considered.
+    func testTheHistogramCaptionOverEveryLookState() async throws {
+        // (apply a look, expected caption, why)
+        let rows: [(String, (AppViewModel) -> Void, AppViewModel.HistogramSource)] = [
+            ("untouched", { _ in }, .original),
+            ("adjustment only", { $0.adjustmentBinding(for: .exposure).wrappedValue = 2.0 }, .adjusted),
+            ("LUT only", { $0.selectLUT(TestImages.warmLUT()) }, .graded),
+            ("LUT and adjustment", {
+                $0.selectLUT(TestImages.warmLUT())
+                $0.adjustmentBinding(for: .exposure).wrappedValue = 2.0
+            }, .graded),
+            ("LUT at zero intensity", {
+                $0.selectLUT(TestImages.warmLUT())
+                $0.setLUTIntensity(0)
+            }, .original),
+            ("LUT at zero intensity, with an adjustment", {
+                $0.selectLUT(TestImages.warmLUT())
+                $0.setLUTIntensity(0)
+                $0.adjustmentBinding(for: .exposure).wrappedValue = 2.0
+            }, .adjusted),
+            ("develop only", { $0.developBinding(for: .exposure).wrappedValue = 0.7 }, .original),
+        ]
+
+        for (name, apply, expected) in rows {
+            let viewModel = AppViewModel(engine: FakeRenderEngine())
+            try await openStandardImage(viewModel)
+            apply(viewModel)
+            XCTAssertEqual(viewModel.histogramSource, expected, "look state: \(name)")
+        }
+    }
+
+    /// Holding Space wins over everything else — it is showing the comparison baseline.
+    func testHoldingSpaceCaptionsTheHistogramOriginal() async throws {
+        let viewModel = AppViewModel(engine: FakeRenderEngine())
+        try await openStandardImage(viewModel)
+
+        viewModel.selectLUT(TestImages.warmLUT())
+        XCTAssertEqual(viewModel.histogramSource, .graded)
+
+        viewModel.isShowingOriginal = true
+        XCTAssertEqual(viewModel.histogramSource, .original)
+    }
 }

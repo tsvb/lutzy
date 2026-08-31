@@ -25,9 +25,16 @@ struct LUTID: Codable, Sendable, Hashable {
 
     /// True for a LUT that exists only in memory (a freshly derived one, before the user saves it).
     ///
-    /// Its ID carries a `UUID`, so it *cannot* resolve after a relaunch. Persisting such a document
-    /// is not wrong, but the LUT reference in it is expected to dangle; anything that writes
-    /// documents to disk should decide deliberately what to do here rather than discover it later.
+    /// It *cannot* resolve after a relaunch — but not because the ID is random. Since Step 9 the ID is
+    /// content-derived (the first 64 bits of the cube table's SHA-256) and so is perfectly stable
+    /// across launches. What does not survive is the *registry*: `DerivedLUTRegistry` is an in-memory
+    /// dictionary with no persistence, and no folder scan ever mints a `derived://` ID — `init(url:)`
+    /// sets `id` to the file path. So nothing can resolve the reference on the next launch even though
+    /// the same cube would hash to the same ID.
+    ///
+    /// Persisting such a document is not wrong, but the LUT reference in it is expected to dangle;
+    /// anything that writes documents to disk should decide deliberately what to do here rather than
+    /// discover it later.
     var isDerived: Bool { raw.hasPrefix("derived://") }
 
     // Encoded as a bare string rather than `{"raw": "…"}`. This is a newtype over the path, and the

@@ -140,13 +140,13 @@ public struct ContentView: View {
         .help("Show the source folder file browser")
         .disabled(viewModel.collection.items.isEmpty)
 
-        // Info inspector (histogram + EXIF)
+        // The inspector: Info (histogram + EXIF), Develop, Adjust.
         Button {
             viewModel.toggleInspector()
         } label: {
             Label("Info", systemImage: "sidebar.right")
         }
-        .help("Show histogram & EXIF (⌘I)")
+        .help("Show the inspector — info, develop and adjustments (⌘I)")
         .keyboardShortcut("i", modifiers: .command)
         .disabled(viewModel.sourceImage == nil)
 
@@ -221,7 +221,11 @@ public struct ContentView: View {
             } label: {
                 Label("Export All", systemImage: "square.and.arrow.up.on.square")
             }
-            .help("Apply the current LUT to all imported images and export to a folder (⌘⇧E)")
+            // Not "the current LUT": `performBatchExport` hands every image the whole `EditDocument`
+            // — RAW develop and adjustments included. Saying LUT understated it in the direction that
+            // surprises people, because `rawDevelop` was seeded from one RAW's as-shot values.
+            .help("Apply the current look — LUT, develop and adjustments — to all imported images "
+                  + "and export to a folder (⌘⇧E)")
             .disabled(viewModel.isExporting)
         }
     }

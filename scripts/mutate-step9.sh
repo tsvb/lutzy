@@ -54,19 +54,44 @@ mutate() {
     return
   fi
 
-  if grep -qE "with [0-9]+ tests? skipped and 0 failures" <<<"$out" && ! grep -q "with [0-9]* failures" <<<"$out"; then
+  # **A failure is looked for FIRST, and SKIPPED only after.** These two were the other way round
+  # until this back-port, and the old skip test — `with N tests skipped and 0 failures`, negated
+  # against a loose `with [0-9]* failures` — matched a run that both skipped *and* failed on a
+  # machine without the DNG. The negation could never fire, because xctest prints `and 0 failures`,
+  # not `with 0 failures`. Several filters below name suites that mix RAW-gated tests with ordinary
+  # ones (`PreviewCutoverTests` has two `XCTSkip` sites in nine tests and appears in six of them;
+  # the derive-gate mutation at the bottom targets `DeriveInvarianceTests`, which skips wholesale),
+  # so a genuine survivor in such a suite was reported SKIPPED — and SKIPPED is (correctly) excluded
+  # from the `exit 1` at the bottom. **The harness would have exited 0 on an uncaught mutation, on
+  # CI and on every clean clone.** Detecting the failure first cannot make that mistake: a run that
+  # skipped some tests and failed others is caught, which is what it is.
+  #
+  # Note the failure pattern has to tolerate the skip clause sitting between "with" and the failure
+  # count — xctest prints `with 1 test skipped and 2 failures` — and the previous `with [1-9]`
+  # shorthand cannot be reused here, because it also matches `with 1 test skipped and 0 failures`.
+  # That is precisely why the skip branch had to run first before, and why it no longer has to.
+  #
+  # This is `scripts/mutate-step10a.sh`'s classifier, verbatim. Step 10a found and fixed the bug and
+  # the fix was never carried back here; the two files now agree, and must be changed together.
+  #
+  # **Step 9's recorded tally — "19 mutations caught, 1 shown equivalent by inspection"
+  # (`docs/PHASE2_SPEC.md` §6) — was produced by the broken classifier**, on a machine where the DNG
+  # in `realworldtest/` was present. It has not been reproduced since the fix. A run reporting any
+  # SKIPPED is a weaker run than that one, whatever its caught count says.
+  if grep -qE "with ([0-9]+ tests? skipped and )?[1-9][0-9]* failures?" <<<"$out"; then
+    echo "caught    $label"
+    PASS=$((PASS+1))
+    return
+  fi
+
+  if grep -qE "with [0-9]+ tests? skipped and 0 failures" <<<"$out"; then
     echo "SKIPPED   $label — the test skipped rather than running"
     SKIPPED=$((SKIPPED+1))
     return
   fi
 
-  if grep -qE "Executed [0-9]+ tests?, with [1-9]" <<<"$out"; then
-    echo "caught    $label"
-    PASS=$((PASS+1))
-  else
-    echo "SURVIVED  $label — '$filter' still passed with the code broken"
-    SURVIVED=$((SURVIVED+1)); SURVIVOR_NAMES+=("$label -> $filter")
-  fi
+  echo "SURVIVED  $label — '$filter' still passed with the code broken"
+  SURVIVED=$((SURVIVED+1)); SURVIVOR_NAMES+=("$label -> $filter")
 }
 
 VM=Sources/LUTzyKit/ViewModels/AppViewModel.swift
@@ -176,8 +201,17 @@ echo "caught:     $PASS"
 echo "SURVIVED:   $SURVIVED"
 echo "NO-BUILD:   $NOBUILD   (proves nothing — fix the mutation)"
 echo "NO-TESTS:   $NORUN     (proves nothing — fix the filter/pattern)"
-echo "SKIPPED:    $SKIPPED   (proves nothing — fixture missing)"
+echo "SKIPPED:    $SKIPPED   (proves nothing — fixture missing; FAILS the run)"
 for n in "${SURVIVOR_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  survived: $n"; done
 for n in "${NOBUILD_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  no-build: $n"; done
 for n in "${NORUN_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  no-tests: $n"; done
-[[ $SURVIVED -eq 0 && $NOBUILD -eq 0 && $NORUN -eq 0 ]] || exit 1
+[[ $SKIPPED -eq 0 ]] || echo "  INCONCLUSIVE: $SKIPPED mutation(s) never ran — put the DNG in realworldtest/ and re-run"
+
+# **SKIPPED is inconclusive, not a pass, and it belongs in this gate.** It was excluded here, which
+# is the hole the classifier fix above does not close on its own: from the summary lines alone, a
+# mutation that SURVIVED in a run where any suite skipped is indistinguishable from one that merely
+# skipped — both print `with N tests skipped and 0 failures` and nothing else. Excluding SKIPPED
+# therefore let this harness exit 0 while proving nothing about the mutation, which is the one
+# outcome a falsifiability check must never produce. An inconclusive run is not a green run: run
+# this on a machine with the Leica DNG in `realworldtest/` present, or treat the result as unproven.
+[[ $SURVIVED -eq 0 && $NOBUILD -eq 0 && $NORUN -eq 0 && $SKIPPED -eq 0 ]] || exit 1

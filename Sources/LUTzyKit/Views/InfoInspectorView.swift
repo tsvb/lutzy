@@ -100,10 +100,8 @@ struct InfoInspectorView: View {
 
     @State private var channel: HistogramChart.Mode = .rgb
 
-    private var histogramSourceLabel: String {
-        if viewModel.isShowingOriginal { return "Original" }
-        return viewModel.selectedLUT != nil ? "Graded" : "Original"
-    }
+    /// See `AppViewModel.histogramSource` (B14). The decision lives there so it can be tested.
+    private var histogramSourceLabel: String { viewModel.histogramSource.rawValue }
 
     // MARK: - Metadata
 
@@ -154,73 +152,13 @@ struct InfoInspectorView: View {
             Image(systemName: "info.circle")
                 .font(.system(size: 28, weight: .thin))
                 .foregroundStyle(.secondary.opacity(0.5))
-            Text("Open an image to see its\nhistogram and EXIF data")
+            // This stands in for the whole inspector, not just the Info tab, so it names all three.
+            Text("Open an image to see its histogram\nand EXIF, and to develop and adjust it")
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
-    }
-}
-
-// MARK: - Histogram chart
-
-/// Canvas-drawn histogram. RGB mode overlays the three channels with additive
-/// blending (overlaps brighten toward white, the classic look); single-channel
-/// and luma modes draw one filled curve.
-struct HistogramChart: View {
-    enum Mode: Hashable {
-        case rgb, luma, red, green, blue
-    }
-
-    let data: HistogramData
-    let channel: Mode
-
-    var body: some View {
-        Canvas { context, size in
-            switch channel {
-            case .rgb:
-                fill(.red,   Color.red,   in: context, size: size, blend: .plusLighter)
-                fill(.green, Color.green, in: context, size: size, blend: .plusLighter)
-                fill(.blue,  Color.blue,  in: context, size: size, blend: .plusLighter)
-            case .luma:
-                fill(.luma, Color.white.opacity(0.85), in: context, size: size, blend: .normal)
-            case .red:
-                fill(.red, Color.red, in: context, size: size, blend: .normal)
-            case .green:
-                fill(.green, Color.green, in: context, size: size, blend: .normal)
-            case .blue:
-                fill(.blue, Color.blue, in: context, size: size, blend: .normal)
-            }
-        }
-    }
-
-    private func fill(
-        _ ch: HistogramData.Channel,
-        _ color: Color,
-        in context: GraphicsContext,
-        size: CGSize,
-        blend: GraphicsContext.BlendMode
-    ) {
-        let norm = data.normalized(ch)
-        guard norm.count > 1 else { return }
-        let w = size.width
-        let h = size.height
-        let step = w / CGFloat(norm.count - 1)
-
-        var path = Path()
-        path.move(to: CGPoint(x: 0, y: h))
-        for (i, v) in norm.enumerated() {
-            let x = CGFloat(i) * step
-            let y = h - v * h
-            path.addLine(to: CGPoint(x: x, y: y))
-        }
-        path.addLine(to: CGPoint(x: w, y: h))
-        path.closeSubpath()
-
-        var ctx = context
-        ctx.blendMode = blend
-        ctx.fill(path, with: .color(color.opacity(channel == .rgb ? 0.75 : 0.9)))
     }
 }

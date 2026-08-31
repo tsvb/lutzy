@@ -2,9 +2,9 @@
 
 _Full read of all 18 Swift files (~4,300 lines) at `094e932`, plus README, CI, and `PHASE2_SPEC.md`._
 
-The app had grown across ten feature PRs with **no tests at all** — CI runs `swift build` and nothing
-else — so nothing had ever been verified beyond "it compiles, and it looked right on the sample images
-in the repo." Those samples are all landscape, all 3:2, all from the same two cameras. Several of the
+The app had grown across ten feature PRs with **no tests at all** — CI ran `swift build` and nothing
+else at the time of this review; it now runs debug build → `swift test` → release build — so nothing
+had ever been verified beyond "it compiles, and it looked right on the sample images in the repo." Those samples are all landscape, all 3:2, all from the same two cameras. Several of the
 bugs below live exactly in the gap that leaves.
 
 Findings are marked **[fixed]** where this pass resolved them and **[open]** where they are recorded for
@@ -150,21 +150,95 @@ any axis filled the whole table with NaN. Such an axis now falls back to the def
 `isActive = items.count > 1` meant a folder holding exactly one image left `selectedItem` nil and ←/→
 dead, while the browser panel still listed the row. Now `!items.isEmpty`.
 
-### B14 — `InfoInspectorView`'s histogram label still assumes a LUT · Low · [open]
+### B14 — `InfoInspectorView`'s histogram label assumed a LUT · Low · [fixed]
 
-`InfoInspectorView.swift:105` derives its "Graded"/"Original" histogram label from
-`viewModel.selectedLUT != nil` — the same root cause as `PreviewView`'s split-view label, which read
-`selectedLUT?.name ?? "LUT"`. Phase 2 Step 10b's Adjust panel made both stale the same way:
-`isComparisonAvailable` now also goes true for an adjustment-only edit with no LUT selected, so this
-panel still calls that render "Original" while a real, non-identity edit is showing. `PreviewView`'s
-equivalent was fixed in Step 10b's follow-up pass (the fallback now reads "Adjusted"); this is the
-one remaining site, deliberately deferred out of that pass's scope.
+`InfoInspectorView` derived its "Graded"/"Original" histogram label from `viewModel.selectedLUT != nil`
+— the same root cause as `PreviewView`'s split-view label, which read `selectedLUT?.name ?? "LUT"`.
+Phase 2 Step 10b's Adjust panel made both stale the same way: `isComparisonAvailable` also goes true
+for an adjustment-only edit with no LUT selected, so this panel called that render "Original" while a
+real, non-identity edit was showing. `PreviewView`'s equivalent was fixed in Step 10b's follow-up pass
+(the fallback reads "Adjusted"); this was the one remaining site.
+
+**Fix:** `AppViewModel.histogramSource`, a three-case enum derived beside `isComparisonAvailable` and
+read by the view. Put in the view model rather than the `ViewBuilder` for the reason `developPanelState`
+gives — this repo has no SwiftUI view tests, so a distinction living only in a view cannot be asserted,
+and this one had already been wrong once.
+
+Written in terms of the same predicates as the A/B gate rather than in terms of `selectedLUT`, which
+makes it exact at two edges the old label could not have reached: a LUT at **zero intensity** is
+`lut.isIdentity`, so it reads "Adjusted" beside real adjustments and "Original" on its own; and
+`rawDevelop` is deliberately not consulted, matching `originalForComparison`, so a develop-only edit
+reads "Original" because both sides of the comparison genuinely show the same histogram. All seven
+look states are pinned as a table in `AdjustInspectorTests.testTheHistogramCaptionOverEveryLookState`.
+
+### B15 — A failed open during the RAW probe parked the Develop panel on "probing" forever · Low · [fixed]
+
+`AppViewModel.load` cancelled `capabilitiesTask` unconditionally, before it knew whether the new file
+decodes, while `refreshCapabilities()` — which clears `rawCapabilities` and starts a fresh probe — is
+reached only from the `.success` branch. The `.failure` branch and the `guard !Task.isCancelled` early
+return both skip it.
+
+So: open a RAW, then within the 25–170 ms probe window step onto a file that fails to decode. The
+first image's probe is killed and never restarted, while `sourceImage` and `imageSource` still describe
+that first image. `rawCapabilities == nil` with `sourceIsRAW == true` is exactly `developPanelState`'s
+`.probing` case, so the panel spun on "Reading the decoder's develop controls…" indefinitely, beside
+the RAW that is still on screen. Recovered only by opening an image that decodes.
+
+Narrow, but reachable and unbounded. Found by the opposition pass while checking the doc comment on
+`developPanelState`, which claimed the clear happens "on every open".
+
+**Fix — cancel at the refresh site, not the load site.** `load()` no longer cancels the probe;
+`refreshCapabilities()` already did, and it is the only place that knows a replacement is actually
+coming. On a successful open that runs in the same main-actor turn as the decode, so the behaviour is
+unchanged; on a failed one the probe finishes and describes the image the user is still looking at.
+At most one probe is ever in flight, because there is only one handle to hold it.
+
+**Why no test caught it:** every `developPanelState` test built a fresh `AppViewModel` and opened
+exactly one image. Nothing opened a second image over an in-flight probe, so the whole class of
+stale-state-across-opens defects was uncovered. `LoadCancellationTests` opens two, and includes the
+converse — a *successful* open must still supersede the previous probe's answer, or "stop cancelling"
+would be satisfiable by never cancelling.
+
+**Adjacent, same function, also [fixed]:** `refreshMetadata(url:data:)` fired an *unstored,
+uncancelled* `Task.detached` that writes `self.metadata` on the main actor — no handle to cancel and no
+generation token, so image A's `ImageMetadata` could land after image B's had been published and leave
+the Info panel describing the wrong file. Same root shape as B11. Now stored, cancelled by the call it
+supersedes, and checked for cancellation before publishing.
+
+That one is pinned **as source text**, and the entry should not round it up: `ImageMetadata.read` is a
+static call with no injection seam, so no test can hold one read open while another finishes. The
+honest options were a timing-dependent test that would flake or a structural one, and the structural
+one catches deletion — the failure that actually happens to lines like these — while proving nothing
+about the ordering itself.
+
+### B16 — `CIRAWFilter` accepts garbage, so an undecodable RAW opened at 0×0 · Low · [fixed]
+
+Found while building B15's fixture, which needed a file that fails to open.
+
+`ImageDecoder.load` guarded the RAW branch with a `nil` check, as though `CIRAWFilter` behaved like
+`CIImage(contentsOf:)`. It does not. Measured: handed **twelve bytes of ASCII text** named `.dng`,
+`CIRAWFilter(imageURL:)` constructs a filter *and* returns an `outputImage`, with extent
+`(inf, inf, 0.0, 0.0)`. Nothing was `nil`, so the decoder returned it as a valid image.
+
+The result was quiet rather than loud, because the render paths guard on `isRasterizable` downstream
+(§1, `CGRect.isRasterizable`): a corrupt, truncated, or simply misnamed RAW "opened", the status bar
+read `0×0`, the preview stayed blank, and no error was ever shown. The non-RAW branch never had this
+hole.
+
+**Fix:** the RAW branch checks `output.extent.isRasterizable` as well as `nil` — the guard the module
+already had, applied at the decode boundary rather than only downstream of it. Third instance of the
+same shape in this review: a framework accepting input the code assumed it would reject (B1
+orientation, B12 degenerate LUT domain). Covered on CI — the fixture is a text file, not a RAW — with
+the converse pinned too, so the fix is not satisfiable by rejecting every RAW.
 
 ---
 
 ## 2. Stubbed, incomplete, and dead
 
-**[open]** unless noted.
+**[open]** unless noted. What is genuinely still open here is **feature work, not drift**: no UI for
+`RecipeExtractor.Options` (cube size is effectively hardcoded at 33), export quality hardcoded at 0.95
+with no EXIF/ICC survival, and Phase 2's undo and per-image edits, which are Step 11. Everything in
+this section that was a *defect* or a *stale claim* is marked fixed below.
 
 - ~~**No tests, anywhere.**~~ **[fixed]** — the package is now split into `LUTzyKit` plus a thin `@main`
   executable, with 61 XCTest cases and `swift test` wired into CI. Fixtures are generated, never
@@ -193,14 +267,24 @@ one remaining site, deliberately deferred out of that pass's scope.
   `export` shared the pattern. All three now go through `CGRect.isRasterizable`.
 - `LUTLibrary.scanError` was set but no view ever read it, so folder-scan failures were silent.
   **[fixed]** — the sidebar now shows it.
-- `RecipeReport.alignmentShift` is computed, stored, and documented, but `RecipeReportView` never renders
-  it. Either show it (it is the one number that tells you the pair was mis-registered) or drop it.
+- `RecipeReport.alignmentShift` was computed, stored, and documented, but `RecipeReportView` never
+  rendered it. **[fixed]** — shown, as the review preferred. Of everything on that report it is the one
+  number that says the *pair* was wrong rather than the fit: every other stat stays plausible under a
+  mis-registered pair, because the cube still fits, just to the wrong pixels. It reads "aligned" at
+  (0, 0) — the expected result — and turns yellow with a hint beyond ±1 px, one pixel of play because
+  the search is integer-pixel and a ±1 result on a real pair is rounding, not a crop difference.
 - `RecipeExtractor.Options` — cube size, sample counts, edge threshold, search radius, and now working
   resolution — has no UI. Cube size is effectively hardcoded at 33.
-- Unused API: `ImageMetadata.hasCameraInfo`, `ImageMetadata.isEmpty`, `ImageCollection.selectedItem`,
-  `HistogramData.Channel: CaseIterable`. **[partly fixed]** — `ImageProcessor.renderToNSImage` was on
-  this list and went with the rest of the type in Phase 2 Step 7, along with `renderPreview`,
-  `export` and `histogram`, all of which the engine now owns.
+- Unused API. **[fixed]**, and one entry was wrong. `ImageMetadata.hasCameraInfo`,
+  `ImageMetadata.isEmpty` and `HistogramData.Channel`'s `CaseIterable` conformance had no caller in
+  either target and are removed — `InfoInspectorView` asks `metadata.sections.isEmpty` directly, which
+  is the same question one indirection shorter, and the histogram picker iterates
+  `HistogramChart.Mode`, a different type with an `rgb` case `Channel` has no equivalent for.
+  **`ImageCollection.selectedItem` was listed here in error**: `LibraryScanTests` has covered it since
+  the scan work, in the test that pins the defect where a stalled scan left `isActive` false and killed
+  ←/→. It stays. `ImageProcessor.renderToNSImage` was also on this list and went with the rest of the
+  type in Phase 2 Step 7, along with `renderPreview`, `export` and `histogram`, all of which the engine
+  now owns.
 - `dismissRecipeExtractor` claimed the scratch `.cube` was "cleared … on app exit". Nothing cleared it.
   **[partly fixed]** — a cancelled derive no longer writes one; a completed one is still kept
   deliberately (so the sheet can be reopened) and left to the OS temp sweep. **Phase 2 Step 9 did not
@@ -226,13 +310,22 @@ one remaining site, deliberately deferred out of that pass's scope.
   flush, a replaced cube renders **0/255** different from the one it replaced.
 - Export quality is hardcoded at 0.95 with no UI, and no EXIF/ICC metadata survives an export. Note that
   metadata cannot be injected through `CIImageRepresentationOption` — it needs `CGImageDestination`.
-- All of Phase 2 — non-destructive pipeline, RAW develop controls, undo, per-image edits — is unbuilt.
+- Phase 2 — non-destructive pipeline, RAW develop controls, undo, per-image edits — was unbuilt at the
+  time of this review. **[partly fixed]** since: Steps 0–10b shipped the first two. `EditDocument` is
+  the look state, `RenderPipeline`/`RenderEngine` render the preview and both export paths from it,
+  `ImageProcessor` and its baked `processedImage` are gone (zero declarations and zero call sites at
+  HEAD), and both inspectors ship — RAW develop in Step 10a, Adjustments in Step 10b. The A/B
+  comparison is the load-bearing evidence for "non-destructive": `AppViewModel` re-renders two looks
+  from one untouched `ImageSource` with no reload, which a baked pipeline could not serve.
+  **Undo and per-image edits remain open**, deferred to Step 11's `EditDocumentStore`.
 
 ---
 
 ## 3. Organization
 
-**[open]** — deliberately not touched in this pass, to keep the correctness diff reviewable.
+**[fixed]** — every bullet below is now closed. It was deliberately not touched in the original
+pass, to keep the correctness diff reviewable; the work landed across Steps 7–10b and the
+review-alignment pass.
 
 - ~~**`AppViewModel` (674 lines) is a god object**~~ **[fixed]** — split into `ExportCoordinator`
   (single + batch export and the naming they share, including `uniqueExportURL`) and `DeriveCoordinator`
@@ -248,13 +341,17 @@ one remaining site, deliberately deferred out of that pass's scope.
   and `MenuCommandReceivers` moved to `MenuCommands.swift`, `StatusBar`/`KeyHint` to `StatusBar.swift`,
   and `KeyboardShortcuts`/`KeyMonitor` to `KeyboardShortcuts.swift`. `ContentView.swift` is down to
   ~231 lines: the layout and the toolbar, nothing else.
-- `HistogramChart` lives at the bottom of `InfoInspectorView.swift`, away from `Histogram.swift`.
-- **`docs/PHASE2_SPEC.md` is 4,180 lines** of raw multi-agent output. It contradicts itself across
-  sections, and a meaningful fraction of it is meta-commentary arguing with earlier drafts about bugs
-  that never existed ("FABRICATED PRE-EXISTING BUG (verified false)"). Its actual decisions — the
-  `EditDocument` value spine, the `RenderPipeline.buildImage` fold, the `actor RenderEngine`, the
-  `WorkingSpace` seam — would fit in under 300 lines. As it stands it is more likely to mislead an
-  implementer than guide one.
+- ~~`HistogramChart` lives at the bottom of `InfoInspectorView.swift`, away from `Histogram.swift`.~~
+  **[fixed]** — it is `Views/HistogramChart.swift` now. Moved there rather than into
+  `Models/Histogram.swift` as this bullet suggested: that file is the *data*, and the Models layer does
+  not import SwiftUI. Keeping the tally and the drawing in separate layers is why the histogram is
+  testable without a view at all.
+- ~~**`docs/PHASE2_SPEC.md` is 4,180 lines** of raw multi-agent output, self-contradicting, a
+  meaningful fraction of it meta-commentary arguing with earlier drafts about bugs that never existed
+  ("FABRICATED PRE-EXISTING BUG (verified false)").~~ **[fixed]** — distilled at the time (§5 item 3),
+  and this bullet simply outlived the fix. Measured at HEAD: **534 lines, zero occurrences of
+  "FABRICATED"**. It has grown past the 292 it was distilled to, because Steps 3–10b each recorded
+  what they measured, which is the point of it.
 - `.gitignore` claimed "Package.resolved is intentionally committed" for a project with zero
   dependencies and no `Package.resolved`. **[fixed]**
 
@@ -275,17 +372,65 @@ so the README was the only wrong copy of the keymap.
 
 ---
 
+## 4b. In-app copy drift · [fixed]
+
+Found by the opposition pass, which harvested claims from documentation and doc comments but not from
+the strings the app actually shows. Every item below is verified against HEAD. **None is a correctness
+bug** — they are all cases where shipped copy describes an older, smaller app — but they are the copy a
+user reads, which makes them worse than a stale spec line, not better.
+
+All four are corrected. Each was a wording decision rather than a mechanical fix, so the reasoning is
+recorded beside the string in the source.
+
+- **Export All's tooltip** read "Apply the current **LUT** to all imported images", while
+  `ExportCoordinator.performBatchExport` takes an `EditDocument` and applies the whole look —
+  `rawDevelop` and `adjustments` included — to every image in the folder. The shipped-UI twin of the
+  README drift fixed above, and the more consequential one: the document's `rawDevelop` was seeded from
+  *one* RAW's as-shot values, and the tooltip gave no hint those travel to every other file. Now names
+  all three.
+- **The inspector button and the empty state** named only the Info tab ("Show histogram & EXIF",
+  "Open an image to see its histogram and EXIF data") though the inspector has been a three-tab
+  Info/Develop/Adjust picker since Step 10b. The empty state matters more than it looks: it stands in
+  for the *whole* inspector when nothing is open, not for the Info tab. Both name all three now.
+- **The Sharpening badge's hint** read "applied separately, not in LUT", promising a second stage that
+  does not exist: `sharpeningRatio` is measured, carried on the report and displayed, with no consumer
+  anywhere in the render path. Now "measured, not applied".
+- **`geometryMismatch`'s message** said the two files "must be the same frame at the same aspect
+  ratio", but the guard compares aspect only, within `aspectTolerance`. Differing pixel dimensions are
+  accepted by design — reconciling them is what the Lanczos step is for — so the message overstated the
+  requirement it was explaining, and named "shapes" for what is really an aspect check. Now says so.
+
+**Also fixed, same class: the ship gate itself.** Every step plan ends with a gate of the shape
+`git diff --stat main -- <load-bearing files>`, "Expected: **no output**". Step 10b's would have failed
+on the merge that shipped it — re-run against its own merge base, `AdjustmentNode.swift` and
+`RenderPipeline.swift` both moved. **The design intent held perfectly**: every changed line is a doc
+comment, and the changes are the §8.7 closures. The defect is in the gate, which cannot tell a comment
+from a statement, and a gate nobody can pass gets ignored — which is worse than no gate.
+
+`scripts/code-diff-gate.sh <base-ref> <file>...` asks the question the plans meant to ask. Comment-only
+edits pass; one moved statement fails, and prints the diff that failed it. Verified against the case
+that motivated it — on Step 10b's merge, `git diff --stat` reports two changed files and this reports
+`PASS — no executable line moved` — and against a real code change, where it names the line.
+
+It strips whole-line `//` and `///` comments only: not trailing comments, not `/* */`, and it is not a
+parser, so a `//` inside a string literal stays. Deliberate, and the script says so. Over-stripping
+would let a real change hide, which is the failure it exists to prevent; under-stripping costs a false
+alarm you can read.
+
+---
+
 ## 5. Suggested order for the follow-up work
 
 1. ~~**`LUTzyKit` split + test target.**~~ **Done** — see §2.
 2. ~~**Split `AppViewModel` and the rest of `ContentView`.**~~ **Done** — see §3.
 3. ~~**Distil `PHASE2_SPEC.md`**~~ **Done** — 292 lines, §6 of it is the ordered migration.
 
-**Phase 2 itself is now the only work left.** Steps 0–2 of its migration are complete: the library
-split and test harness, the `WorkingSpace` colour seam (which closed the latent preview/export
-mismatch — `createCGImage` passed no colour space in two places), and the value-state types
-(`EditDocument` and friends), which are defined but not yet referenced by anything. Step 3, the
-`RenderPipeline`, is next.
+**Phase 2 itself is now the only work left.** _As written, Steps 0–2 were complete and Step 3 was
+next. At HEAD that paragraph is four steps stale — **Steps 0–10b have shipped**, and the value-state
+types it describes as "defined but not yet referenced by anything" are the spine the whole render path
+runs on. See `PHASE2_SPEC.md` §6 for the current row-by-row state; **Step 11 (`EditDocumentStore`,
+undo, per-image edits) is what is actually next.** Left in place rather than rewritten, because §5 is a
+record of what the review recommended, not a status board — the correction belongs beside it._
 
 ### Where coverage is still thin
 
@@ -317,8 +462,16 @@ Worth knowing before leaning on the suite:
   adjustment changes nothing end to end (because `CIRAWFilter` itself silently discards the write,
   independent of our own gate — measured worst pixel delta: 0), and a source-text test
   (`RAWDevelopSettingsTests.testEveryGatedAdjustmentIsAppliedOnlyBehindItsOwnSupportedFlag`)
-  independently checks that each of the eight gated properties in `apply(to:)` is written inside a
-  condition that **names** its own `is*Supported` flag, which is the part the pixel test cannot see.
+  independently checks that each of the **nine** gated properties in `apply(to:)` is written inside a
+  condition that **names** its own `is*Supported` flag, which is the part the pixel test cannot see:
+  the eight per-file adjustments from a table, and `highlightRecoveryEnabled` separately and more
+  strictly, for its `#available(macOS 26, *)` guard as well as its flag.
+
+  (This said "eight" until the opposition pass. Eight is the count of gated *seeds* on
+  `RAWCapabilities` — highlight recovery has no per-image seed — so it is right for seeds and wrong
+  for gated writes; the repo says nine everywhere else. The error was in the safe direction, since it
+  undersold a test that does cover the ninth. It was introduced the day *after* the ninth gate landed,
+  and survived a later rewrite of this very paragraph.)
 
   **That is deliberately narrower than "verifies the gate holds", and the entry should not round it
   up.** The test reads the source of `apply(to:)` and asserts each write's condition mentions the

@@ -15,7 +15,10 @@ import simd
 ///   1. Render RAW with default CIRAWFilter → CIImage (the "neutral baseline"
 ///      that LUTzy itself would feed to a cube filter)
 ///   2. Decode JPG → CIImage
-///   3. Lanczos-scale the RAW render down to JPG dimensions
+///   3. Lanczos-scale **both** renders onto one common working extent — the
+///      JPG's dimensions, capped so the long edge is at most
+///      `Options.workingLongEdge` (3000 by default). Not "the RAW down to JPG
+///      dimensions": the JPG is resampled too whenever it exceeds the cap.
 ///   4. Box-blur the JPG to compute an edge mask (sharpening contaminates
 ///      chroma at high frequencies)
 ///   5. Render all three to RGBA8 byte buffers in sRGB
@@ -69,11 +72,15 @@ struct RecipeExtractor {
             case .renderFailed(let s):  return "Render failed: \(s)"
             case .zeroSamples:          return "No usable samples found in the smooth regions of the image"
             case .geometryMismatch(let raw, let jpg):
+                // Says "aspect ratio", not "the same frame at the same aspect ratio": the guard
+                // compares aspect only, within `aspectTolerance`. Differing pixel dimensions are
+                // fine and expected — the Lanczos step exists to reconcile them — so the old copy
+                // overstated the requirement it was explaining.
                 return """
-                    RAW and JPG have different shapes \
+                    RAW and JPG have different aspect ratios \
                     (\(Int(raw.width))×\(Int(raw.height)) vs \(Int(jpg.width))×\(Int(jpg.height))). \
-                    They must be the same frame at the same aspect ratio — check for an in-camera \
-                    crop mode, a rotated JPG, or a mismatched pair.
+                    They must be the same frame; differing pixel dimensions are fine, but the shape \
+                    has to match — check for an in-camera crop mode, a rotated JPG, or a mismatched pair.
                     """
             }
         }
@@ -119,9 +126,14 @@ struct RecipeExtractor {
         progress?(0.05, "Loading RAW…")
 
         // 1. RAW → CIImage at neutral CIRAWFilter defaults. Routed through the
-        //    single shared helper on ImageDecoder so the derive baseline
-        //    can't drift from the render path — and stays independent of any
-        //    user develop settings.
+        //    shared helper on ImageDecoder so that derive stays independent of
+        //    any user develop settings — which is the invariant that matters
+        //    here, and is pinned by DeriveBaselineImmunityTests.
+        //
+        //    Not "can't drift from the render path": the render stack builds
+        //    its own CIRAWFilter in RenderPipeline.rawFilter(for:) and never
+        //    calls this helper. The two match because a neutral develop sets
+        //    nothing, not because they share a constructor.
         guard let rawImage = ImageDecoder.developRAWNeutral(at: rawURL) else {
             throw ExtractorError.cannotLoadRAW(rawURL.lastPathComponent)
         }

@@ -275,9 +275,15 @@ final class RenderPipelineTests: TempDirectoryTestCase {
     /// The direction of `temperatureTint`, pinned deliberately.
     ///
     /// With the source neutral pinned at D65 and only `targetNeutral` moving, **raising Kelvin cools
-    /// the image** — the inverse of the Lightroom convention. `docs/PHASE2_SPEC.md` §8.7 leaves the
-    /// mapping open on purpose; this test records what ships today so that changing it later is a
-    /// deliberate act with a failing test attached, rather than a silent look change.
+    /// the image** — the inverse of the Lightroom convention. `docs/PHASE2_SPEC.md` §8.7 is **closed**:
+    /// this direction is pinned deliberately and must not be flipped here, because the node's
+    /// convention is what stored documents mean. The user-facing correction lives one layer up, in
+    /// `AdjustmentControl.sliderMapped(_:)`, which reflects the Adjust slider about D65 so that
+    /// dragging right warms. Changing that mapping is a UI decision; changing this one silently
+    /// re-renders every document ever saved.
+    ///
+    /// This test records what ships today so that either change is a deliberate act with a failing
+    /// test attached, rather than a silent look change.
     ///
     /// Measured on a mid grey: 3200 K → (158,121,74), 6500 K → (128,128,128), 9000 K → (119,128,144).
     func testRaisingKelvinCoolsTheImage() throws {

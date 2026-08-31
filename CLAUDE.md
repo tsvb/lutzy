@@ -15,13 +15,27 @@ while deploying to 14 is the normal Apple model and is the *stricter* arrangemen
 refuses any API newer than the deployment target unless it is `#available`-guarded, so the guard is
 enforced rather than remembered. Use newer API behind `#available` — don't avoid it.
 
-**Requires Xcode 26 or newer to build.** That is the cost of the above: `RAWDevelopSettings` references
-`CIRAWFilter.isHighlightRecoveryEnabled`, which only exists in the macOS 26 SDK. On an older Xcode the
+**Requires Xcode 26 or newer to build.** That is the cost of the above: the package references
+`CIRAWFilter`'s highlight-recovery pair — `isHighlightRecoveryEnabled` and `isHighlightRecoverySupported`
+— which only exist in the macOS 26 SDK. They are the only two properties `CIRAWFilter` gained after the
+macOS 14 deployment target; every other knob the package touches is present at 14. On an older Xcode the
 package will not compile, and no availability check can change that — `#available` gates a call at
 runtime; it cannot conjure a symbol the SDK never declared. That distinction cost a red build in Phase 2
 Step 2, when CI still ran `macos-14` (Xcode 15.4 / macOS 14.5 SDK) and the code built clean locally.
 
-If CI ever needs to move back to an older image, that reference is the thing that has to go with it.
+If CI ever needs to move back to an older image, **the whole highlight-recovery feature has to go with
+it, not one line.** There are seven references across three files, and deleting only the one named above
+still leaves the build red:
+
+- `RAWDevelopSettings.apply(to:)` — the guard *and* its body (`:154-155`); the guard names the sibling
+  property, so it does not survive on its own.
+- `RenderEngine.rawCapabilities(for:)` (`:257-258`) — the capability probe, in a second file.
+- `RAWDevelopSettingsTests` (`:164-165`, `:200-202`) — compiled by `swift test`, which CI runs.
+- `RAWDevelopSettingsTests` (`:289-303`) — source-text assertions that pin the
+  `isHighlightRecoverySupported` check and the `#available` guard, and so fail once the knob is gone.
+
+`RAWCapabilities.isHighlightRecoverySupported` is LUTzy's own stored property, not the SDK's, and can
+stay.
 
 ## Swift 6 language mode is on, for every target
 
