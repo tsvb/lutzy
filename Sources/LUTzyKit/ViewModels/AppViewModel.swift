@@ -46,11 +46,21 @@ final class AppViewModel: ObservableObject {
     /// What the develop panel should be showing right now. **Three states, not two.**
     ///
     /// `rawCapabilities` is `nil` in two situations that mean opposite things, and the panel used to
-    /// treat them as one. `refreshCapabilities()` clears it **synchronously** on every open and
-    /// refills it 25–170 ms later, so a RAW opened with the Develop tab already showing spent the
-    /// whole probe reading "No develop stage — Develop controls come from the RAW decoder. This image
-    /// is already rendered." That is a false statement about the file, and because `inspectorTab` is
-    /// not reset on open it was shown again on every ←/→ step through a folder of RAWs.
+    /// treat them as one. `refreshCapabilities()` clears it **in the same main-actor turn that
+    /// publishes the newly decoded image** — there is no suspension point between them, so no frame
+    /// can show the new file beside the old file's capabilities — and refills it 25–170 ms later, so a
+    /// RAW opened with the Develop tab already showing spent the whole probe reading "No develop stage
+    /// — Develop controls come from the RAW decoder. This image is already rendered." That is a false
+    /// statement about the file, and because `inspectorTab` is not reset on open it was shown again on
+    /// every ←/→ step through a folder of RAWs.
+    ///
+    /// Not on *every* open, though: a load that fails or is cancelled never reaches the clear, which is
+    /// harmless because it never publishes a new source either — everything on screen still coherently
+    /// describes the previous image. The exception is a failed or cancelled open landing on top of an
+    /// in-flight probe: `load()` cancels `capabilitiesTask` at `:375`, before it knows whether the new
+    /// file decodes, and only the `.success` branch re-probes (`:427`), so `rawCapabilities` stays
+    /// `nil` with `sourceIsRAW` still true and the panel parks on `.probing` indefinitely. Recorded as **B15 [open]** in `docs/CODE_REVIEW.md`; every
+    /// `developPanelState` test opens exactly one image, which is why it went unseen.
     ///
     /// Deriving the state here rather than in the view is what makes it testable: this repo has no
     /// SwiftUI view tests, so a distinction that lives only in a `ViewBuilder` cannot be asserted.

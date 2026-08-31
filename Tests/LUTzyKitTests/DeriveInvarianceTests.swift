@@ -156,12 +156,17 @@ final class DeriveInvarianceTests: XCTestCase {
         XCTAssertGreaterThan(derived.report.sampleCount, 0)
     }
 
-    /// The neutral RAW render derive fits against must stay independent of user develop settings.
+    /// The **pipeline** side of derive's baseline: `RenderPipeline` must honour a document's develop
+    /// settings, so that the neutral render derive fits against is demonstrably not what a developed
+    /// document produces.
     ///
-    /// `PHASE2_SPEC.md` §5 states this as "derive baseline immunity" and enforces it by construction
-    /// — `RecipeExtractor` takes URLs and options, never an `EditDocument`. Construction is the right
-    /// enforcement, but it is only as durable as the next signature change, so this asserts the
-    /// consequence: a document with aggressive develop settings does not move the cube derive fits.
+    /// **This does not test derive.** It never re-derives — both operands are
+    /// `ImageDecoder.developRAWNeutral` and `RenderPipeline.buildImage` — so it is invariant to
+    /// `RecipeExtractor.derive`'s signature, and its own failure message says as much ("develop is not
+    /// reaching the pipeline at all"). `PHASE2_SPEC.md` §5 named this test as the enforcement of
+    /// "derive baseline immunity" for several steps; it is not, and a defaulted `develop:` parameter
+    /// on `derive` leaves it green. That invariant is pinned by `DeriveBaselineImmunityTests`, which
+    /// reads derive's signature as source text and runs without a DNG.
     func testDeriveIgnoresTheDocumentsDevelopSettings() throws {
         let derived = try requireDerive()
 

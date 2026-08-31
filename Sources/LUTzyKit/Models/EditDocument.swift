@@ -2,10 +2,11 @@ import Foundation
 
 /// The look, as a value.
 ///
-/// This is the spine of Phase 2. Today LUTzy holds a *baked* `processedImage`; after the migration it
-/// holds one of these and rebuilds the image from it on demand. Being a `Codable`, `Sendable`,
-/// `Equatable` value is what buys undo, presets, per-image edits, and a clean actor boundary all at
-/// once — none of which a baked bitmap can give. See `docs/PHASE2_SPEC.md` §3.
+/// This is the spine of Phase 2. LUTzy used to hold a *baked* `processedImage`; since the Step 5
+/// cutover it holds one of these and rebuilds the image from it on demand — `ImageProcessor` is gone.
+/// Being a `Codable`, `Sendable`, `Equatable` value is what buys undo, presets, per-image edits, and a
+/// clean actor boundary all at once — none of which a baked bitmap can give. Undo and per-image edits
+/// are still to come, in Step 11. See `docs/PHASE2_SPEC.md` §3.
 ///
 /// **An empty document is the identity transform.** `EditDocument()` must render the source
 /// unchanged; that invariant is what lets the migration introduce the new spine under the old
@@ -55,9 +56,10 @@ struct EditDocument: Codable, Sendable, Equatable {
     /// the same photograph without the *look*, not a different rendering of the negative. This
     /// implements that.
     ///
-    /// It is invisible today, because nothing sets `rawDevelop` until the Step 10 inspector exists,
-    /// and a neutral develop is exactly the plain decode. It becomes load-bearing the moment that
-    /// inspector ships, which is why it is decided here rather than then.
+    /// It was invisible when it was written, because nothing set `rawDevelop` and a neutral develop is
+    /// exactly the plain decode — it was decided ahead of the Step 10a inspector rather than after it.
+    /// That inspector has shipped, so this is load-bearing now: `AppViewModel+Develop` writes
+    /// `document.rawDevelop`, and holding Space keeps those edits while dropping the look.
     ///
     /// Sharing `rawDevelop` with the full document is also what keeps the A/B swap cheap: the
     /// engine's developed-source memo is keyed on it, so both sides of the comparison hit the same

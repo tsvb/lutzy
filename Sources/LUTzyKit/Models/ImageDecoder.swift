@@ -91,11 +91,23 @@ enum ImageDecoder {
     /// Develop a RAW/DNG at **neutral / default `CIRAWFilter` settings** — no
     /// user develop adjustments are applied.
     ///
-    /// This is the single source of truth for the "neutral baseline" RAW
-    /// render. Both normal RAW loading and LUT derivation (`RecipeExtractor`)
-    /// develop RAWs through here, so the derive baseline can never drift from
-    /// the render path and stays independent of any user-adjustable develop
-    /// path. Returns `nil` if the file can't be decoded.
+    /// This defines the "neutral baseline" RAW render for the two callers that
+    /// take it: the eager decode in `AppViewModel.load`, and LUT derivation
+    /// (`RecipeExtractor`). Sharing it is what keeps derive independent of any
+    /// user-adjustable develop setting — derive fits its cube against exactly
+    /// this render and cannot see a document.
+    ///
+    /// **It is not the only construction of a neutral RAW.** The render stack
+    /// does not call this at all: `RenderPipeline.rawFilter(for:)` builds its
+    /// own `CIRAWFilter`, because it must also handle a `.data` backing (a
+    /// Photos import has no URL to pass, and this signature takes one). The two
+    /// agree only because `RAWDevelopSettings.neutral` sets nothing — an
+    /// agreement, not a structural guarantee, and pinned by a single test that
+    /// skips without a local DNG and covers the URL backing only. Do not read
+    /// this comment as saying the derive baseline *cannot* drift from the
+    /// render path; it says the two callers here cannot drift from each other.
+    ///
+    /// Returns `nil` if the file can't be decoded.
     static func developRAWNeutral(at url: URL) -> CIImage? {
         return CIRAWFilter(imageURL: url)?.outputImage
     }

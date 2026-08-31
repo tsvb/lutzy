@@ -58,8 +58,12 @@ framework's own gate absorbs the write whether ours ran or not. The pixel test t
 end-to-end behaviour and nothing about our code, and is named
 `testAValueWrittenToAnUnsupportedAdjustmentChangesNothing` to say so. Our gate is covered instead by
 `RAWDevelopSettingsTests.testEveryGatedAdjustmentIsAppliedOnlyBehindItsOwnSupportedFlag`, which reads
-the source text of `apply(to:)` and checks each of the eight properties is written only behind its own
+the source text of `apply(to:)` and checks each of the nine properties is written only behind its own
 flag. `CODE_REVIEW.md` §5 is corrected to say exactly that, and no more.
+
+_(Said "eight" as written; corrected by the opposition pass. Eight is the gated **seed** count —
+highlight recovery has no per-image seed — and nine is the gated **write** count, which is what this
+sentence is about.)_
 
 **2. The probe cannot return only flags.** As-shot white balance on this file is
 `temp = 5842.2, tint = 14.04` — not a round default. Every `RAWDevelopSettings` property is

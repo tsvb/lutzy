@@ -37,7 +37,7 @@ a baked image, which buys four things at once:
 | ✅ LUT intensity ships today — `lutIntensity`, `CubeLUT.apply(to:intensity:)`, toolbar slider | the original called this "NEW behavior… exists nowhere". It exists. |
 | ✅ EXIF orientation baked at load for every non-RAW decode | the original's "standard images have NO orientation baking" is stale |
 | ✅ `AppViewModel` split into `ExportCoordinator` + `DeriveCoordinator` | the `[processor]`-capture hazard it inherited is gone as of Step 7 |
-| ✅ `ImageDecoder.rawExtensions` internal; `developRAWNeutral` is the one neutral baseline | was `ImageProcessor` until Step 7 |
+| ✅ `ImageDecoder.rawExtensions` internal; `developRAWNeutral` defines the neutral RAW baseline for the eager decode and for derive | the render stack builds its own `CIRAWFilter` in `RenderPipeline.rawFilter(for:)` — the only site that handles a `.data` backing — and matches the baseline only because `RAWDevelopSettings.neutral` sets nothing. Pinned by one URL-only test that skips without a local RAW. Was `ImageProcessor` until Step 7 |
 | ✅ Derive: cancellable, geometry-validated, capped at a 3000 px working resolution | |
 | ✅ The value-state types exist (`EditDocument` and friends) — but nothing uses them yet | Step 2 is **done** |
 | ✅ `RenderPipeline.buildImage` and `LUTFilterCache` exist — also unused | Step 3 is **done** |
@@ -187,7 +187,15 @@ There are **four** explicit `CGColorSpace.sRGB` literals today and **two implici
 | *(was implicit)* | `ImageProcessor.renderToNSImage` `createCGImage` | same |
 
 ✅ **Step 1 closed all six.** Every `CGColorSpace(name:)` literal in the module now lives in
-`WorkingSpace.swift`; each site takes a `WorkingSpace` defaulting to `.current`.
+`WorkingSpace.swift` — verified by sweeping `CGColorSpace(`, `workingColorSpace`, `outputColorSpace`,
+`NSColorSpace` and `kCGColorSpace*` over `Sources/`, which hit only that file. The five render,
+interpolation and encoding sites take a `WorkingSpace` defaulting to `.current`; **derive is the
+exception and reads `WorkingSpace.sRGB` explicitly, by design** — row four above, and §4.4 below, both
+say so. This paragraph used to read "each site takes a `WorkingSpace`", contradicting its own table.
+
+The table is a **snapshot of the problem as it stood at Step 1**, not a map of HEAD — four of its six
+rows point at `ImageProcessor.swift`, deleted in Step 7, and the two line numbers that still resolve
+are the pre-fix ones. Read it as history; do not refresh the line numbers piecemeal.
 
 The two implicit sites were a **latent preview/export mismatch** — byte-identical at sRGB, divergent
 otherwise. Measured: reintroducing the bare `createCGImage` call moves the preview by up to **38/255**
@@ -245,8 +253,17 @@ stays an immutable `Sendable` value.
   from a full decode, so a scaled RAW preview is not byte-proof of the export. Test *wiring symmetry*
   (a knob moves both paths), not byte equality.
 - **Derive baseline immunity.** `RecipeExtractor` must never receive `document.rawDevelop`. Enforced by
-  construction (no `EditDocument` import; signatures take only URLs and options) plus a test that fails
-  if the derive signature gains a develop parameter.
+  `DeriveBaselineImmunityTests`, which reads the source: it pins derive's parameter labels to exactly
+  `{rawURL, jpgURL, options, progress, isCancelled}`, and pins `RecipeExtractor.swift` and
+  `DeriveCoordinator.swift` to naming neither `EditDocument` nor `RAWDevelopSettings` nor `rawDevelop`.
+  There is no import to omit — `EditDocument` is the same module — so the construction half is a
+  convention, and that test is what holds it. It reads text because a *defaulted* develop parameter has
+  no runtime trace: `.neutral` renders byte-identically to `ImageDecoder.developRAWNeutral`, so the
+  derived cube is bit-identical and there is no pixel to assert on. Needs no DNG, so it runs on CI.
+  **This invariant went uncovered from Step 3 until the opposition pass**, and the spec asserted the
+  test existed for the whole of that time; `DeriveInvarianceTests` pins the *pipeline's* develop wiring
+  and is invariant to derive's signature — measured, with the DNG present, against a defaulted
+  `develop:` parameter: it stayed green.
 - **Empty document is identity.** An `EditDocument()` with no LUT must produce the source unchanged.
 
 ---
@@ -267,9 +284,9 @@ leaf by leaf, delete the old path last.
 | ~~6~~ | ~~Cut **export** over; delete `processedImage`~~ | ✅ **done** — 203 tests; 25 mutations caught; **both** export paths cut over, and the histogram came with them (see below) |
 | ~~7~~ | ~~Move thumbnails (**both** `ImageCollection` sites); dissolve `ImageProcessor` GPU duties~~ | ✅ **done** — 208 tests; 18 mutations caught, 2 shown equivalent by measurement; `RenderStackTests` asserts the context count |
 | ~~8~~ | ~~Flip strict concurrency on~~ | ✅ **done** — full **Swift 6 language mode** (errors, not warnings) on all three targets; 214 tests; 9 mutations caught, 1 untestable and named |
-| ~~9~~ | ~~Wire derive into the new state: register the derived LUT by ID, keep the scratch-file bookkeeping~~ | ✅ **done** — 230 tests; 19 mutations caught, 1 shown equivalent by inspection; fixed a **shipped** bug where a derived LUT never resolved (see below) |
+| ~~9~~ | ~~Wire derive into the new state: register the derived LUT by ID, keep the scratch-file bookkeeping~~ | ✅ **done** — 230 tests; 19 mutations caught, 1 shown equivalent by inspection; fixed a **shipped** bug where a derived LUT never resolved (see below). ⚠️ **That tally was produced by a classifier since found to be broken** — `scripts/mutate-step9.sh` tested for "skipped" before "failed", so in any suite mixing RAW-gated with ordinary tests it could score a run by the wrong branch, and `SKIPPED` was excluded from the exit gate. Fixed by back-porting `mutate-step10a.sh`'s failure-first classifier and adding `SKIPPED` to the gate; **the tally has not been re-measured since** |
 | ~~10a~~ | ~~RAW develop inspector + the per-image capability probe~~ | ✅ **done** — `RAWCapabilities` crosses the actor boundary carrying nine gates and twelve per-image seeds; the probe measures **~25 ms warm** against **~183 ms** for a full develop, so it runs once per open and never per render. 33 mutations, 32 caught on the first run and the one survivor closed with the test it exposed. **The RAW-gated tests `XCTSkip` on CI**, which has no DNG — a green tick there says nothing about them |
-| ~~10b~~ | ~~Adjustments inspector — fixed slots, one node of each, canonical pipeline order~~ | ✅ **done** — 308 tests (up from 272), 3 skipped without a DNG; nine per-parameter rows over the five `AdjustmentNode` cases, driving `EditDocument.adjustments` live. `AdjustmentNode`, `RenderPipeline`, `RenderEngine` and `EditDocument` carry no logic, signature or behaviour change — purely additive, aside from two stale §8.7 doc comments corrected in the first two. No mutation run was performed here; `AdjustmentControl`'s sparse-array contract and the slider map are covered instead by pure-value tests needing no GPU, image or RAW, so — unlike 10a's RAW-gated tests — they run on CI. Closed §8.5's, §8.6's and §8.7's remaining open halves, see below |
+| ~~10b~~ | ~~Adjustments inspector — fixed slots, one node of each, canonical pipeline order~~ | ✅ **done** — 313 tests (up from 272; 308 at 10b, plus 5 added by the opposition pass: 3 in `DeriveBaselineImmunityTests`, 2 in `DocumentedTestNamesTests`). **20 skip without a DNG, 3 with one present** — measured both ways, by hiding `realworldtest/` and re-running. The 3 that always skip are `PreviewCostBenchmark`'s, gated on `LUTZY_BENCH` rather than on a RAW; the other 17 are the RAW-gated ones. This entry previously said "3 skipped without a DNG", which was wrong under either reading. Nine per-parameter rows over the five `AdjustmentNode` cases, driving `EditDocument.adjustments` live. `AdjustmentNode`, `RenderPipeline`, `RenderEngine` and `EditDocument` carry no logic, signature or behaviour change — purely additive, aside from **three** stale §8.7 doc comments; only the two in `Sources/` were corrected at the time, and the third, on `RenderPipelineTests.testRaisingKelvinCoolsTheImage`, survived until the opposition pass. The commit that fixed them said "the two doc comments", having grepped `Sources/` alone. No mutation run was performed here; `AdjustmentControl`'s sparse-array contract and the slider map are covered instead by pure-value tests needing no GPU, image or RAW, so — unlike 10a's RAW-gated tests — they run on CI. Closed §8.5's, §8.6's and §8.7's remaining open halves, see below |
 | 11 | Per-image undo keyed by `Item.id`, plus an `EditDocumentStore` | ⌘Z scoped per image |
 | 12 | *(deferred)* export descriptor, metadata/ICC | — |
 
@@ -337,9 +354,12 @@ used by production and every test.
 
 What the step settled:
 
-- **Identity is content-derived.** A derived LUT's id is `derived://<name>/<sha256 of the cube table>`
+- **Identity is content-derived.** A derived LUT's id is
+  `derived://<name>/<first 64 bits of the sha256 of the cube table>` — `CubeLUT` takes
+  `digest.prefix(8)`, so the hex field is 16 characters, not 64. That is deliberate and documented at
+  the call site: it distinguishes the handful of derives in one session, not the world's LUTs.
   (`CryptoKit`; **not** `Hasher`, which is seeded per process and would be stable within a launch and
-  silently different across launches). This reverses a documented property — two identically-built
+  silently different across launches.) This reverses a documented property — two identically-built
   in-memory LUTs are now *one* identity, not two — which two tests assert deliberately. It buys
   determinism per cube value, which is §4.3's real objection to `UUID`. It does **not** buy
   resurrection by re-deriving: `RecipeExtractor` samples with `SystemRandomNumberGenerator`, so the

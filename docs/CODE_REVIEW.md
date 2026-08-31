@@ -2,9 +2,9 @@
 
 _Full read of all 18 Swift files (~4,300 lines) at `094e932`, plus README, CI, and `PHASE2_SPEC.md`._
 
-The app had grown across ten feature PRs with **no tests at all** — CI runs `swift build` and nothing
-else — so nothing had ever been verified beyond "it compiles, and it looked right on the sample images
-in the repo." Those samples are all landscape, all 3:2, all from the same two cameras. Several of the
+The app had grown across ten feature PRs with **no tests at all** — CI ran `swift build` and nothing
+else at the time of this review; it now runs debug build → `swift test` → release build — so nothing
+had ever been verified beyond "it compiles, and it looked right on the sample images in the repo." Those samples are all landscape, all 3:2, all from the same two cameras. Several of the
 bugs below live exactly in the gap that leaves.
 
 Findings are marked **[fixed]** where this pass resolved them and **[open]** where they are recorded for
@@ -160,6 +160,32 @@ panel still calls that render "Original" while a real, non-identity edit is show
 equivalent was fixed in Step 10b's follow-up pass (the fallback now reads "Adjusted"); this is the
 one remaining site, deliberately deferred out of that pass's scope.
 
+### B15 — A failed open during the RAW probe parks the Develop panel on "probing" forever · Low · [open]
+
+`AppViewModel.load` cancels `capabilitiesTask` unconditionally at `:375`, before it knows whether the
+new file decodes. `refreshCapabilities()` (`:799`) — which clears `rawCapabilities` and starts a fresh
+probe — is reached only from the `.success` branch, at `:427`. The `.failure` branch and the
+`guard !Task.isCancelled` early return both skip it.
+
+So: open a RAW, then within the 25–170 ms probe window step onto a file that fails to decode. The
+first image's probe is killed and never restarted, while `sourceImage` and `imageSource` still describe
+that first image. `rawCapabilities == nil` with `sourceIsRAW == true` is exactly `developPanelState`'s
+`.probing` case, so the panel spins on "Reading the decoder's develop controls…" indefinitely, beside
+the RAW that is still on screen. Recovered by opening any image that decodes.
+
+Narrow, but reachable and unbounded. Found by the opposition pass while checking the doc comment on
+`developPanelState`, which claimed the clear happens "on every open".
+
+**Why no test caught it:** every `developPanelState` test builds a fresh `AppViewModel` and opens
+exactly one image (`DevelopInspectorTests.swift:40-199`). Nothing opens a second image over an
+in-flight probe, so the whole class of stale-state-across-opens defects is uncovered.
+
+**Adjacent, same function, also [open]:** `refreshMetadata(url:data:)` (`:781`, called at `:426`) fires
+an *unstored, uncancelled* `Task.detached` that writes `self.metadata` on the main actor — unlike the
+six tasks cancelled at `:371-376`, there is no stored handle to cancel and no generation token. Rapid
+←/→ can therefore land image A's `ImageMetadata` after image B's has already been published, leaving
+the Info panel describing the wrong file. Same root shape as B11.
+
 ---
 
 ## 2. Stubbed, incomplete, and dead
@@ -226,7 +252,14 @@ one remaining site, deliberately deferred out of that pass's scope.
   flush, a replaced cube renders **0/255** different from the one it replaced.
 - Export quality is hardcoded at 0.95 with no UI, and no EXIF/ICC metadata survives an export. Note that
   metadata cannot be injected through `CIImageRepresentationOption` — it needs `CGImageDestination`.
-- All of Phase 2 — non-destructive pipeline, RAW develop controls, undo, per-image edits — is unbuilt.
+- Phase 2 — non-destructive pipeline, RAW develop controls, undo, per-image edits — was unbuilt at the
+  time of this review. **[partly fixed]** since: Steps 0–10b shipped the first two. `EditDocument` is
+  the look state, `RenderPipeline`/`RenderEngine` render the preview and both export paths from it,
+  `ImageProcessor` and its baked `processedImage` are gone (zero declarations and zero call sites at
+  HEAD), and both inspectors ship — RAW develop in Step 10a, Adjustments in Step 10b. The A/B
+  comparison is the load-bearing evidence for "non-destructive": `AppViewModel` re-renders two looks
+  from one untouched `ImageSource` with no reload, which a baked pipeline could not serve.
+  **Undo and per-image edits remain open**, deferred to Step 11's `EditDocumentStore`.
 
 ---
 
@@ -275,6 +308,42 @@ so the README was the only wrong copy of the keymap.
 
 ---
 
+## 4b. In-app copy drift · [open]
+
+Found by the opposition pass, which harvested claims from documentation and doc comments but not from
+the strings the app actually shows. Every item below is verified against HEAD. **None is a correctness
+bug** — they are all cases where shipped copy describes an older, smaller app — but they are the copy a
+user reads, which makes them worse than a stale spec line, not better.
+
+Left open rather than fixed, because each is a wording decision rather than a mechanical correction.
+
+- `ContentView.swift:224` — Export All's tooltip reads "Apply the current **LUT** to all imported
+  images". `ExportCoordinator.performBatchExport` takes an `EditDocument`, so it applies the whole
+  look — `rawDevelop` and `adjustments` included — to every image in the folder. This is the shipped-UI
+  twin of the README drift fixed above, and it is the more consequential one: the document's
+  `rawDevelop` was seeded from *one* RAW's as-shot values, and the tooltip gives no hint that those
+  travel to every other file.
+- `ContentView.swift:149` ("Show histogram & EXIF (⌘I)") and `InfoInspectorView.swift:157` ("Open an
+  image to see its histogram and EXIF data") — the inspector has been a three-tab Info/Develop/Adjust
+  picker since Step 10b. Both strings name only the first tab.
+- `RecipeReportView.swift:107` — the Sharpening badge's hint reads "applied separately, not in LUT".
+  Nothing applies it: `sharpeningRatio` is measured (`RecipeExtractor`), carried (`RecipeReport`), and
+  displayed, and has no consumer anywhere in the render path. "Measured, not applied" would be true.
+- `RecipeExtractor.swift:78` — `geometryMismatch`'s message says the two files "must be the same frame
+  at the same aspect ratio", but the guard at `:159` compares aspect only, within
+  `aspectTolerance = 0.01`. Differing pixel dimensions are accepted by design (that is what the Lanczos
+  step exists for), so the message overstates the requirement it is explaining.
+
+**Also open, same class:** Step 10b's ship gate in
+`docs/superpowers/plans/2026-08-06-step10b-adjustments-inspector.md` — `git diff --stat` over four
+files, "Expected: **no output**" — would have failed on the merge that shipped it. Re-run against the
+merge base, `AdjustmentNode.swift` and `RenderPipeline.swift` both moved. **The design intent held**:
+every changed line is a doc comment, and the changes are the §8.7 closures. The defect is in the gate,
+which cannot tell a comment from a statement. A gate that means "no logic changed" has to diff code,
+not lines.
+
+---
+
 ## 5. Suggested order for the follow-up work
 
 1. ~~**`LUTzyKit` split + test target.**~~ **Done** — see §2.
@@ -317,8 +386,16 @@ Worth knowing before leaning on the suite:
   adjustment changes nothing end to end (because `CIRAWFilter` itself silently discards the write,
   independent of our own gate — measured worst pixel delta: 0), and a source-text test
   (`RAWDevelopSettingsTests.testEveryGatedAdjustmentIsAppliedOnlyBehindItsOwnSupportedFlag`)
-  independently checks that each of the eight gated properties in `apply(to:)` is written inside a
-  condition that **names** its own `is*Supported` flag, which is the part the pixel test cannot see.
+  independently checks that each of the **nine** gated properties in `apply(to:)` is written inside a
+  condition that **names** its own `is*Supported` flag, which is the part the pixel test cannot see:
+  the eight per-file adjustments from a table, and `highlightRecoveryEnabled` separately and more
+  strictly, for its `#available(macOS 26, *)` guard as well as its flag.
+
+  (This said "eight" until the opposition pass. Eight is the count of gated *seeds* on
+  `RAWCapabilities` — highlight recovery has no per-image seed — so it is right for seeds and wrong
+  for gated writes; the repo says nine everywhere else. The error was in the safe direction, since it
+  undersold a test that does cover the ninth. It was introduced the day *after* the ninth gate landed,
+  and survived a later rewrite of this very paragraph.)
 
   **That is deliberately narrower than "verifies the gate holds", and the entry should not round it
   up.** The test reads the source of `apply(to:)` and asserts each write's condition mentions the

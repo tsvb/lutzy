@@ -15,7 +15,10 @@ import simd
 ///   1. Render RAW with default CIRAWFilter → CIImage (the "neutral baseline"
 ///      that LUTzy itself would feed to a cube filter)
 ///   2. Decode JPG → CIImage
-///   3. Lanczos-scale the RAW render down to JPG dimensions
+///   3. Lanczos-scale **both** renders onto one common working extent — the
+///      JPG's dimensions, capped so the long edge is at most
+///      `Options.workingLongEdge` (3000 by default). Not "the RAW down to JPG
+///      dimensions": the JPG is resampled too whenever it exceeds the cap.
 ///   4. Box-blur the JPG to compute an edge mask (sharpening contaminates
 ///      chroma at high frequencies)
 ///   5. Render all three to RGBA8 byte buffers in sRGB
@@ -119,9 +122,14 @@ struct RecipeExtractor {
         progress?(0.05, "Loading RAW…")
 
         // 1. RAW → CIImage at neutral CIRAWFilter defaults. Routed through the
-        //    single shared helper on ImageDecoder so the derive baseline
-        //    can't drift from the render path — and stays independent of any
-        //    user develop settings.
+        //    shared helper on ImageDecoder so that derive stays independent of
+        //    any user develop settings — which is the invariant that matters
+        //    here, and is pinned by DeriveBaselineImmunityTests.
+        //
+        //    Not "can't drift from the render path": the render stack builds
+        //    its own CIRAWFilter in RenderPipeline.rawFilter(for:) and never
+        //    calls this helper. The two match because a neutral develop sets
+        //    nothing, not because they share a constructor.
         guard let rawImage = ImageDecoder.developRAWNeutral(at: rawURL) else {
             throw ExtractorError.cannotLoadRAW(rawURL.lastPathComponent)
         }
