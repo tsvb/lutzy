@@ -10,7 +10,10 @@ import CoreGraphics
 struct HistogramData: Equatable, Sendable {
 
     /// Channels a histogram view can draw.
-    enum Channel: CaseIterable {
+    // `CaseIterable` was on this and `Channel.allCases` was never called (docs/CODE_REVIEW.md
+    // §2, "Unused API"). The picker iterates `HistogramChart.Mode`, a different type with an
+    // `rgb` case this one has no equivalent for.
+    enum Channel {
         case red, green, blue, luma
     }
 

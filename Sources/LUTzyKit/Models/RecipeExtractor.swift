@@ -72,11 +72,15 @@ struct RecipeExtractor {
             case .renderFailed(let s):  return "Render failed: \(s)"
             case .zeroSamples:          return "No usable samples found in the smooth regions of the image"
             case .geometryMismatch(let raw, let jpg):
+                // Says "aspect ratio", not "the same frame at the same aspect ratio": the guard
+                // compares aspect only, within `aspectTolerance`. Differing pixel dimensions are
+                // fine and expected — the Lanczos step exists to reconcile them — so the old copy
+                // overstated the requirement it was explaining.
                 return """
-                    RAW and JPG have different shapes \
+                    RAW and JPG have different aspect ratios \
                     (\(Int(raw.width))×\(Int(raw.height)) vs \(Int(jpg.width))×\(Int(jpg.height))). \
-                    They must be the same frame at the same aspect ratio — check for an in-camera \
-                    crop mode, a rotated JPG, or a mismatched pair.
+                    They must be the same frame; differing pixel dimensions are fine, but the shape \
+                    has to match — check for an in-camera crop mode, a rotated JPG, or a mismatched pair.
                     """
             }
         }

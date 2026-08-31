@@ -42,17 +42,10 @@ struct ImageMetadata: Equatable {
     // MARK: Location
     var coordinates: String?    // "37.7749° N, 122.4194° W"
 
-    /// True when nothing photographic was found (e.g. a screenshot or an image
-    /// stripped of metadata). Dimensions alone don't count as "has metadata".
-    var hasCameraInfo: Bool {
-        make != nil || model != nil || lens != nil || aperture != nil ||
-        shutterSpeed != nil || iso != nil || focalLength != nil ||
-        dateTaken != nil || coordinates != nil
-    }
-
-    var isEmpty: Bool {
-        sections.isEmpty
-    }
+    // `hasCameraInfo` and `isEmpty` stood here with no caller in either target — the "Unused API"
+    // bullet in docs/CODE_REVIEW.md §2. Removed rather than kept: `InfoInspectorView` asks
+    // `metadata.sections.isEmpty` directly, which is the same question one indirection shorter, and
+    // an accessor nobody calls is an accessor nobody has checked.
 
     // MARK: - Display sections
 
