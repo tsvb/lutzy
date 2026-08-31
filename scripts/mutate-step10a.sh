@@ -18,8 +18,8 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-PASS=0; SURVIVED=0; NOBUILD=0; NORUN=0; SKIPPED=0
-declare -a SURVIVOR_NAMES=() NOBUILD_NAMES=() NORUN_NAMES=()
+PASS=0; SURVIVED=0; NOBUILD=0; NORUN=0; SKIPPED=0; CONTROL=0; CONTROL_CAUGHT=0
+declare -a SURVIVOR_NAMES=() NOBUILD_NAMES=() NORUN_NAMES=() CONTROL_CAUGHT_NAMES=()
 
 # mutate <label> <file> <perl-expr> <test-filter>
 mutate() {
@@ -80,15 +80,41 @@ mutate() {
   # **The tally recorded in the commit message / PR body was produced on a machine where the DNG in
   # `realworldtest/` was present and every filter above ran with zero skips.** A run reporting any
   # SKIPPED is a weaker run than that one, whatever its caught count says.
+  # A label beginning with CONTROL marks a **deliberate equivalent mutant** — a change that provably
+  # cannot alter behaviour, carried so the harness proves it can still tell a survivor from a kill.
+  # It is expected to survive, so it must not count toward SURVIVED.
+  #
+  # It did, and the arithmetic was fatal: `mutate-step9.sh` carries one control and gated on
+  # `SURVIVED -eq 0`, so **it could never exit 0 on any run**, however healthy. An exit code that is
+  # always 1 says nothing, which is the same disease as a SKIPPED that was always excluded — a
+  # signal nobody can act on. Counted separately here so the exit code means something again.
+  #
+  # A control that gets CAUGHT is its own finding, and fails the run: it means a test now asserts
+  # something the mutation proves is unobservable — an implementation detail, not behaviour. The fix
+  # then is to loosen the test, never to delete the control.
+  local is_control=0
+  [[ "$label" == CONTROL* ]] && is_control=1
+
   if grep -qE "with ([0-9]+ tests? skipped and )?[1-9][0-9]* failures?" <<<"$out"; then
-    echo "caught    $label"
-    PASS=$((PASS+1))
+    if [[ $is_control -eq 1 ]]; then
+      echo "CTRL-KILL $label — a control was caught; some test is asserting an implementation detail"
+      CONTROL_CAUGHT=$((CONTROL_CAUGHT+1)); CONTROL_CAUGHT_NAMES+=("$label -> $filter")
+    else
+      echo "caught    $label"
+      PASS=$((PASS+1))
+    fi
     return
   fi
 
   if grep -qE "with [0-9]+ tests? skipped and 0 failures" <<<"$out"; then
     echo "SKIPPED   $label — the test skipped rather than running"
     SKIPPED=$((SKIPPED+1))
+    return
+  fi
+
+  if [[ $is_control -eq 1 ]]; then
+    echo "control   $label — survived, as it must"
+    CONTROL=$((CONTROL+1))
     return
   fi
 
@@ -268,10 +294,13 @@ echo "SURVIVED:   $SURVIVED"
 echo "NO-BUILD:   $NOBUILD   (proves nothing — fix the mutation)"
 echo "NO-TESTS:   $NORUN     (proves nothing — fix the filter/pattern)"
 echo "SKIPPED:    $SKIPPED   (proves nothing — fixture missing; FAILS the run)"
+echo "controls:   $CONTROL   (equivalent mutants — expected to survive, and did)"
+[[ $CONTROL_CAUGHT -ne 0 ]] && echo "CTRL-KILL:  $CONTROL_CAUGHT   (a control was caught — a test is over-asserting; FAILS the run)"
 for n in "${SURVIVOR_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  survived: $n"; done
 for n in "${NOBUILD_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  no-build: $n"; done
 for n in "${NORUN_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  no-tests: $n"; done
 [[ $SKIPPED -eq 0 ]] || echo "  INCONCLUSIVE: $SKIPPED mutation(s) never ran — put the DNG in realworldtest/ and re-run"
+for n in "${CONTROL_CAUGHT_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  control caught: $n"; done
 
 # **SKIPPED is inconclusive, not a pass, and it belongs in this gate.** It was excluded here, which
 # is the hole the failure-first classifier does not close on its own: from the summary lines alone, a
@@ -280,4 +309,4 @@ for n in "${NORUN_NAMES[@]:-}"; do [[ -n "$n" ]] && echo "  no-tests: $n"; done
 # therefore let this harness exit 0 while proving nothing about the mutation, which is the one
 # outcome a falsifiability check must never produce. An inconclusive run is not a green run: run
 # this on a machine with the Leica DNG in `realworldtest/` present, or treat the result as unproven.
-[[ $SURVIVED -eq 0 && $NOBUILD -eq 0 && $NORUN -eq 0 && $SKIPPED -eq 0 ]] || exit 1
+[[ $SURVIVED -eq 0 && $NOBUILD -eq 0 && $NORUN -eq 0 && $SKIPPED -eq 0 && $CONTROL_CAUGHT -eq 0 ]] || exit 1
