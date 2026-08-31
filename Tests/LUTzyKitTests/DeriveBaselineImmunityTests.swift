@@ -80,22 +80,66 @@ final class DeriveBaselineImmunityTests: XCTestCase {
         for line in lines[(start + 1)...] {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix(")") { return labels }          // end of the parameter list
-            guard let colon = trimmed.firstIndex(of: ":") else { continue }
-            let label = trimmed[trimmed.startIndex..<colon]
-                .trimmingCharacters(in: .whitespaces)
-                .split(separator: " ").first.map(String.init) ?? ""
-            if !label.isEmpty { labels.append(label) }
+            labels.append(contentsOf: Self.parameterLabels(in: trimmed))
         }
 
         XCTFail("never found the end of derive's parameter list — the declaration did not parse")
         return []
     }
 
+    /// Every parameter label on one line of a declaration.
+    ///
+    /// **Reads every parameter on the line, not just the first.** It read only the first until the
+    /// second opposition pass, which is a hole precisely the shape of the defect this file exists to
+    /// catch: appending `, exposureBias: Double = 0` to the end of an existing parameter's line left
+    /// the parsed set unchanged at five labels, and the exact-set assertion passed with a sixth
+    /// parameter present. The sibling test would not have caught it either — it blacklists
+    /// `EditDocument`, `RAWDevelopSettings` and `rawDevelop`, and a develop knob typed as `Double`
+    /// names none of them.
+    ///
+    /// Splitting is depth-aware because a parameter type contains commas of its own:
+    /// `progress: ((Double, String) -> Void)? = nil` is one parameter, not three. Only `(` and `[`
+    /// open a level — angle brackets are deliberately ignored, since `->` would otherwise read as a
+    /// closing bracket. A generic parameter type with a top-level comma (`Dictionary<String, Int>`)
+    /// would therefore split wrongly and fail the assertion; that is the safe direction to be wrong
+    /// in, because it fails loudly rather than passing quietly.
+    private static func parameterLabels(in line: String) -> [String] {
+        var fragments: [String] = []
+        var current = ""
+        var depth = 0
+        for ch in line {
+            switch ch {
+            case "(", "[":
+                depth += 1
+                current.append(ch)
+            case ")", "]":
+                depth -= 1
+                current.append(ch)
+            case "," where depth == 0:
+                fragments.append(current)
+                current = ""
+            default:
+                current.append(ch)
+            }
+        }
+        fragments.append(current)
+
+        return fragments.compactMap { fragment in
+            guard let colon = fragment.firstIndex(of: ":") else { return nil }
+            let label = fragment[fragment.startIndex..<colon]
+                .trimmingCharacters(in: .whitespaces)
+                .split(separator: " ").first.map(String.init) ?? ""
+            return label.isEmpty ? nil : label
+        }
+    }
+
     /// The invariant the spec said was covered: **derive's signature cannot gain a develop parameter.**
     ///
     /// Asserted as an exact set rather than an absence, so that *any* new parameter has to be
     /// considered here — a develop knob under a name this test never thought to blacklist
-    /// (`settings:`, `raw:`, `baseline:`) fails just the same.
+    /// (`settings:`, `raw:`, `baseline:`) fails just the same, and so does one packed onto the same
+    /// line as an existing parameter, which slipped through until `parameterLabels(in:)` learned to
+    /// read past the first label on a line.
     func testDeriveSignatureTakesOnlyURLsOptionsAndCallbacks() throws {
         let labels = try deriveParameterLabels()
 

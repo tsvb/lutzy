@@ -171,7 +171,11 @@ struct RecipeExtractor {
         let outputSize = workingSize(for: jpgSize, longEdge: options.workingLongEdge)
         let outputRect = CGRect(origin: .zero, size: outputSize)
 
-        progress?(0.25, "Scaling RAW to JPG resolution…")
+        // Not "Scaling RAW to JPG resolution": step 3 resamples *both* images onto a common working
+        // extent capped at `workingLongEdge`, so the JPG is scaled too whenever it exceeds the cap —
+        // the common case. The header comment and README were corrected earlier; this string is the
+        // copy that actually reaches the user, through DeriveCoordinator into the sheet.
+        progress?(0.25, "Scaling to working resolution…")
         try checkCancelled()
 
         // 3. Lanczos-scale both renders onto the common working extent, each
