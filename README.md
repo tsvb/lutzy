@@ -1,112 +1,90 @@
-<div align="center">
+# LUTzy
 
-# 🎨 LUTzy
+A native macOS app for applying `.cube` 3D LUTs to RAW/DNG and standard images, and for deriving a reusable `.cube` from a RAW + JPEG pair.
 
-### Color-grade RAW photos with `.cube` LUTs — and reverse-engineer a camera's look back *into* one.
-
-A fast, native macOS app for applying 3D LUTs to RAW/DNG and standard images, with live side-by-side preview and a one-of-a-kind tool that **derives a LUT from a RAW + JPEG pair**.
+Built with SwiftUI and Core Image. No third-party dependencies.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9-orange)
+![Swift](https://img.shields.io/badge/Swift-6-orange)
 ![UI](https://img.shields.io/badge/UI-SwiftUI%20%2B%20Core%20Image-9cf)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
-![GPU](https://img.shields.io/badge/rendering-Metal--accelerated-success)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-</div>
+## Features
 
----
+**Open**
 
-## What is LUTzy?
+- Native RAW demosaic via `CIRAWFilter` — not the embedded JPEG preview.
+- RAW: `DNG`, `CR2`, `CR3`, `NEF`, `ARW`, `ORF`, `RAF`, `RW2`, `PEF`, `SRW`, `X3F`, `RAW`.
+- Standard: `JPEG`, `PNG`, `TIFF`, `BMP`, `HEIC`.
+- Drag and drop a file or a folder onto the window. Import from Photos (up to 50 at a time) or open a folder from the toolbar.
 
-LUTzy is a focused color tool built entirely on Apple frameworks — **SwiftUI** for the interface, **Core Image** (Metal-backed) for every pixel operation, and **zero third-party dependencies**. It does three things exceptionally well:
+**Grade**
 
-1. **Opens your photos** — native RAW/DNG demosaicing plus all the usual formats.
-2. **Grades them with `.cube` LUTs** — browse a whole folder of looks and preview them instantly on the GPU.
-3. **Reverses the process** — point it at a RAW file *and* the camera's straight-out-of-camera JPEG, and it will **synthesize a `.cube` LUT** that turns the neutral RAW into that JPEG's look. Bottle your camera's color science (or a borrowed film simulation) and apply it to everything else.
+- Standard `.cube` 3D LUTs (`LUT_3D_SIZE`, `DOMAIN_MIN` / `DOMAIN_MAX`), applied through `CIColorCubeWithColorSpace` on Metal.
+- Sidebar library scans a folder recursively, groups looks by subfolder, and filters by name.
+- Intensity slider (0–100%) blends the graded result back toward the original.
 
-> [!TIP]
-> The headline trick lives in **[Derive a LUT from a JPG](#-derive-a-lut-from-a-jpg)**. If you've ever wanted to capture a camera's JPEG look as a reusable LUT, that's the section to read.
+**Compare**
 
----
+- Side-by-side original vs graded, or a single view — toggle with `V`.
+- Hold `Space` in single view to flash the original.
+- `↑` / `↓` steps through the library with a live preview.
 
-## ✨ Features
+**Inspect** (`⌘I`)
 
-### Open anything
-- **Native RAW/DNG** via Core Image's `CIRAWFilter` — proper demosaicing, not just the embedded preview.
-- Supported RAW: `DNG`, `CR2`, `CR3`, `NEF`, `ARW`, `ORF`, `RAF`, `RW2`, `PEF`, `SRW`, `X3F`, `RAW`.
-- Standard formats: `JPEG`, `PNG`, `TIFF`, `BMP`, `HEIC`.
-- **Drag & drop** a single image *or* a whole folder onto the window.
-- **Import from Photos** (up to 50 at once) or **import a folder** straight from the toolbar.
+- **Info** — RGB / luma histogram of what is on screen (the graded result, or the original while `Space` is held), plus EXIF, TIFF, and GPS.
+- **Develop** — `CIRAWFilter` controls for RAW files (exposure, boost, contrast, detail, sharpness, noise reduction, white balance, and others). Each control is shown only if that file’s decoder reports it as supported.
+- **Adjust** — nine tone and color controls (exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, vibrance), applied after develop and before the LUT.
 
-### Grade with LUTs
-- Parses standard `.cube` 3D LUTs (`LUT_3D_SIZE`, `DOMAIN_MIN`/`MAX`) and applies them through `CIColorCubeWithColorSpace` — **fully GPU-accelerated** via Metal.
-- **Sidebar library** scans your LUT folder recursively and groups looks by subfolder, with a live search field and a running count.
-- **Folder access is remembered** through security-scoped bookmarks — pick your LUT folder once. (Requires a sandboxed build; see *Build & run* — no current build path produces one.)
+**Batch**
 
-### Compare like you mean it
-- **Side-by-side** original vs. graded, or a single full-bleed view — toggle with **`V`**.
-- **Hold `Space`** to flash back to the original in single view.
-- **`↑` / `↓`** cycles through every LUT in your library with instant preview.
-- **Intensity slider** (0–100%) blends the graded result back toward the original, so a look can be dialled in rather than taken whole.
+- Open a source folder (`⌘⌥I`) to scan recursively, grouped by subfolder. `⌘R` rescans.
+- Filmstrip along the bottom; `←` / `→` (or `[` / `]`) steps through the set with the current look still applied.
 
-### Inspect what you're looking at
-The inspector (**`⌘I`**) has three tabs:
-- **Info** — live RGB / luma histogram of the displayed image (the graded result, or the original while you hold `Space`), plus the file's EXIF, TIFF, and GPS metadata.
-- **Develop** — `CIRAWFilter` controls for RAW files: exposure, boost, contrast, detail, sharpness, noise reduction, white balance and more. Each knob appears only if *that file's* decoder reports it as supported, so the panel is built per image rather than assumed.
-- **Adjust** — nine tone and colour controls (exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, vibrance), applied after develop and before the LUT.
+**Export**
 
-### Work in batches
-- Point LUTzy at a **source folder** (**`⌘⌥I`**) and it scans recursively, groups by subfolder, and remembers the choice across launches. **`⌘R`** re-scans.
-- A **filmstrip** appears along the bottom, with async-generated thumbnails.
-- **`←` / `→`** (or **`[` / `]`**) step through the set; the selected LUT stays applied as you go.
+- 16-bit TIFF, JPEG (quality 0.95), or PNG, always at full source resolution — never the preview scale.
+- Files are named `{photo}_{LUT}.{ext}`, with spaces in the LUT name replaced by underscores.
+- **Export All** (`⌘⇧E`) writes the current look — develop, adjustments, LUT, and intensity — to every image in the set. Failures are counted and skipped; the run does not abort.
 
-### Export at full quality
-- **16-bit TIFF**, **JPEG** (q 0.95), or **PNG** — always at full source resolution, never the downscaled preview.
-- Output is auto-named `‹photo›_‹LUT name›.‹ext›`.
-- **Export All** (**`⌘⇧E`**) applies the current LUT and intensity to every image in the set and writes them to a folder you pick, skipping (and counting) anything that fails rather than aborting the run.
+## Derive a LUT from a JPEG
 
----
+In addition to applying LUTs, LUTzy can derive one from a matched RAW + JPEG pair.
 
-## 🔬 Derive a LUT from a JPG
+The JPEG the camera wrote alongside the RAW is a look — the manufacturer’s color science, or whatever film simulation / picture profile was set. LUTzy compares a neutral RAW develop against that JPEG and writes the difference as a portable `.cube`.
 
-This is what makes LUTzy unusual. Most apps *apply* LUTs; LUTzy can also **manufacture** one.
-
-**The idea:** your camera shot a RAW and, at the same instant, rendered its own JPEG using the manufacturer's color science (or whatever film simulation / picture profile you had dialed in). That JPEG *is* a look. LUTzy compares the neutral RAW against that JPEG and bakes the difference into a portable `.cube` file you can apply to any other photo.
-
-**Menu:** `File ▸ Derive LUT from JPG…` (**`⌘D`**) → pick the RAW, pick the JPEG, hit **Derive**.
+**File ▸ Derive LUT from JPG…** (`⌘D`) — pick the RAW, pick the JPEG, then Derive.
 
 ```
-  RAW ──► CIRAWFilter (neutral baseline) ─┐
-                                          ├─► align ─► sample smooth regions ─► build 33³ cube ─► .cube
-  JPEG ─► decode ─► edge mask ────────────┘                                         │
-                                                                                    └─► Analysis report
+  RAW  ──► CIRAWFilter (neutral baseline) ─┐
+                                           ├─► align ─► sample smooth regions ─► 33³ cube ─► .cube
+  JPEG ─► decode ─► edge mask ─────────────┘                                      │
+                                                                                  └─► analysis report
 ```
 
-Under the hood the extractor:
+1. The RAW is developed with the same default `CIRAWFilter` pipeline used everywhere else in the app, so the derived LUT applies without a baseline mismatch.
+2. The pair is rejected if the aspect ratios differ (within 1%). Differing pixel dimensions are fine. Both images are Lanczos-scaled onto a shared working extent, capped at 3,000 px on the long edge, then aligned by luma cross-correlation.
+3. An edge mask is built from the JPEG so in-camera sharpening does not contaminate the samples. About 200,000 samples are taken from smooth regions only.
+4. Samples accumulate into a 33³ cube. Sparse cells are filled from their neighbors; anything still empty is anchored to identity.
 
-1. Renders the RAW through the **same** default `CIRAWFilter` pipeline LUTzy uses everywhere — so the derived LUT drops straight back into the normal apply path with no baseline mismatch.
-2. Checks the pair actually describes one frame (same aspect ratio) and refuses mismatched files rather than silently stretching one onto the other. Lanczos-scales both onto a common working extent — capped at 3000 px on the long edge, since 200k samples describe the color mapping just as well from a 3000 px render as from a 9000 px one — and finds the integer-pixel alignment by luma cross-correlation.
-3. Builds an **edge mask** from the JPEG (so in-camera sharpening can't contaminate the color samples) and draws ~200k samples from smooth regions only.
-4. Accumulates them into a **33³ color cube**, smooths any sparse cells from their neighbors, and anchors the rest to identity.
+The result previews on the current image immediately and stays in memory until **Save to LUT Folder…**, at which point it joins the sidebar like any other `.cube`.
 
-### The analysis report
+### Analysis report
 
-Every derivation comes with a readout (rendered with Swift Charts) so you understand *what the look actually does*:
+Each derivation includes a report (Swift Charts) describing what the look actually does:
 
 | Metric | Meaning |
 |---|---|
-| **Tone curve** | Per-channel R/G/B input→output mapping, plotted against the identity line |
+| **Tone curve** | Per-channel R/G/B input→output mapping, against the identity line |
 | **Saturation** | Chroma ratio in smooth regions — `>1` more saturated, `<1` more muted |
-| **Sharpening** | High-frequency energy ratio (same operator, same pixels, both images) — **measured but deliberately *not* baked into the LUT** (a LUT can't sharpen; apply it separately if you want to match) |
-| **Coverage** | % of cube cells filled by real samples vs. interpolated |
-| **Samples** | How many smooth-region pixels survived the edge mask |
+| **Sharpening** | High-frequency energy ratio on the same pixels. Measured only — a LUT cannot sharpen, and LUTzy does not apply a separate sharpening stage |
+| **Coverage** | Percentage of cube cells filled by real samples versus interpolated |
+| **Samples** | Smooth-region pixels that survived the edge mask |
+| **Alignment** | Integer-pixel shift between the JPEG and the neutral render (usually near zero) |
 | **Camera** | Make / model and EXIF contrast, saturation, sharpness, and white-balance tags from the JPEG |
 
-The result previews live on your current image immediately and stays a scratch LUT until you click **Save to LUT Folder…**, at which point it joins your sidebar library like any other `.cube`.
-
----
-
-## ⌨️ Keyboard shortcuts
+## Keyboard shortcuts
 
 | Key | Action |
 |---|---|
@@ -114,172 +92,72 @@ The result previews live on your current image immediately and stays a scratch L
 | `←` / `→` (or `[` / `]`) | Previous / next image (when a set is loaded) |
 | `Space` (hold) | Show original (single view) |
 | `V` | Toggle side-by-side / single view |
-| `⌘I` | Toggle the inspector — info, develop, adjust |
+| `⌘I` | Toggle inspector (Info, Develop, Adjust) |
 | `⌘O` | Open image |
 | `⌘⇧I` | Import from Photos |
 | `⌘⌥I` | Open source folder |
-| `⌘R` | Re-scan the source folder |
+| `⌘R` | Rescan source folder |
 | `⌘⇧L` | Choose LUT folder |
-| `⌘D` | Derive LUT from JPG |
+| `⌘D` | Derive LUT from JPEG |
 | `⌘S` | Export |
-| `⌘⇧E` | Export all |
+| `⌘⇧E` | Export All |
 
-> Arrow/letter shortcuts are handled by a window-level `NSEvent` monitor (SwiftUI's `.onKeyPress` doesn't fire reliably inside a `NavigationSplitView`); `⌘`-shortcuts flow through the standard menu bar.
+Arrow and letter keys are handled at the window level so they still work inside the split view. Command shortcuts go through the menu bar.
 
----
+## Requirements
 
-## 🚀 Build & run
-
-LUTzy is a Swift Package — no `.xcodeproj` to manage.
-
-**Quickest (CLI):**
-```bash
-swift run
-```
-Builds and launches the app for fast iteration. Note: the SwiftUI executable target runs without the bundled asset catalog or sandbox entitlements, so the app icon and security-scoped bookmark persistence won't be active in this mode.
-
-**In Xcode — a better debugger, the same unbundled executable:**
-```bash
-open Package.swift     # or: xed .
-```
-Then select the **LUTzy** scheme and **Run** (`⌘R`).
-
-> **Neither path currently produces an icon or a sandboxed app.** `Package.swift` excludes both
-> `Assets.xcassets` and `LUTzy.entitlements` from the target, `AppIcon.appiconset` contains no images,
-> and there is no `Info.plist` or bundle identifier anywhere in the repo — so both paths build a bare
-> SwiftPM executable rather than a `.app`. The entitlements file is real and correct
-> ([`LUTzy.entitlements`](Sources/LUTzy/LUTzy.entitlements): user-selected read/write + app-scope
-> bookmarks), but nothing applies it, so the security-scoped bookmark persistence described above is
-> inactive in both modes and folder choices do not survive a restart. Wiring these up needs an Xcode
-> app target that does not exist yet.
-
-**Tests:**
-```bash
-swift test
-```
-322 tests, no fixtures to download — everything they need is generated into a temp directory. 22 of
-them need a RAW/JPG pair in `realworldtest/` (untracked) and skip without it; 3 more are benchmarks
-gated on `LUTZY_BENCH`. CI runs debug build → tests → release build on every push and PR.
-
-**Requirements:**
-
-|  | |
+| | |
 |---|---|
-| **To run LUTzy** | macOS **14.0+** — unchanged, and what the deployment target targets |
-| **To build LUTzy** | **Xcode 26+** (macOS 26 SDK) |
+| **To run** | macOS 14.0 or later |
+| **To build** | Xcode 26 or later (macOS 26 SDK) |
 
-Those are deliberately different. Building against a current SDK while deploying to macOS 14 is the
-normal Apple model, and the stricter one: the compiler refuses any API newer than macOS 14 unless it
-is `#available`-guarded. One RAW develop control (`CIRAWFilter`'s highlight recovery) only exists in
-the macOS 26 SDK, so an older Xcode cannot compile the package — while the app it produces still runs
-on macOS 14.
+The deployment target is macOS 14; CI and local builds use the current SDK. Anything newer than 14 must be `#available`-guarded or it will not compile.
 
----
+One RAW develop control — `CIRAWFilter` highlight recovery — exists only in the macOS 26 SDK, so an older Xcode cannot compile the package. The binary still runs on macOS 14.
 
-## 🗂 Project structure
+## Build and run
 
-LUTzy is split into a `LUTzyKit` library and a thin `@main` executable, so the app's own code can be
-unit-tested — `@testable` cannot import an executable target.
+LUTzy is a Swift package. There is no `.xcodeproj` in the repo.
 
-```
-Sources/
-├── LUTzy/                      # thin entry point only
-│   ├── LUTzyApp.swift          # @main App + AppDelegate — window, default size, commands
-│   ├── Assets.xcassets/        # app-icon slots (currently empty; excluded from the target)
-│   └── LUTzy.entitlements      # App Sandbox + user-selected file access (not applied by any build path)
-└── LUTzyKit/                   # everything of substance — 43 files
-    ├── Models/
-    │   │  # the look, as a value
-    │   ├── EditDocument.swift      # the render state: rawDevelop + adjustments + LUT, Codable/Sendable
-    │   ├── AdjustmentNode.swift    # closed enum of adjustment stages, in canonical pipeline order
-    │   ├── AdjustmentControl.swift # the nine UI controls: ranges, neutrals, slider↔node mapping
-    │   ├── LUTSettings.swift       # which LUT and at what intensity; LUTID newtype over the id
-    │   ├── RAWDevelopSettings.swift# per-file CIRAWFilter knobs, each written behind its own gate
-    │   ├── RAWCapabilities.swift   # what this file's decoder supports, probed once per open
-    │   │  # rendering
-    │   ├── RenderEngine.swift      # actor — owns the only CIContext on the render path
-    │   ├── RenderPipeline.swift    # pure fold: source + document + LUT → CIImage
-    │   ├── RenderScale.swift       # preview vs full, applied before the graph rather than after
-    │   ├── WorkingSpace.swift      # the one colour space: LUT interpolation + output encoding
-    │   ├── LUTFilterCache.swift    # actor-side cache of built CIColorCube filters
-    │   ├── Histogram.swift         # 256-bin per-channel histogram data model
-    │   │  # input and output
-    │   ├── ImageDecoder.swift      # supported types, oriented load options, eager RAW/standard decode
-    │   ├── ImageSource.swift       # a URL or Data backing plus its native extent, Sendable
-    │   ├── ImageCollection.swift   # multi-image set with async thumbnail generation
-    │   ├── ImageMetadata.swift     # EXIF/TIFF/GPS read + display formatting for the inspector
-    │   ├── Thumbnails.swift        # embedded-preview reads, deliberately outside Core Image
-    │   ├── ExportFormat.swift      # JPEG/PNG/TIFF/HEIF + their encoding options
-    │   │  # LUTs
-    │   ├── CubeLUT.swift           # .cube parser + writer → CIColorCube filter (also in-memory init)
-    │   ├── LUTLibrary.swift        # scans LUT folder, groups by category, bookmark persistence
-    │   ├── DerivedLUTRegistry.swift# in-memory registry for derived LUTs, keyed by content hash
-    │   ├── RecipeExtractor.swift   # (RAW, JPG) → 3D LUT derivation pipeline
-    │   └── RecipeReport.swift      # analysis data model (tone curve, ratios, EXIF camera info)
-    ├── ViewModels/
-    │   ├── AppViewModel.swift      # central @MainActor state: image, LUT, preview, histogram
-    │   ├── AppViewModel+Develop.swift # the Develop panel's bindings, seeds and reset
-    │   ├── AppViewModel+Adjust.swift  # the Adjust panel's bindings and reset
-    │   ├── ExportCoordinator.swift # single + batch export, and the naming they share
-    │   └── DeriveCoordinator.swift # "Derive LUT from JPG" flow, scratch-until-saved result
-    └── Views/
-        ├── ContentView.swift       # split-view layout + toolbar                          [public]
-        ├── MenuCommands.swift      # File menu + its notification names                   [public]
-        ├── StatusBar.swift         # status line + key hints along the bottom
-        ├── KeyboardShortcuts.swift # window-level NSEvent monitor for arrow/letter keys
-        ├── LUTSidebar.swift        # searchable, category-grouped LUT list
-        ├── PreviewView.swift       # side-by-side / single canvas, drag-drop, badges
-        ├── FilmstripView.swift     # horizontal thumbnail strip for batches
-        ├── SourceBrowserView.swift # docked source-folder file list, grouped by subfolder
-        ├── InfoInspectorView.swift # the three-tab inspector shell + the Info tab
-        ├── DevelopInspectorView.swift # the Develop tab — per-file RAW controls
-        ├── AdjustInspectorView.swift  # the Adjust tab — the nine tone/colour controls
-        ├── HistogramChart.swift    # Canvas-drawn histogram, additive RGB or single channel
-        ├── RecipeExtractorSheet.swift # "Derive LUT from JPG" modal (pickers, progress, report)
-        └── RecipeReportView.swift  # analysis card — Swift Charts tone curve + stat badges
-
-Tests/
-└── LUTzyKitTests/              # XCTest, 35 files; fixtures are generated, never committed
-    ├── Fixtures.swift          # builds .cube files and orientation-tagged JPEGs in a temp dir
-    ├── FakeRenderEngine.swift  # a RenderEngining that never touches the GPU
-    ├── PixelAssertions.swift   # byte-level image comparison helpers
-    └── …plus 32 suites covering the parser, the render stack, both inspectors, export,
-        derive, concurrency settings, and the claims these docs make
+```bash
+swift run          # build and launch
+open Package.swift # or: xed .  — then run the LUTzy scheme
+swift test         # XCTest
 ```
 
-`ContentView` and `LUTzyCommands` are the only `public` symbols — the executable needs exactly those
-two and nothing else.
+`swift test` generates its fixtures at runtime; there is nothing to download. Tests that need a real RAW/JPEG pair look in `realworldtest/` (untracked) and skip when it is absent. Preview-cost benchmarks are gated on `LUTZY_BENCH`.
 
-`docs/CODE_REVIEW.md` records the standing findings from the last full review — what was fixed, and
-what is still outstanding.
+CI on every push and pull request: debug build → tests → release build, on a `macos-26` runner, still deploying to macOS 14.
 
-## 🏗 Architecture notes
+### Packaging
 
-- **MVVM with coordinators.** [`AppViewModel`](Sources/LUTzyKit/ViewModels/AppViewModel.swift) holds the image, LUT, and preview state, and owns four collaborators: `LUTLibrary`, `ImageCollection`, [`ExportCoordinator`](Sources/LUTzyKit/ViewModels/ExportCoordinator.swift), and [`DeriveCoordinator`](Sources/LUTzyKit/ViewModels/DeriveCoordinator.swift). The coordinators report *what* happened through `onStatus`/`onError` closures; deciding how to present it stays with the view model. Views observe, and the menu bar talks to it via `NotificationCenter`.
-- **Panels are a seam, not a dependency.** Every operation that needs a file dialog is split into a `perform…` core taking an explicit URL and a thin `…Dialog` wrapper that runs the panel. `NSOpenPanel`/`NSSavePanel` can't run headless, so this is what makes export and save testable at all.
-- **Core Image end to end.** RAW demosaicing (`CIRAWFilter`), LUT application (`CIColorCubeWithColorSpace`), scaling (`CILanczosScaleTransform`), and all export encoding run through one Metal-backed `CIContext`.
-- **One colour seam.** [`WorkingSpace`](Sources/LUTzyKit/Models/WorkingSpace.swift) is the single source of truth for both the LUT interpolation space and the output encoding space, so they cannot drift apart; every render and export site takes it, defaulting to sRGB. Cube data is laid out R-fastest → G → B, matching both the `.cube` spec and Core Image's expected ordering.
-- **Images are rendered upright.** `CIRAWFilter` honors EXIF orientation; plain `CIImage(contentsOf:)` does not, so every non-RAW decode goes through `ImageDecoder.orientedLoadOptions`. Preview, filmstrip thumbnail, reported dimensions, and export all agree.
-- **Work stays off the main actor.** Decoding, preview rasterization, folder scans, LUT parsing, export, and recipe derivation all run detached and publish results back to `@MainActor`; the intensity slider is debounced and each render cancels the one before it. Previews are capped at 1600×1200; exports are always full resolution.
-- **No third-party code.** Everything ships with the system: SwiftUI, Core Image, AppKit, PhotosUI, Swift Charts, ImageIO, Metal, simd.
+Both `swift run` and Run from `Package.swift` produce a SwiftPM executable, not a bundled `.app`. `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`; the app-icon set is empty; there is no `Info.plist` or bundle identifier.
 
----
+The entitlements file is valid (App Sandbox, user-selected file access, app-scoped bookmarks), but nothing applies it. Folder choices therefore do not survive a restart. A sandboxed app — including anything that could go to the App Store — needs an Xcode app target that does not exist yet, plus a 1024×1024 icon and a bundle identifier.
 
-## 📦 Preparing for the App Store
+## Repository layout
 
-1. Drop a 1024×1024 source icon into [`Assets.xcassets/AppIcon.appiconset`](Sources/LUTzy/Assets.xcassets/AppIcon.appiconset).
-2. Set your **Bundle Identifier** and **Team** in the target's Signing & Capabilities.
-3. Keep **App Sandbox** enabled (the included entitlements already grant user-selected file access + app-scope bookmarks).
-4. **Product ▸ Archive ▸ Distribute App ▸ App Store Connect.**
+The app is split so its own code can be unit-tested (`@testable` cannot import an executable target). Only `ContentView` and `LUTzyCommands` are public.
 
----
+```
+Sources/LUTzy/          @main entry point, AppDelegate, asset catalog (excluded from the target)
+Sources/LUTzyKit/       models, view models, views
+Tests/LUTzyKitTests/    XCTest; fixtures generated into a temp directory
+docs/                   pipeline spec and standing review notes
+```
 
-## 📄 License
+## Architecture
 
-LUTzy is released under the [MIT License](LICENSE) — free to use, modify, and distribute.
+- **One document, one pipeline.** [`EditDocument`](Sources/LUTzyKit/Models/EditDocument.swift) is the look: RAW develop, adjustments, LUT, and intensity. Preview, histogram, and both export paths render that document through the same graph; they differ only by [`RenderScale`](Sources/LUTzyKit/Models/RenderScale.swift) (preview is capped at 1600×1200; export is always full resolution).
+- **One GPU context.** [`RenderEngine`](Sources/LUTzyKit/Models/RenderEngine.swift) is an actor and owns the only `CIContext` on the render path. `CIImage` / `CIFilter` stay inside it; `Sendable` values cross the boundary.
+- **One color space.** [`WorkingSpace`](Sources/LUTzyKit/Models/WorkingSpace.swift) is the source of truth for LUT interpolation and output encoding (sRGB today). Cube data is laid out R-fastest → G → B, matching the `.cube` spec and Core Image.
+- **Upright images.** `CIRAWFilter` honors EXIF orientation; `CIImage(contentsOf:)` does not, so every non-RAW decode goes through `ImageDecoder.orientedLoadOptions`. Preview, thumbnails, reported dimensions, and export agree.
+- **Panels are a test seam.** Operations that need a file dialog split into a `perform…` core that takes a URL and a thin `…Dialog` wrapper. `NSOpenPanel` / `NSSavePanel` cannot run headless; that split is what makes export and save testable.
+- **Work stays off the main actor.** Decode, preview rasterization, folder scans, LUT parsing, export, and derive run in the background and publish back to `@MainActor`. The intensity slider is debounced so a drag does not enqueue a render per tick.
+- **Swift 6 language mode** on every target, with no concurrency escape hatches. Apple frameworks only: SwiftUI, Core Image, AppKit, PhotosUI, Swift Charts, ImageIO, Metal, simd.
 
----
+Further reading: [docs/PHASE2_SPEC.md](docs/PHASE2_SPEC.md) (render pipeline and RAW develop), [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) (standing findings).
 
-<div align="center">
-<sub>Built with SwiftUI · Core Image · Metal — and nothing else.</sub>
-</div>
+## License
+
+[MIT](LICENSE).
