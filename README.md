@@ -2,57 +2,72 @@
 
 A macOS app that applies `.cube` LUTs to RAW and other images. It can also build a LUT from a RAW + JPEG pair.
 
-SwiftUI and Core Image. No third-party packages. Runs on macOS 14; you need Xcode 26 to compile it (see [Build](#build)).
+SwiftUI and Core Image, no third-party packages. macOS 14 to run, [Xcode 26 to compile](#build).
 
 ## Features
 
-- RAW is demosaiced with `CIRAWFilter`, not the embedded preview. DNG, CR2, CR3, NEF, ARW, ORF, RAF, RW2, PEF, SRW, X3F, RAW. Also JPEG, PNG, TIFF, BMP, HEIC.
-- Drop a file or a folder on the window. `⌘O` opens a file, `⌘⇧I` imports from Photos (max 50), `⌘⌥I` opens a source folder.
-- `.cube` 3D LUTs (`LUT_3D_SIZE`, `DOMAIN_MIN` / `DOMAIN_MAX`) go through `CIColorCubeWithColorSpace` on Metal. The sidebar scans a folder recursively, groups by subfolder, and is searchable. Intensity 0–100%.
-- LUT folder and source folder are supposed to persist via security-scoped bookmarks. They don't — nothing is sandboxed yet. [Build](#build).
-- `V` toggles side-by-side vs single view. Hold Space (single view) for the original. `↑` `↓` walk the library.
-- `⌘I` is the inspector. **Info**: histogram of what's on screen (graded, or original while Space is down) plus EXIF / TIFF / GPS. **Develop**: the `CIRAWFilter` knobs this file's decoder actually supports. **Adjust**: nine sliders after develop and before the LUT (exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, vibrance).
-- A source folder gets a filmstrip. `←` `→` or `[` `]` step through it; the current look stays on. `⌘R` rescans.
-- Export is 16-bit TIFF, JPEG (quality 0.95), or PNG, always full resolution, named `{photo}_{LUT}.ext` (spaces in the LUT name become underscores). **Export All** (`⌘⇧E`) writes the whole look — develop, adjustments, LUT, intensity — and counts failures instead of aborting.
+- **RAW** via `CIRAWFilter`, not the embedded preview.
+  DNG, CR2, CR3, NEF, ARW, ORF, RAF, RW2, PEF, SRW, X3F, RAW.
+  JPEG, PNG, TIFF, BMP, HEIC.
+- **Import** — drop a file or a folder. <kbd>⌘O</kbd> file · <kbd>⌘⇧I</kbd> Photos (max 50) · <kbd>⌘⌥I</kbd> source folder.
+- **LUTs** — `.cube` 3D (`LUT_3D_SIZE`, `DOMAIN_MIN` / `DOMAIN_MAX`) through `CIColorCubeWithColorSpace` on Metal. Sidebar scans recursively, groups by subfolder, searchable. Intensity 0–100%. <kbd>⌘⇧L</kbd> picks the folder.
+- **Preview** — <kbd>V</kbd> side-by-side / single. Hold <kbd>Space</kbd> in single view for the original. <kbd>↑</kbd> <kbd>↓</kbd> walk the library.
+- **Inspector** <kbd>⌘I</kbd>
+  - **Info** — histogram of what's on screen (graded, or original while Space is down) plus EXIF / TIFF / GPS
+  - **Develop** — the `CIRAWFilter` knobs this file's decoder actually supports
+  - **Adjust** — nine sliders after develop, before the LUT: exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, vibrance
+- **Filmstrip** when a source folder is open. <kbd>←</kbd> <kbd>→</kbd> or <kbd>[</kbd> <kbd>]</kbd> step through; the current look stays on. <kbd>⌘R</kbd> rescans.
+- **Export** — 16-bit TIFF, JPEG (quality 0.95), or PNG, always full resolution, named `{photo}_{LUT}.ext` (spaces in the LUT name become underscores). <kbd>⌘⇧E</kbd> Export All writes the whole look — develop, adjustments, LUT, intensity — and counts failures instead of aborting.
 
 ## Derive LUT from JPG
 
-`File ▸ Derive LUT from JPG…` (`⌘D`). Pick the RAW, pick the JPEG, hit Derive. The JPEG is treated as a look (the manufacturer's color science, or whatever picture profile was on). LUTzy writes the difference against a neutral RAW develop.
+<kbd>⌘D</kbd> — File ▸ Derive LUT from JPG…. Pick the RAW, pick the JPEG, hit Derive.
 
-The pair has to be the same frame — aspect within 1%. Pixel size can differ; that's normal.
+The JPEG is treated as a look (the manufacturer's color science, or whatever picture profile was on). LUTzy writes the difference against a neutral RAW develop. Same frame required — aspect within 1%. Pixel size can differ.
 
 ```
-  RAW  ──► CIRAWFilter (neutral baseline) ─┐
-                                           ├─► align ─► sample smooth regions ─► 33³ cube ─► .cube
-  JPEG ─► decode ─► edge mask ─────────────┘                                      │
-                                                                                  └─► analysis report
+RAW  ──► CIRAWFilter (neutral) ─┐
+                                ├─► align ─► smooth samples ─► 33³ cube ─┬─► .cube
+JPEG ─► decode ─► edge mask ────┘                                        └─► report
 ```
 
-The RAW is developed with the same default `CIRAWFilter` settings the rest of the app uses, so the LUT applies without a baseline mismatch. Both images are Lanczos-scaled onto a shared working extent (long edge capped at 3000 px; 200k samples don't get better from a 60 MP buffer) and aligned by luma cross-correlation. An edge mask on the JPEG keeps in-camera sharpening out of the color samples. Surviving pixels (~200k, from a 2M draw) fill a 33³ cube; empty cells are pulled from neighbors, then identity.
+The result previews on the current image and stays in memory until **Save to LUT Folder…**.
 
-The LUT previews on whatever image you have open and stays in memory until **Save to LUT Folder…**.
+The report is a tone curve (R/G/B vs identity) plus saturation, sharpening, coverage, samples, alignment, and camera EXIF. Sharpening is measured, not applied — a cube can't sharpen, and there isn't a second stage that does.
 
-The report is a tone curve (R/G/B vs identity) plus saturation, sharpening, coverage, sample count, alignment, and camera EXIF. Sharpening is measured, not applied — a cube can't sharpen, and there isn't a second stage that does.
+<details>
+<summary>How the cube is built</summary>
+
+The RAW is developed with the same default `CIRAWFilter` settings the rest of the app uses, so the LUT applies without a baseline mismatch. Both images are Lanczos-scaled onto a shared working extent (long edge capped at 3000 px — 200k samples don't get better from a 60 MP buffer) and aligned by luma cross-correlation. An edge mask on the JPEG keeps in-camera sharpening out of the color samples. Surviving pixels (~200k, from a 2M draw) fill a 33³ cube; empty cells are pulled from neighbors, then identity.
+
+</details>
 
 ## Shortcuts
 
-| Key | Action |
-|---|---|
-| `↑` `↓` | previous / next LUT |
-| `←` `→` or `[` `]` | previous / next image (when a set is loaded) |
-| Space (hold) | original, in single view |
-| `V` | side-by-side / single |
-| `⌘I` | inspector |
-| `⌘O` | open image |
-| `⌘⇧I` | Photos |
-| `⌘⌥I` | source folder |
-| `⌘R` | rescan source folder |
-| `⌘⇧L` | LUT folder |
-| `⌘D` | derive |
-| `⌘S` | export |
-| `⌘⇧E` | export all |
+**Preview**
 
-Letter keys are a window-level `NSEvent` monitor. SwiftUI's `.onKeyPress` doesn't fire reliably inside `NavigationSplitView`. Command-keys go through the menu bar.
+| Key | Action |
+|:---|:---|
+| <kbd>↑</kbd> <kbd>↓</kbd> | previous / next LUT |
+| <kbd>←</kbd> <kbd>→</kbd> or <kbd>[</kbd> <kbd>]</kbd> | previous / next image |
+| <kbd>Space</kbd> (hold) | original, in single view |
+| <kbd>V</kbd> | side-by-side / single |
+| <kbd>⌘I</kbd> | inspector |
+
+**File**
+
+| Key | Action |
+|:---|:---|
+| <kbd>⌘O</kbd> | open image |
+| <kbd>⌘⇧I</kbd> | Photos |
+| <kbd>⌘⌥I</kbd> | source folder |
+| <kbd>⌘R</kbd> | rescan source folder |
+| <kbd>⌘⇧L</kbd> | LUT folder |
+| <kbd>⌘D</kbd> | derive |
+| <kbd>⌘S</kbd> | export |
+| <kbd>⌘⇧E</kbd> | export all |
+
+Letter keys are a window-level `NSEvent` monitor — SwiftUI's `.onKeyPress` doesn't fire reliably inside `NavigationSplitView`. <kbd>⌘</kbd> shortcuts go through the menu bar.
 
 ## Build
 
@@ -62,17 +77,28 @@ open Package.swift  # same binary, Xcode debugger
 swift test
 ```
 
-There is no `.xcodeproj`. Both of those Run paths produce a SwiftPM executable, not a `.app`. `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`; the appiconset is empty; there is no `Info.plist` or bundle identifier. `LUTzy.entitlements` is a real sandbox file (user-selected read/write, app-scoped bookmarks) sitting unused. Wiring that up is an Xcode app target, which this repo doesn't have.
+> [!IMPORTANT]
+> `swift run` and Run from Xcode both produce a SwiftPM executable, not a sandboxed `.app`. LUT folder and source folder do not persist across launches.
 
-**Run:** macOS 14. **Compile:** Xcode 26 / macOS 26 SDK. Deployment target and SDK are different things. The compiler will reject any API newer than 14 unless it's `#available`-guarded. Highlight recovery on `CIRAWFilter` (`isHighlightRecoveryEnabled` / `isHighlightRecoverySupported`) only exists in the 26 SDK, so an older Xcode can't build the package at all — `#available` does not conjure a missing symbol. The binary still runs on 14.
+There is no `.xcodeproj`. `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`; the appiconset is empty; there is no `Info.plist` or bundle identifier. The entitlements file is real (sandbox, user-selected files, app-scoped bookmarks) and unused. An Xcode app target would apply it. This repo doesn't have one.
 
-`swift test` generates fixtures into a temp directory. Tests that need a real RAW/JPEG pair look in `realworldtest/` (gitignored) and skip if it isn't there. Set `LUTZY_BENCH=1` for the preview-cost tests. CI is debug build → test → release build on `macos-26`.
+- **Run** — macOS 14
+- **Compile** — Xcode 26 / macOS 26 SDK
 
-Everything of substance is in `Sources/LUTzyKit`. `Sources/LUTzy` is `@main` and an AppDelegate that forces `.regular` activation, because a bare executable otherwise starts as a background process with no Dock icon. Only `ContentView` and `LUTzyCommands` are public, so the kit can be `@testable import`ed.
+Deployment target and SDK are different things. The compiler rejects API newer than 14 unless it's `#available`-guarded. Highlight recovery on `CIRAWFilter` (`isHighlightRecoveryEnabled` / `isHighlightRecoverySupported`) only exists in the 26 SDK, so an older Xcode can't build the package — `#available` does not conjure a missing symbol. The binary still runs on 14.
 
-The look is an `EditDocument` (develop + adjustments + LUT). Preview, histogram, and both export paths render that document through one `RenderEngine` actor / one `CIContext`. The only difference between preview and export is scale: 1600×1200 vs full. `WorkingSpace` (sRGB) is used for both cube interpolation and encoding, so those two can't drift. Non-RAW files go through `ImageDecoder.orientedLoadOptions` because `CIImage(contentsOf:)` ignores EXIF orientation and `CIRAWFilter` doesn't.
+`swift test` generates fixtures into a temp directory. Tests that need a real RAW/JPEG pair look in `realworldtest/` (gitignored) and skip if it isn't there. `LUTZY_BENCH=1` for the preview-cost tests. CI is debug build → test → release build on `macos-26`.
+
+<details>
+<summary>Layout and render path</summary>
+
+Everything of substance is in `Sources/LUTzyKit`. `Sources/LUTzy` is `@main` plus an AppDelegate that forces `.regular` activation, because a bare executable otherwise starts as a background process with no Dock icon. Only `ContentView` and `LUTzyCommands` are public, so the kit can be `@testable import`ed.
+
+The look is an `EditDocument` (develop + adjustments + LUT). Preview, histogram, and both export paths render that document through one `RenderEngine` actor / one `CIContext`. Preview vs export differs only by scale: 1600×1200 vs full. `WorkingSpace` (sRGB) is used for both cube interpolation and encoding. Non-RAW files go through `ImageDecoder.orientedLoadOptions` because `CIImage(contentsOf:)` ignores EXIF orientation and `CIRAWFilter` doesn't.
 
 Swift 6 language mode on every target. No `@unchecked Sendable`, `nonisolated(unsafe)`, or `@preconcurrency`.
+
+</details>
 
 Pipeline notes: [docs/PHASE2_SPEC.md](docs/PHASE2_SPEC.md). Standing review: [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md).
 
