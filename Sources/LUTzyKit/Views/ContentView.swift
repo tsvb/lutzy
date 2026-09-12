@@ -104,12 +104,11 @@ public struct ContentView: View {
     }
 
     private var detailContent: some View {
-        HStack(spacing: 0) {
+        // A real split so the browser is user-resizable, instead of a fixed 240pt `HStack`.
+        HSplitView {
             if viewModel.isSourceBrowserPresented && !viewModel.collection.items.isEmpty {
                 SourceBrowserView(viewModel: viewModel)
-                    .frame(width: 240)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-                Divider()
+                    .frame(minWidth: 200, idealWidth: 240, maxWidth: 360)
             }
 
             VStack(spacing: 0) {
@@ -126,6 +125,7 @@ public struct ContentView: View {
 
                 StatusBar(viewModel: viewModel)
             }
+            .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.collection.isActive)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSourceBrowserPresented)

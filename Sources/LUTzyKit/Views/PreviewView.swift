@@ -4,6 +4,7 @@ import SwiftUI
 /// and single-image mode. Hold Space to flash original in single mode.
 struct PreviewView: View {
     let viewModel: AppViewModel
+    @State private var isDropTargeted = false
 
     private let bgColor = Color(nsColor: NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1))
 
@@ -25,9 +26,18 @@ struct PreviewView: View {
                 emptyState
             }
         }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            handleDrop(providers)
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .padding(4)
+            }
         }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first else { return false }
+            open(dropped: url)
+            return true
+        } isTargeted: { isDropTargeted = $0 }
     }
 
     // MARK: - Side-by-side
@@ -137,22 +147,15 @@ struct PreviewView: View {
 
     // MARK: - Drop
 
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
-            guard let data = item as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-            Task { @MainActor in
-                var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                    viewModel.openSourceFolder(url: url)
-                } else {
-                    viewModel.collection.clear()
-                    viewModel.openImage(url: url)
-                }
-            }
+    /// A folder becomes the source folder; a file replaces whatever set was loaded.
+    private func open(dropped url: URL) {
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            viewModel.openSourceFolder(url: url)
+        } else {
+            viewModel.collection.clear()
+            viewModel.openImage(url: url)
         }
-        return true
     }
 }
 

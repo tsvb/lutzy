@@ -60,32 +60,6 @@ struct LUTSidebar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
-            // Search (matches LUT names and folder names)
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                TextField("Search", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .focused(searchFocus)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Clear search")
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
-            .onExitCommand { searchText = "" }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
-
             Divider()
 
             // LUT list
@@ -98,6 +72,10 @@ struct LUTSidebar: View {
             }
         }
         .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
+        // The system search field, in the sidebar's own slot: matches LUT names and folder names,
+        // clears on Escape, and reports its focus so the plain-key shortcuts stand down while typing.
+        .searchable(text: $searchText, placement: .sidebar, prompt: "Search LUTs")
+        .searchFocused(searchFocus)
     }
 
     private var scanningState: some View {

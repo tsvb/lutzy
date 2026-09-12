@@ -1,12 +1,25 @@
 import SwiftUI
 
 /// Docked panel listing the source folder's images, grouped by subfolder.
-/// Click a row to open it; the current selection is highlighted and scrolled
-/// into view, staying in sync with the filmstrip and ←/→ navigation.
+/// Selecting a row opens it; the selection is the list's own, bound to the
+/// collection's index, so it stays in sync with the filmstrip and ←/→
+/// navigation and is scrolled into view when either moves it.
 struct SourceBrowserView: View {
     let viewModel: AppViewModel
 
     private var collection: ImageCollection { viewModel.collection }
+
+    /// The list's selection, expressed as the collection's index. `nil` from the list (a click on
+    /// empty space) is ignored: there is always a current image while the browser is showing.
+    private var selection: Binding<ImageCollection.Item.ID?> {
+        Binding(
+            get: { collection.selectedItem?.id },
+            set: { id in
+                guard let id, let index = collection.items.firstIndex(where: { $0.id == id }) else { return }
+                viewModel.selectCollectionImage(at: index)
+            }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,7 +64,7 @@ struct SourceBrowserView: View {
 
     private var list: some View {
         ScrollViewReader { proxy in
-            List {
+            List(selection: selection) {
                 ForEach(groups) { group in
                     if showHeaders {
                         Section {
@@ -79,21 +92,12 @@ struct SourceBrowserView: View {
     @ViewBuilder
     private func rows(_ group: Group) -> some View {
         ForEach(group.entries, id: \.item.id) { entry in
-            Button {
-                viewModel.selectCollectionImage(at: entry.index)
-            } label: {
-                SourceBrowserRow(
-                    item: entry.item,
-                    isSelected: entry.index == collection.selectedIndex
-                )
-            }
-            .buttonStyle(.plain)
-            .id(entry.item.id)
-            .listRowBackground(
-                entry.index == collection.selectedIndex
-                    ? Color.accentColor.opacity(0.22)
-                    : Color.clear
+            SourceBrowserRow(
+                item: entry.item,
+                isSelected: entry.index == collection.selectedIndex
             )
+            .tag(entry.item.id)
+            .id(entry.item.id)
         }
     }
 
