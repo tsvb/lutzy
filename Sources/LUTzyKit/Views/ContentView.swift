@@ -10,6 +10,13 @@ public struct ContentView: View {
     @State private var viewModel = AppViewModel()
     @State private var photosSelection: [PhotosPickerItem] = []
 
+    /// The canvas is the window's resting focus. `.onKeyPress` (in `mainContent`) only fires while
+    /// something in the split view has focus, and a preview canvas has nothing focusable of its
+    /// own, so it is made focusable and takes focus at launch, on click, and when a sheet closes.
+    @FocusState private var isCanvasFocused: Bool
+    /// True while the sidebar's search field is being typed into; the key table stays out then.
+    @FocusState private var isSearchFocused: Bool
+
     public init() {}
 
     public var body: some View {
@@ -32,7 +39,6 @@ public struct ContentView: View {
             .sheet(isPresented: Bindable(viewModel.derive).isSheetPresented) {
                 RecipeExtractorSheet(coordinator: viewModel.derive)
             }
-            .modifier(KeyboardShortcuts(viewModel: viewModel))
             .modifier(MenuCommandReceivers(viewModel: viewModel))
             .alert(
                 "Something went wrong",
@@ -66,13 +72,34 @@ public struct ContentView: View {
 
     private var mainContent: some View {
         NavigationSplitView {
-            LUTSidebar(viewModel: viewModel)
+            LUTSidebar(viewModel: viewModel, searchFocus: $isSearchFocused)
         } detail: {
             detailContent
+                .focusable()
+                .focusEffectDisabled()
+                .focused($isCanvasFocused)
+                .onTapGesture { isCanvasFocused = true }
         }
         .inspector(isPresented: Bindable(viewModel).isInspectorPresented) {
             InfoInspectorView(viewModel: viewModel)
                 .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
+        }
+        .defaultFocus($isCanvasFocused, true)
+        .task { isCanvasFocused = true }
+        .onChange(of: viewModel.derive.isSheetPresented) { _, presented in
+            if !presented { isCanvasFocused = true }
+        }
+        .onKeyPress(keys: KeyCommandMap.keys, phases: KeyCommandMap.phases) { press in
+            guard !isSearchFocused,
+                  let action = KeyCommandMap.action(
+                    for: press.key,
+                    modifiers: press.modifiers,
+                    phase: press.phase,
+                    collectionActive: viewModel.collection.isActive
+                  )
+            else { return .ignored }
+            viewModel.perform(action)
+            return .handled
         }
     }
 

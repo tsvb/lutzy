@@ -1,135 +1,95 @@
 import SwiftUI
-import AppKit
 
 //
-// SwiftUI's `.onKeyPress` modifier only fires when the modified view (or a
-// descendant) has focus. Inside a NavigationSplitView the sidebar list eats
-// focus when clicked and the detail pane has nothing focusable by default, so
-// `.onKeyPress` was effectively never firing. We use an NSEvent local monitor
-// instead, which catches every key event at the window level regardless of
-// which subview has focus. Menu shortcuts (⌘-anything) still go through the
-// standard menu system — we explicitly let those events pass through.
+// Plain-key shortcuts for the main window — Space, the arrows, V and the brackets.
+//
+// These arrive through SwiftUI's `.onKeyPress`, attached to the `NavigationSplitView` in
+// `ContentView`. That modifier fires for the focused view *and every ancestor of it*, so a handler on
+// the split view sees a key whichever pane holds focus: the sidebar list, the canvas, or the
+// inspector. The one thing it needs is that *something* has focus, which is what the
+// `.focusable()` canvas, `.defaultFocus` and the click-to-focus in `ContentView` guarantee. (An
+// earlier version used an `NSEvent` local monitor because nothing in the detail pane was focusable
+// and `.onKeyPress` never fired; making the canvas focusable is the fix, not a workaround.)
+//
+// ⌘-anything is left alone so it reaches the menu bar, and nothing fires while the search field is
+// being typed into. The mapping itself is a pure table, `KeyCommandMap`, so it can be tested without
+// a window.
+//
 
-struct KeyboardShortcuts: ViewModifier {
-    let viewModel: AppViewModel
-    @State private var monitor: KeyMonitor?
+/// What a plain key does. A value rather than a call so the mapping can be asserted.
+enum KeyAction: Equatable, Sendable {
+    /// Space: `true` on the way down, `false` on release.
+    case compareOriginal(Bool)
+    case previousLUT
+    case nextLUT
+    case previousImage
+    case nextImage
+    case toggleSideBySide
+}
 
-    func body(content: Content) -> some View {
-        content
-            .onAppear {
-                if monitor == nil {
-                    monitor = KeyMonitor(viewModel: viewModel)
-                }
+/// The table behind the main window's plain-key shortcuts.
+enum KeyCommandMap {
+    /// The keys `ContentView` subscribes to. Both cases of `v` because a held Shift changes the key.
+    static var keys: Set<KeyEquivalent> {
+        [.upArrow, .downArrow, .leftArrow, .rightArrow, .space, "v", "V", "[", "]"]
+    }
+
+    /// Down and up for Space; repeat so a held arrow keeps stepping, as it did under AppKit.
+    static var phases: KeyPress.Phases { [.down, .repeat, .up] }
+
+    /// - Returns: what `key` should do, or `nil` to let the press through untouched.
+    static func action(
+        for key: KeyEquivalent,
+        modifiers: EventModifiers,
+        phase: KeyPress.Phase,
+        collectionActive: Bool
+    ) -> KeyAction? {
+        // ⌘ belongs to the menu bar.
+        if modifiers.contains(.command) { return nil }
+
+        let character = key.character
+
+        // Space is the only key with an "up" meaning, and it does not repeat: the original is
+        // already showing.
+        if character == KeyEquivalent.space.character {
+            switch phase {
+            case .down: return .compareOriginal(true)
+            case .up: return .compareOriginal(false)
+            default: return nil
             }
-            .onDisappear {
-                monitor?.stop()
-                monitor = nil
-            }
+        }
+
+        switch phase {
+        case .down:
+            break
+        case .repeat:
+            // Stepping repeats; a toggle does not.
+            if character == "v" || character == "V" { return nil }
+        default:
+            return nil
+        }
+
+        switch character {
+        case KeyEquivalent.upArrow.character: return .previousLUT
+        case KeyEquivalent.downArrow.character: return .nextLUT
+        case KeyEquivalent.leftArrow.character, "[": return collectionActive ? .previousImage : nil
+        case KeyEquivalent.rightArrow.character, "]": return collectionActive ? .nextImage : nil
+        case "v", "V": return .toggleSideBySide
+        default: return nil
+        }
     }
 }
 
-/// Owns an NSEvent local monitor for the lifetime of the main content view.
-@MainActor
-final class KeyMonitor {
-    private var token: Any?
-    private weak var viewModel: AppViewModel?
-    private let removeMonitor: (Any) -> Void
-
-    /// True while a monitor is installed. Internal so the lifecycle that replaced `deinit` can be
-    /// asserted at all.
-    var isMonitoring: Bool { token != nil }
-
-    /// - Parameter removeMonitor: how to tear the monitor down. Injectable **only** because there is
-    ///   no way to observe from outside AppKit whether `NSEvent.removeMonitor` was actually called —
-    ///   `isMonitoring` alone would pass against a `stop()` that dropped the token and leaked the
-    ///   monitor, which is precisely the failure this step's teardown change could introduce. A
-    ///   mutation demonstrated that gap. Same seam as `RenderEngine.init(context:)`.
-    init(
-        viewModel: AppViewModel,
-        removeMonitor: @escaping (Any) -> Void = { NSEvent.removeMonitor($0) }
-    ) {
-        self.viewModel = viewModel
-        self.removeMonitor = removeMonitor
-        self.token = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
-            return self?.handle(event) ?? event
-        }
-    }
-
-    /// Remove the monitor.
-    ///
-    /// **Explicit rather than in `deinit`, because Step 8 turned Swift 6 language mode on.** A
-    /// `deinit` is `nonisolated` — it can run on any thread, so the compiler refuses to let it touch
-    /// `token`, which is the `Any?` AppKit hands back and is not `Sendable`. The escape hatches are
-    /// `nonisolated(unsafe)` or an `@unchecked Sendable` box, and this module does not use either.
-    ///
-    /// Losing the `deinit` safety net costs nothing real and fixes something: `NSEvent.removeMonitor`
-    /// is an AppKit call that wants the main thread, and reaching it from a `deinit` that could run
-    /// anywhere was already the wrong shape. `KeyboardShortcuts.onDisappear` owns the lifetime now,
-    /// on the actor that owns the window. Idempotent, so calling it twice is harmless.
-    func stop() {
-        if let token { removeMonitor(token) }
-        token = nil
-    }
-
-    private func handle(_ event: NSEvent) -> NSEvent? {
-        guard let vm = viewModel else { return event }
-
-        // If a sheet is up, let the sheet's text fields and buttons handle keys.
-        if vm.derive.isSheetPresented { return event }
-
-        // Don't hijack keys while editing text (the search field, etc.) — a
-        // focused SwiftUI TextField makes the window's field editor (an NSText)
-        // the first responder.
-        if NSApp.keyWindow?.firstResponder is NSText { return event }
-
-        // Don't consume Command-modified events — those belong to the menu bar.
-        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if mods.contains(.command) { return event }
-
-        let isDown = event.type == .keyDown
-
-        // Hardware key codes (US layout independent for arrows/space).
-        // ↑/↓ cycle LUTs; ←/→ step through the source files.
-        switch event.keyCode {
-        case 49:  // Space — hold to compare original
-            vm.showOriginal(isDown)
-            return nil
-        case 126: // Up arrow — previous LUT
-            if isDown { vm.selectPreviousLUT() }
-            return nil
-        case 125: // Down arrow — next LUT
-            if isDown { vm.selectNextLUT() }
-            return nil
-        case 123: // Left arrow — previous image
-            guard vm.collection.isActive else { return event }
-            if isDown { vm.selectPreviousImage() }
-            return nil
-        case 124: // Right arrow — next image
-            guard vm.collection.isActive else { return event }
-            if isDown { vm.selectNextImage() }
-            return nil
-        default:
-            break
-        }
-
-        // Character keys (key-down only)
-        guard isDown, let chars = event.charactersIgnoringModifiers?.lowercased() else {
-            return event
-        }
-        switch chars {
-        case "v":
-            vm.toggleSideBySide()
-            return nil
-        case "[":
-            guard vm.collection.isActive else { return event }
-            vm.selectPreviousImage()
-            return nil
-        case "]":
-            guard vm.collection.isActive else { return event }
-            vm.selectNextImage()
-            return nil
-        default:
-            return event
+extension AppViewModel {
+    /// Dispatch for `KeyCommandMap`.
+    func perform(_ action: KeyAction) {
+        switch action {
+        case .compareOriginal(let show): showOriginal(show)
+        case .previousLUT: selectPreviousLUT()
+        case .nextLUT: selectNextLUT()
+        case .previousImage: selectPreviousImage()
+        case .nextImage: selectNextImage()
+        case .toggleSideBySide: toggleSideBySide()
         }
     }
 }

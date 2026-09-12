@@ -3,6 +3,8 @@ import SwiftUI
 /// Sidebar showing the LUT library grouped by category.
 struct LUTSidebar: View {
     let viewModel: AppViewModel
+    /// Owned by `ContentView`, which suspends the plain-key shortcuts while this is true.
+    var searchFocus: FocusState<Bool>.Binding
     @State private var searchText = ""
 
     /// Names of collapsed folders. Stored as a set of category names (a folder
@@ -65,6 +67,7 @@ struct LUTSidebar: View {
                     .foregroundColor(.secondary)
                 TextField("Search", text: $searchText)
                     .textFieldStyle(.plain)
+                    .focused(searchFocus)
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""

@@ -46,7 +46,8 @@ Practical consequences when writing code here:
 
 - **`deinit` is `nonisolated`.** It can run on any thread, so it may not touch non-`Sendable` stored
   state even on a `@MainActor` class. Teardown that needs the main actor belongs in an explicit
-  method the owner calls — see `KeyMonitor.stop()`, which is why that pattern exists.
+  method the owner calls. `ImageCollection.deinit` shows the other half: it reads `scopedURL`, so that
+  property is `@ObservationIgnored` — a tracked property would be a `@MainActor` accessor it cannot call.
 - **Closures handed to an unstructured `Task` must be `@Sendable`.** Mark the parameter rather than
   reaching for an opt-out.
 - **`CIImage`, `CIFilter` and `CIContext` are not `Sendable`** and must stay inside `RenderEngine`.

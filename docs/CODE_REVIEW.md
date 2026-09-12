@@ -413,7 +413,8 @@ review-alignment pass.
   `AppViewModelTests` stand on.
 - ~~**`ContentView.swift` holds several unrelated top-level types.**~~ **[fixed]** — the menu commands
   and `MenuCommandReceivers` moved to `MenuCommands.swift`, `StatusBar`/`KeyHint` to `StatusBar.swift`,
-  and `KeyboardShortcuts`/`KeyMonitor` to `KeyboardShortcuts.swift`. `ContentView.swift` is down to
+  and `KeyboardShortcuts`/`KeyMonitor` to `KeyboardShortcuts.swift` (which holds the `KeyCommandMap`
+  table since the 09/2026 move to `.onKeyPress`). `ContentView.swift` is down to
   ~231 lines: the layout and the toolbar, nothing else.
 - **Observation instead of Combine** *(09/2026 UI modernization)* — `AppViewModel`, the two
   coordinators, `ImageCollection` and `LUTLibrary` are `@Observable`. The forwarding loop in

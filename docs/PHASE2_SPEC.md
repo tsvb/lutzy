@@ -71,6 +71,8 @@ Two real fixes fell out, both in code the earlier steps had not touched:
   thread — so it may not touch the non-`Sendable` `Any?` token AppKit returns. Teardown became an
   explicit `stop()` on the main actor, called from `onDisappear`. That is the better shape anyway:
   `NSEvent.removeMonitor` wants the main thread, and reaching it from a `deinit` never guaranteed one.
+  (`KeyMonitor` itself went in the 09/2026 UI modernization — the shortcuts are `.onKeyPress` now —
+  but the lesson stands, and `ImageCollection.deinit` is where it applies today.)
 - `PreviewCostBenchmark.timeAsync` passed a non-`Sendable` closure to an unstructured `Task`. Marked
   `@Sendable`; every call site already captured only values.
 
