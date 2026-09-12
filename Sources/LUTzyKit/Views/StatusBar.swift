@@ -5,6 +5,7 @@ import SwiftUI
 
 struct StatusBar: View {
     let viewModel: AppViewModel
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         HStack(spacing: 0) {
@@ -29,6 +30,7 @@ struct StatusBar: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
             .glassEffect(.regular, in: .capsule)
+            .opacity(appearsActive ? 1 : 0.6)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 5)

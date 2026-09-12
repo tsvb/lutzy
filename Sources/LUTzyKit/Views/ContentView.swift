@@ -251,14 +251,17 @@ public struct ContentView: View {
             .help("Open an image, a source folder, or import from Photos")
         }
 
-        // LUT folder
-        ToolbarItem(id: "lutFolder", placement: .primaryAction) {
-            Button {
-                viewModel.chooseLUTFolder()
-            } label: {
-                Label("LUT Folder", systemImage: "folder")
+        // LUT folder — set once, so on macOS 27 it is the first control to fold into the overflow
+        // menu when the window narrows (`visibilityPriority` is a 27 SDK addition).
+        if #available(macOS 27, *) {
+            ToolbarItem(id: "lutFolder", placement: .primaryAction) {
+                lutFolderButton
             }
-            .help("Choose the folder of .cube files")
+            .visibilityPriority(.low)
+        } else {
+            ToolbarItem(id: "lutFolder", placement: .primaryAction) {
+                lutFolderButton
+            }
         }
 
         // Export
@@ -274,23 +277,43 @@ public struct ContentView: View {
             .disabled(viewModel.sourceImage == nil)
         }
 
-        // Batch export — only when a multi-image set is loaded
+        // Batch export — only when a multi-image set is loaded. Export keeps the higher priority:
+        // the single export is the everyday action, the batch the occasional one.
         if viewModel.collection.isActive {
-            ToolbarItem(id: "exportAll", placement: .primaryAction) {
-                Button {
-                    viewModel.batchExportDialog()
-                } label: {
-                    Label("Export All", systemImage: "square.and.arrow.up.on.square")
+            if #available(macOS 27, *) {
+                ToolbarItem(id: "exportAll", placement: .primaryAction) {
+                    exportAllButton
                 }
-                // Not "the current LUT": `performBatchExport` hands every image the whole
-                // `EditDocument` — RAW develop and adjustments included. Saying LUT understated it in
-                // the direction that surprises people, because `rawDevelop` was seeded from one RAW's
-                // as-shot values.
-                .help("Apply the current look — LUT, develop and adjustments — to all imported images "
-                      + "and export to a folder (⌘⇧E)")
-                .disabled(viewModel.isExporting)
+                .visibilityPriority(.low)
+            } else {
+                ToolbarItem(id: "exportAll", placement: .primaryAction) {
+                    exportAllButton
+                }
             }
         }
+    }
+
+    private var lutFolderButton: some View {
+        Button {
+            viewModel.chooseLUTFolder()
+        } label: {
+            Label("LUT Folder", systemImage: "folder")
+        }
+        .help("Choose the folder of .cube files")
+    }
+
+    private var exportAllButton: some View {
+        Button {
+            viewModel.batchExportDialog()
+        } label: {
+            Label("Export All", systemImage: "square.and.arrow.up.on.square")
+        }
+        // Not "the current LUT": `performBatchExport` hands every image the whole `EditDocument` —
+        // RAW develop and adjustments included. Saying LUT understated it in the direction that
+        // surprises people, because `rawDevelop` was seeded from one RAW's as-shot values.
+        .help("Apply the current look — LUT, develop and adjustments — to all imported images "
+              + "and export to a folder (⌘⇧E)")
+        .disabled(viewModel.isExporting)
     }
 }
 

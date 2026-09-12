@@ -157,6 +157,8 @@ struct PreviewView: View {
 /// A Liquid Glass capsule over the image — it reads on any picture and follows the window's tint.
 struct ComparisonBadge: View {
     let text: String
+    /// Overlays step back with the window, like the system's own chrome does.
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         Text(text)
@@ -166,5 +168,6 @@ struct ComparisonBadge: View {
             .padding(.vertical, 5)
             .foregroundStyle(.primary)
             .glassEffect(.regular, in: .capsule)
+            .opacity(appearsActive ? 1 : 0.6)
     }
 }
