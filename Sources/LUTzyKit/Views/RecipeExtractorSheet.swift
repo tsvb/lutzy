@@ -7,7 +7,7 @@ import AppKit
 /// user clicks Save. Observes `DeriveCoordinator` directly rather than the
 /// whole app view model — this sheet touches nothing else.
 struct RecipeExtractorSheet: View {
-    @ObservedObject var coordinator: DeriveCoordinator
+    let coordinator: DeriveCoordinator
     @Environment(\.dismiss) private var dismiss
 
     @State private var rawURL: URL?

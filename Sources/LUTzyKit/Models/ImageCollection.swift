@@ -1,9 +1,11 @@
 import Foundation
 import AppKit
+import Observation
 
 /// Manages a collection of imported images with async thumbnail generation.
+@Observable
 @MainActor
-final class ImageCollection: ObservableObject {
+final class ImageCollection {
 
     struct Item: Identifiable {
         let id = UUID()
@@ -16,18 +18,22 @@ final class ImageCollection: ObservableObject {
         var subfolder: String = ""
     }
 
-    @Published var items: [Item] = []
-    @Published var selectedIndex: Int = 0
-    @Published var isActive: Bool = false
+    var items: [Item] = []
+    var selectedIndex: Int = 0
+    var isActive: Bool = false
     /// The persistent source folder, if one is set (nil for Photos imports or
     /// one-off single-image opens).
-    @Published var sourceFolderURL: URL?
+    var sourceFolderURL: URL?
 
     private static let bookmarkKey = "imageSourceFolderBookmark"
-    private var thumbnailTask: Task<Void, Never>?
-    private var scanTask: Task<Void, Never>?
+    @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
+    @ObservationIgnored private var scanTask: Task<Void, Never>?
     /// Folder whose security scope we hold open, released when we move on.
-    private var scopedURL: URL?
+    ///
+    /// `@ObservationIgnored` so it stays a plain stored property: `deinit` below is `nonisolated`
+    /// under Swift 6, and the macro would otherwise turn this into a `@MainActor` accessor it may
+    /// not call. Nothing on screen depends on it, so nothing is lost by not tracking it.
+    @ObservationIgnored private var scopedURL: URL?
 
     deinit {
         scopedURL?.stopAccessingSecurityScopedResource()

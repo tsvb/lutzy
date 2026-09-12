@@ -12,7 +12,7 @@ import SwiftUI
 /// here — it comes from `AdjustmentControl.allCases`, so which rows appear and in what order is a
 /// value the tests can assert rather than a shape buried in a `ViewBuilder`.
 struct AdjustInspectorView: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
 
     var body: some View {
         ScrollView {

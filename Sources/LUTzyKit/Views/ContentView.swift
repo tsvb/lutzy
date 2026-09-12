@@ -7,7 +7,7 @@ import AppKit
 /// One of two entry points LUTzyKit exposes to the executable (the other is
 /// `LUTzyCommands`); everything else in the module stays internal.
 public struct ContentView: View {
-    @StateObject private var viewModel = AppViewModel()
+    @State private var viewModel = AppViewModel()
     @State private var photosSelection: [PhotosPickerItem] = []
 
     public init() {}
@@ -21,7 +21,7 @@ public struct ContentView: View {
                 }
             }
             .photosPicker(
-                isPresented: $viewModel.isPhotosPickerPresented,
+                isPresented: Bindable(viewModel).isPhotosPickerPresented,
                 selection: $photosSelection,
                 maxSelectionCount: 50,
                 matching: .images
@@ -29,10 +29,7 @@ public struct ContentView: View {
             .onChange(of: photosSelection) { _, newSelection in
                 handlePhotosSelection(newSelection)
             }
-            .sheet(isPresented: Binding(
-                get: { viewModel.derive.isSheetPresented },
-                set: { viewModel.derive.isSheetPresented = $0 }
-            )) {
+            .sheet(isPresented: Bindable(viewModel.derive).isSheetPresented) {
                 RecipeExtractorSheet(coordinator: viewModel.derive)
             }
             .modifier(KeyboardShortcuts(viewModel: viewModel))
@@ -73,7 +70,7 @@ public struct ContentView: View {
         } detail: {
             detailContent
         }
-        .inspector(isPresented: $viewModel.isInspectorPresented) {
+        .inspector(isPresented: Bindable(viewModel).isInspectorPresented) {
             InfoInspectorView(viewModel: viewModel)
                 .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
         }
@@ -110,7 +107,7 @@ public struct ContentView: View {
     @ViewBuilder
     private var toolbarContent: some View {
         // Format picker
-        Picker("Format", selection: $viewModel.exportFormat) {
+        Picker("Format", selection: Bindable(viewModel).exportFormat) {
             ForEach(ExportFormat.allCases) { fmt in
                 Text(fmt.rawValue).tag(fmt)
             }

@@ -4,7 +4,7 @@ import SwiftUI
 // reminder of the keys that do something on the right.
 
 struct StatusBar: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
 
     var body: some View {
         HStack(spacing: 0) {

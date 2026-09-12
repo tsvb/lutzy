@@ -1,20 +1,21 @@
 import Foundation
 import CoreImage
 import AppKit
-import Combine
+import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
 /// Central state for the LUTzy app.
+@Observable
 @MainActor
-final class AppViewModel: ObservableObject {
+final class AppViewModel {
 
-    // MARK: - Published state
+    // MARK: - Observed state
 
-    @Published var sourceImage: CIImage?
-    @Published var sourceName: String = ""
-    @Published var sourceSize: CGSize = .zero
-    @Published var sourceURL: URL?
+    var sourceImage: CIImage?
+    var sourceName: String = ""
+    var sourceSize: CGSize = .zero
+    var sourceURL: URL?
 
     /// **The look, as a value.** Phase 2's spine: everything the user has chosen lives here, and the
     /// preview is rebuilt from it rather than from a baked image (`docs/PHASE2_SPEC.md` §3).
@@ -27,7 +28,7 @@ final class AppViewModel: ObservableObject {
     /// `rawDevelop`, and carrying it forward means a value set on one RAW silently overrides the next
     /// RAW's own probed as-shot seed. Known, and deliberately deferred to Step 11 — see §8.4 for the
     /// worked example and why that step is the right place to settle it.
-    @Published private(set) var document = EditDocument()
+    private(set) var document = EditDocument()
 
     /// How to reproduce the open image. Held instead of a decoded `CIImage` because a RAW has to be
     /// re-developed to honour `document.rawDevelop` (§4.2).
@@ -41,7 +42,7 @@ final class AppViewModel: ObservableObject {
     /// Probed once per open rather than per render: the probe builds a `CIRAWFilter`, which measures
     /// ~25 ms on a 30 MB DNG. Not memoized across images — one entry would save that on returning to
     /// an image, at the cost of another cache whose invalidation nobody will remember.
-    @Published private(set) var rawCapabilities: RAWCapabilities?
+    private(set) var rawCapabilities: RAWCapabilities?
 
     /// What the develop panel should be showing right now. **Three states, not two.**
     ///
@@ -84,9 +85,8 @@ final class AppViewModel: ObservableObject {
     /// stops anything else reaching through it. It is also the input the state mapping is tested
     /// against directly.
     ///
-    /// Not `@Published`: it only ever changes inside `load()`, which writes several `@Published`
-    /// properties in the same main-actor turn (`sourceImage` among them), so any view observing this
-    /// view model is already being invalidated when it moves.
+    /// Observation tracks this through `imageSource`, which is a stored property the macro watches
+    /// even though it is private — so a view reading this is invalidated when the source moves.
     var sourceIsRAW: Bool { imageSource?.kind == .raw }
 
     /// The three states of the develop panel. See `AppViewModel.developPanelState`.
@@ -112,11 +112,11 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    private var capabilitiesTask: Task<Void, Never>?
-    private var developTask: Task<Void, Never>?
+    @ObservationIgnored private var capabilitiesTask: Task<Void, Never>?
+    @ObservationIgnored private var developTask: Task<Void, Never>?
 
     /// Held so a superseded EXIF read can be cancelled before it publishes. See `refreshMetadata`.
-    private var metadataTask: Task<Void, Never>?
+    @ObservationIgnored private var metadataTask: Task<Void, Never>?
 
     /// Whether any call since the last fired render changed `rawDevelop`.
     ///
@@ -127,7 +127,7 @@ final class AppViewModel: ObservableObject {
     /// task, even though the comparison baseline genuinely needs to move. Accumulating the flag here
     /// instead — OR'd in by every call, read and cleared by whichever call actually fires the render —
     /// means the baseline re-renders if *any* call in the burst touched develop, not just the last.
-    private var pendingDevelopChange = false
+    @ObservationIgnored private var pendingDevelopChange = false
 
     /// LUTs a document can reference that no folder scan produces — a freshly derived LUT, and the
     /// file it becomes once saved. See `DerivedLUTRegistry`; this is the Step 9 replacement for the
@@ -204,14 +204,14 @@ final class AppViewModel: ObservableObject {
         return document.lut.isIdentity ? .adjusted : .graded
     }
 
-    @Published var previewNSImage: NSImage?
-    @Published var originalPreviewNSImage: NSImage?
-    @Published var isShowingOriginal: Bool = false
-    @Published var isSideBySide: Bool = true
+    var previewNSImage: NSImage?
+    var originalPreviewNSImage: NSImage?
+    var isShowingOriginal: Bool = false
+    var isSideBySide: Bool = true
 
     /// Inspector visibility. Computing the histogram is gated on this — plus on the Info tab being
     /// the one on screen — so we don't tally pixels for a panel nobody's looking at.
-    @Published var isInspectorPresented: Bool = false {
+    var isInspectorPresented: Bool = false {
         didSet { if isInspectorPresented { updateHistogram() } }
     }
 
@@ -222,7 +222,7 @@ final class AppViewModel: ObservableObject {
     /// and without this every settled render of a develop drag would tally an off-screen histogram.
     /// Switching **back** recomputes, or the panel would return blank (or stale) after a detour
     /// through Develop.
-    @Published var inspectorTab: InspectorTab = .info {
+    var inspectorTab: InspectorTab = .info {
         didSet { if inspectorTab == .info { updateHistogram() } }
     }
 
@@ -237,22 +237,22 @@ final class AppViewModel: ObservableObject {
         }
     }
     /// Source-folder file browser panel visibility.
-    @Published var isSourceBrowserPresented: Bool = false
+    var isSourceBrowserPresented: Bool = false
     /// EXIF/TIFF/GPS metadata of the loaded image, read at load time.
-    @Published var metadata: ImageMetadata = ImageMetadata()
+    var metadata: ImageMetadata = ImageMetadata()
     /// Histogram of the currently displayed image (graded result, or original
     /// while comparing). `nil` until computed / when no image is loaded.
-    @Published var histogram: HistogramData?
-    private var histogramTask: Task<Void, Never>?
+    var histogram: HistogramData?
+    @ObservationIgnored private var histogramTask: Task<Void, Never>?
 
-    @Published var isLoading: Bool = false
-    @Published var statusMessage: String = "Open an image to get started"
+    var isLoading: Bool = false
+    var statusMessage: String = "Open an image to get started"
 
     /// Non-nil when a hard failure should be surfaced as a dismissible alert.
     /// Bound to an `.alert` in ContentView; cleared when the user dismisses it.
-    @Published var errorMessage: String?
+    var errorMessage: String?
 
-    @Published var isPhotosPickerPresented: Bool = false
+    var isPhotosPickerPresented: Bool = false
 
     // MARK: - Owned state
 
@@ -275,11 +275,10 @@ final class AppViewModel: ObservableObject {
     /// The renderer. An `any RenderEngining` rather than the concrete actor so a test can drive the
     /// preview flow without a GPU — the reason Step 4 introduced the protocol.
     private let engine: any RenderEngining
-    private var loadTask: Task<Void, Never>?
-    private var previewTask: Task<Void, Never>?
-    private var originalPreviewTask: Task<Void, Never>?
-    private var intensityTask: Task<Void, Never>?
-    private var cancellables: [AnyCancellable] = []
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var previewTask: Task<Void, Never>?
+    @ObservationIgnored private var originalPreviewTask: Task<Void, Never>?
+    @ObservationIgnored private var intensityTask: Task<Void, Never>?
 
     // MARK: - Init
 
@@ -287,19 +286,9 @@ final class AppViewModel: ObservableObject {
         self.engine = engine
         self.export = ExportCoordinator(engine: engine)
 
-        // Forward nested ObservableObject changes so SwiftUI views update.
-        for child in [
-            library.objectWillChange.eraseToAnyPublisher(),
-            collection.objectWillChange.eraseToAnyPublisher(),
-            export.objectWillChange.eraseToAnyPublisher(),
-            derive.objectWillChange.eraseToAnyPublisher(),
-        ] {
-            cancellables.append(child.sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
-            })
-        }
+        // No change forwarding from `library`, `collection`, `export` or `derive`: they are
+        // `@Observable` too, and a view that reads through them (or through the passthroughs above)
+        // is tracked on the property it actually touched. `AppViewModelTests` pins that.
 
         wireCoordinators()
         library.restoreFolder()

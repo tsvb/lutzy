@@ -11,7 +11,7 @@ import AppKit
 // standard menu system — we explicitly let those events pass through.
 
 struct KeyboardShortcuts: ViewModifier {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
     @State private var monitor: KeyMonitor?
 
     func body(content: Content) -> some View {

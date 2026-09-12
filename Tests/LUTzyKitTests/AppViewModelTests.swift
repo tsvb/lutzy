@@ -382,4 +382,28 @@ final class AppViewModelTests: TempDirectoryTestCase {
             "Import a set of images first (Export All works on the filmstrip)"
         )
     }
+
+    // MARK: - Observation
+
+    /// `AppViewModel` used to be an `ObservableObject` that re-broadcast its coordinators'
+    /// `objectWillChange` so a view observing only the view model still re-rendered when, say, the
+    /// export format changed inside `ExportCoordinator`. The `@Observable` migration deleted that
+    /// forwarding: Observation tracks the property a view actually read, through however many
+    /// objects the read passed. Nothing else would notice if that stopped being true — this repo has
+    /// no view tests — so it is pinned here on the `exportFormat` passthrough, which is exactly the
+    /// shape the toolbar's format picker reads.
+    func testANestedCoordinatorMutationIsObservedThroughThePassthrough() {
+        let viewModel = AppViewModel(engine: FakeRenderEngine())
+        let changed = expectation(description: "onChange fired for a nested mutation")
+
+        withObservationTracking {
+            _ = viewModel.exportFormat
+        } onChange: {
+            changed.fulfill()
+        }
+
+        viewModel.export.format = .tiff
+        wait(for: [changed], timeout: 1)
+        XCTAssertEqual(viewModel.exportFormat, .tiff)
+    }
 }

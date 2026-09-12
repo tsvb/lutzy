@@ -3,7 +3,7 @@ import SwiftUI
 /// Docked inspector pane: histogram of the displayed image up top, EXIF/TIFF
 /// metadata listed below. Toggled from the toolbar (and ⌘I).
 struct InfoInspectorView: View {
-    @ObservedObject var viewModel: AppViewModel
+    @Bindable var viewModel: AppViewModel
 
     var body: some View {
         VStack(spacing: 0) {

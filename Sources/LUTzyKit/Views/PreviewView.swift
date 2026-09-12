@@ -3,7 +3,7 @@ import SwiftUI
 /// Main image preview area. Supports side-by-side (original vs LUT)
 /// and single-image mode. Hold Space to flash original in single mode.
 struct PreviewView: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
 
     private let bgColor = Color(nsColor: NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1))
 

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Sidebar showing the LUT library grouped by category.
 struct LUTSidebar: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
     @State private var searchText = ""
 
     /// Names of collapsed folders. Stored as a set of category names (a folder

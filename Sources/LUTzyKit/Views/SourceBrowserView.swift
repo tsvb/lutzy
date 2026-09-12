@@ -4,7 +4,7 @@ import SwiftUI
 /// Click a row to open it; the current selection is highlighted and scrolled
 /// into view, staying in sync with the filmstrip and ←/→ navigation.
 struct SourceBrowserView: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
 
     private var collection: ImageCollection { viewModel.collection }
 
