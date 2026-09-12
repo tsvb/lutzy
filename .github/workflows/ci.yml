@@ -5,10 +5,10 @@ name: CI
 # official checkout — matches the project's zero-dependency ethos.
 on:
   push:
-    branches: [main]
+    # `claude/**` so an agent branch is built on every push, before it has a PR.
+    branches: [main, 'claude/**']
   pull_request:
     branches: [main]
-  # Lets a feature branch be built on demand before it has a PR.
   workflow_dispatch:
 
 # Cancel an in-progress run if newer commits are pushed to the same ref.
