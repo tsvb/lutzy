@@ -35,5 +35,10 @@ struct LUTzyApp: App {
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1200, height: 800)
         .commands { LUTzyCommands() }
+
+        Settings {
+            ContentView.settings
+        }
+        .windowResizability(.contentSize)
     }
 }

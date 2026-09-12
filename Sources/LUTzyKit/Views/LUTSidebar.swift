@@ -7,12 +7,15 @@ struct LUTSidebar: View {
     var searchFocus: FocusState<Bool>.Binding
     @State private var searchText = ""
 
-    /// Names of collapsed folders. Stored as a set of category names (a folder
-    /// absent from the set is expanded), so newly-discovered folders default to
-    /// expanded. Persisted across launches and re-scans.
-    private static let collapsedKey = "lutzy.collapsedLUTCategories"
-    @State private var collapsed: Set<String> =
-        Set(UserDefaults.standard.stringArray(forKey: LUTSidebar.collapsedKey) ?? [])
+    /// Names of collapsed folders, newline-joined in `UserDefaults` (a folder absent from the set
+    /// is expanded, so newly-discovered folders default to expanded). `@AppStorage` rather than a
+    /// hand-persisted `@State` so the Settings window's "Expand All" is reflected here at once.
+    @AppStorage(AppPreference.collapsedLUTCategories) private var collapsedRaw = ""
+
+    private var collapsed: Set<String> {
+        get { Set(collapsedRaw.split(separator: "\n").map(String.init)) }
+        nonmutating set { collapsedRaw = newValue.sorted().joined(separator: "\n") }
+    }
 
     private var isSearching: Bool { !searchText.isEmpty }
 
@@ -155,7 +158,6 @@ struct LUTSidebar: View {
             set: { expand in
                 guard !isSearching else { return }
                 if expand { collapsed.remove(id) } else { collapsed.insert(id) }
-                persistCollapsed()
             }
         )
     }
@@ -167,11 +169,6 @@ struct LUTSidebar: View {
         } else {
             collapsed.subtract(ids)    // some closed → expand all
         }
-        persistCollapsed()
-    }
-
-    private func persistCollapsed() {
-        UserDefaults.standard.set(Array(collapsed), forKey: Self.collapsedKey)
     }
 }
 

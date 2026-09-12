@@ -285,6 +285,8 @@ final class AppViewModel {
     init(engine: any RenderEngining = RenderEngine.shared) {
         self.engine = engine
         self.export = ExportCoordinator(engine: engine)
+        // Launch defaults from Settings (⌘,). Read once: see `AppPreference`.
+        self.isSideBySide = UserDefaults.standard.bool(forKey: AppPreference.defaultSideBySide, default: true)
 
         // No change forwarding from `library`, `collection`, `export` or `derive`: they are
         // `@Observable` too, and a view that reads through them (or through the passthroughs above)
@@ -297,7 +299,8 @@ final class AppViewModel {
         // Both the LUT scan above and this one run asynchronously, so the
         // window paints immediately and fills in as the scans land.
         if collection.restoreSourceFolder() {
-            isSourceBrowserPresented = true
+            isSourceBrowserPresented = UserDefaults.standard.bool(
+                forKey: AppPreference.showSourceBrowserOnRestore, default: true)
             openFirstImageWhenScanned()
         }
     }

@@ -66,6 +66,7 @@ The RAW is developed with the same default `CIRAWFilter` settings the rest of th
 | <kbd>⌘D</kbd> | derive |
 | <kbd>⌘S</kbd> | export |
 | <kbd>⌘⇧E</kbd> | export all |
+| <kbd>⌘,</kbd> | settings — launch defaults and the sidebar's collapsed folders |
 
 Letter keys go through SwiftUI's `.onKeyPress` on the split view; the preview canvas is focusable and holds focus by default so the handler always has a focused descendant. <kbd>⌘</kbd> shortcuts go through the menu bar.
 

@@ -44,6 +44,11 @@ final class ExportCoordinator {
 
     init(engine: any RenderEngining = RenderEngine.shared) {
         self.engine = engine
+        // Launch default from Settings (⌘,). Read once: see `AppPreference`.
+        if let raw = UserDefaults.standard.string(forKey: AppPreference.defaultExportFormat),
+           let format = ExportFormat(rawValue: raw) {
+            self.format = format
+        }
     }
 
     /// Quality for the lossy encoders. Hardcoded as it always was; a UI for it is Step 12's
