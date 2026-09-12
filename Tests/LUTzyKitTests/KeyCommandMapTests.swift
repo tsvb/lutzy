@@ -10,7 +10,7 @@ final class KeyCommandMapTests: XCTestCase {
 
     private func action(
         _ key: KeyEquivalent,
-        _ phase: KeyPress.Phase = .down,
+        _ phase: KeyPress.Phases = .down,
         modifiers: EventModifiers = [],
         collectionActive: Bool = true
     ) -> KeyAction? {
@@ -68,7 +68,7 @@ final class KeyCommandMapTests: XCTestCase {
 
     func testEverySubscribedKeyDoesSomethingInSomePhase() {
         for key in KeyCommandMap.keys {
-            let anyPhase = [KeyPress.Phase.down, .repeat, .up].contains { action(key, $0) != nil }
+            let anyPhase = [KeyPress.Phases.down, .repeat, .up].contains { action(key, $0) != nil }
             XCTAssertTrue(anyPhase, "\(key.character) is subscribed to but never mapped")
         }
     }

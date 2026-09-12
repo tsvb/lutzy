@@ -41,7 +41,7 @@ enum KeyCommandMap {
     static func action(
         for key: KeyEquivalent,
         modifiers: EventModifiers,
-        phase: KeyPress.Phase,
+        phase: KeyPress.Phases,
         collectionActive: Bool
     ) -> KeyAction? {
         // ⌘ belongs to the menu bar.
