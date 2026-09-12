@@ -63,6 +63,7 @@ struct InfoInspectorView: View {
             metadataSection
         }
         .formStyle(.grouped)
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     // MARK: - Histogram

@@ -121,7 +121,7 @@ struct RecipeExtractorSheet: View {
             .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
 
             Button("Choose…") { onPick() }
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
         }
     }
 
@@ -144,6 +144,7 @@ struct RecipeExtractorSheet: View {
                 coordinator.dismiss()
                 dismiss()
             }
+            .buttonStyle(.glass)
             .keyboardShortcut(.cancelAction)
 
             Spacer()
@@ -152,6 +153,7 @@ struct RecipeExtractorSheet: View {
                 Button("Save to LUT Folder…") {
                     coordinator.saveDialog()
                 }
+                .buttonStyle(.glass)
             }
 
             Button("Derive") {
@@ -159,7 +161,7 @@ struct RecipeExtractorSheet: View {
                     coordinator.derive(rawURL: r, jpgURL: j)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
             .keyboardShortcut(.defaultAction)
             .disabled(rawURL == nil || jpgURL == nil || coordinator.isDeriving)
         }

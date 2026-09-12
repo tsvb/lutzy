@@ -22,10 +22,9 @@ public struct ContentView: View {
     public var body: some View {
         mainContent
             .navigationTitle("")
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    toolbarContent
-                }
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar(id: "main") {
+                toolbarContent
             }
             .photosPicker(
                 isPresented: Bindable(viewModel).isPhotosPickerPresented,
@@ -131,126 +130,153 @@ public struct ContentView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSourceBrowserPresented)
     }
 
-    @ViewBuilder
-    private var toolbarContent: some View {
+    /// A customizable toolbar (View ▸ Customize Toolbar…): every control has a stable id, and
+    /// `ToolbarSpacer`s group them the way the old `Divider`s did, in the system's own idiom.
+    @ToolbarContentBuilder
+    private var toolbarContent: some CustomizableToolbarContent {
         // Format picker
-        Picker("Format", selection: Bindable(viewModel).exportFormat) {
-            ForEach(ExportFormat.allCases) { fmt in
-                Text(fmt.rawValue).tag(fmt)
-            }
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 180)
-
-        Divider()
-
-        // Side-by-side toggle
-        Button {
-            viewModel.toggleSideBySide()
-        } label: {
-            Label(
-                viewModel.isSideBySide ? "Single View" : "Side by Side",
-                systemImage: viewModel.isSideBySide ? "rectangle" : "rectangle.split.2x1"
-            )
-        }
-        .help("Toggle side-by-side comparison (V)")
-
-        // Source folder browser
-        Button {
-            viewModel.toggleSourceBrowser()
-        } label: {
-            Label("Source", systemImage: "sidebar.leading")
-        }
-        .help("Show the source folder file browser")
-        .disabled(viewModel.collection.items.isEmpty)
-
-        // The inspector: Info (histogram + EXIF), Develop, Adjust.
-        Button {
-            viewModel.toggleInspector()
-        } label: {
-            Label("Info", systemImage: "sidebar.right")
-        }
-        .help("Show the inspector — info, develop and adjustments (⌘I)")
-        .keyboardShortcut("i", modifiers: .command)
-        .disabled(viewModel.sourceImage == nil)
-
-        Divider()
-
-        // LUT intensity
-        HStack(spacing: 6) {
-            Text("Intensity")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Slider(
-                value: Binding(
-                    get: { viewModel.lutIntensity },
-                    set: { viewModel.setLUTIntensity($0) }
-                ),
-                in: 0...1
-            )
-            .frame(width: 100)
-            Text("\(Int((viewModel.lutIntensity * 100).rounded()))%")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 36, alignment: .trailing)
-        }
-        .help("LUT intensity (0–100%)")
-        .disabled(viewModel.selectedLUT == nil)
-
-        Divider()
-
-        // Import menu
-        Menu {
-            Button("Open Image...") {
-                viewModel.openImageDialog()
-            }
-            Divider()
-            Button("Import from Photos...") {
-                viewModel.importFromPhotos()
-            }
-            Button("Open Source Folder...") {
-                viewModel.chooseSourceFolder()
-            }
-            if !viewModel.collection.items.isEmpty {
-                Button("Refresh Source Folder") {
-                    viewModel.refreshSource()
+        ToolbarItem(id: "format", placement: .primaryAction) {
+            Picker("Format", selection: Bindable(viewModel).exportFormat) {
+                ForEach(ExportFormat.allCases) { fmt in
+                    Text(fmt.rawValue).tag(fmt)
                 }
             }
-        } label: {
-            Label("Import", systemImage: "photo.on.rectangle")
+            .pickerStyle(.segmented)
+            .frame(width: 180)
+            .help("Export format")
+        }
+
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        // Side-by-side toggle
+        ToolbarItem(id: "compare", placement: .primaryAction) {
+            Button {
+                viewModel.toggleSideBySide()
+            } label: {
+                Label(
+                    viewModel.isSideBySide ? "Single View" : "Side by Side",
+                    systemImage: viewModel.isSideBySide ? "rectangle" : "rectangle.split.2x1"
+                )
+            }
+            .help("Toggle side-by-side comparison (V)")
+        }
+
+        // Source folder browser
+        ToolbarItem(id: "source", placement: .primaryAction) {
+            Button {
+                viewModel.toggleSourceBrowser()
+            } label: {
+                Label("Source", systemImage: "sidebar.leading")
+            }
+            .help("Show the source folder file browser")
+            .disabled(viewModel.collection.items.isEmpty)
+        }
+
+        // The inspector: Info (histogram + EXIF), Develop, Adjust.
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
+            Button {
+                viewModel.toggleInspector()
+            } label: {
+                Label("Info", systemImage: "sidebar.right")
+            }
+            .help("Show the inspector — info, develop and adjustments (⌘I)")
+            .keyboardShortcut("i", modifiers: .command)
+            .disabled(viewModel.sourceImage == nil)
+        }
+
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        // LUT intensity
+        ToolbarItem(id: "intensity", placement: .primaryAction) {
+            HStack(spacing: 6) {
+                Text("Intensity")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(
+                    value: Binding(
+                        get: { viewModel.lutIntensity },
+                        set: { viewModel.setLUTIntensity($0) }
+                    ),
+                    in: 0...1
+                )
+                .frame(width: 100)
+                Text("\(Int((viewModel.lutIntensity * 100).rounded()))%")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .trailing)
+                    .contentTransition(.numericText(value: viewModel.lutIntensity))
+                    .animation(.default, value: viewModel.lutIntensity)
+            }
+            .help("LUT intensity (0–100%)")
+            .disabled(viewModel.selectedLUT == nil)
+        }
+
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        // Import menu
+        ToolbarItem(id: "import", placement: .primaryAction) {
+            Menu {
+                Button("Open Image...") {
+                    viewModel.openImageDialog()
+                }
+                Divider()
+                Button("Import from Photos...") {
+                    viewModel.importFromPhotos()
+                }
+                Button("Open Source Folder...") {
+                    viewModel.chooseSourceFolder()
+                }
+                if !viewModel.collection.items.isEmpty {
+                    Button("Refresh Source Folder") {
+                        viewModel.refreshSource()
+                    }
+                }
+            } label: {
+                Label("Import", systemImage: "photo.on.rectangle")
+            }
+            .help("Open an image, a source folder, or import from Photos")
         }
 
         // LUT folder
-        Button {
-            viewModel.chooseLUTFolder()
-        } label: {
-            Label("LUT Folder", systemImage: "folder")
+        ToolbarItem(id: "lutFolder", placement: .primaryAction) {
+            Button {
+                viewModel.chooseLUTFolder()
+            } label: {
+                Label("LUT Folder", systemImage: "folder")
+            }
+            .help("Choose the folder of .cube files")
         }
 
         // Export
-        Button {
-            viewModel.exportDialog()
-        } label: {
-            Label("Export", systemImage: "square.and.arrow.up")
+        ToolbarItem(id: "export", placement: .primaryAction) {
+            Button {
+                viewModel.exportDialog()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+            // ⌘S is bound once, on the File ▸ Export menu item (LUTzyApp.swift).
+            // Binding it here too gave the window two competing handlers.
+            .help("Export the graded image (⌘S)")
+            .disabled(viewModel.sourceImage == nil)
         }
-        // ⌘S is bound once, on the File ▸ Export menu item (LUTzyApp.swift).
-        // Binding it here too gave the window two competing handlers.
-        .help("Export the graded image (⌘S)")
-        .disabled(viewModel.sourceImage == nil)
 
         // Batch export — only when a multi-image set is loaded
         if viewModel.collection.isActive {
-            Button {
-                viewModel.batchExportDialog()
-            } label: {
-                Label("Export All", systemImage: "square.and.arrow.up.on.square")
+            ToolbarItem(id: "exportAll", placement: .primaryAction) {
+                Button {
+                    viewModel.batchExportDialog()
+                } label: {
+                    Label("Export All", systemImage: "square.and.arrow.up.on.square")
+                }
+                // Not "the current LUT": `performBatchExport` hands every image the whole
+                // `EditDocument` — RAW develop and adjustments included. Saying LUT understated it in
+                // the direction that surprises people, because `rawDevelop` was seeded from one RAW's
+                // as-shot values.
+                .help("Apply the current look — LUT, develop and adjustments — to all imported images "
+                      + "and export to a folder (⌘⇧E)")
+                .disabled(viewModel.isExporting)
             }
-            // Not "the current LUT": `performBatchExport` hands every image the whole `EditDocument`
-            // — RAW develop and adjustments included. Saying LUT understated it in the direction that
-            // surprises people, because `rawDevelop` was seeded from one RAW's as-shot values.
-            .help("Apply the current look — LUT, develop and adjustments — to all imported images "
-                  + "and export to a folder (⌘⇧E)")
-            .disabled(viewModel.isExporting)
         }
     }
 }

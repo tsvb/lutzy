@@ -106,7 +106,7 @@ struct LUTSidebar: View {
             Button("Choose Folder...") {
                 viewModel.chooseLUTFolder()
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.glass)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -137,6 +137,7 @@ struct LUTSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     // MARK: - Folder collapse state

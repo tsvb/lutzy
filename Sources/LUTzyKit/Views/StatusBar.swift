@@ -16,7 +16,7 @@ struct StatusBar: View {
 
             Spacer()
 
-            // Hints
+            // Hints, on one glass capsule rather than one per key — five capsules read as buttons.
             HStack(spacing: 12) {
                 KeyHint(key: "↑↓", label: "cycle LUTs")
                 if viewModel.collection.isActive {
@@ -26,9 +26,12 @@ struct StatusBar: View {
                 KeyHint(key: "Space", label: "compare")
                 KeyHint(key: "⌘S", label: "export")
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .glassEffect(.regular, in: .capsule)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.vertical, 5)
         .background(.bar)
     }
 }

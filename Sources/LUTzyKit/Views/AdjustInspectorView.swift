@@ -27,6 +27,7 @@ struct AdjustInspectorView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     private var header: some View {

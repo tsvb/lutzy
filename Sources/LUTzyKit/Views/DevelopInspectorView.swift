@@ -33,6 +33,7 @@ struct DevelopInspectorView: View {
                     }
                 }
                 .formStyle(.grouped)
+        .scrollEdgeEffectStyle(.soft, for: .top)
             case .probing:
                 probing
             case .noDevelopStage:

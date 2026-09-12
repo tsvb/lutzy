@@ -100,24 +100,19 @@ struct PreviewView: View {
                     .animation(.easeInOut(duration: 0.15), value: viewModel.isShowingOriginal)
                     .animation(.easeInOut(duration: 0.15), value: viewModel.selectedLUT)
 
-                // Comparison badge
-                if viewModel.isShowingOriginal && viewModel.isComparisonAvailable {
+                // One glass container so the two badges blend if they ever overlap.
+                GlassEffectContainer {
                     VStack {
                         HStack {
-                            ComparisonBadge(text: "Original")
+                            // Comparison badge
+                            if viewModel.isShowingOriginal && viewModel.isComparisonAvailable {
+                                ComparisonBadge(text: "Original")
+                            }
                             Spacer()
-                        }
-                        Spacer()
-                    }
-                    .padding(20)
-                }
-
-                // LUT name badge
-                if !viewModel.isShowingOriginal, let lut = viewModel.selectedLUT {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            ComparisonBadge(text: lut.name)
+                            // LUT name badge
+                            if !viewModel.isShowingOriginal, let lut = viewModel.selectedLUT {
+                                ComparisonBadge(text: lut.name)
+                            }
                         }
                         Spacer()
                     }
@@ -159,6 +154,7 @@ struct PreviewView: View {
     }
 }
 
+/// A Liquid Glass capsule over the image — it reads on any picture and follows the window's tint.
 struct ComparisonBadge: View {
     let text: String
 
@@ -168,7 +164,7 @@ struct ComparisonBadge: View {
             .fontWeight(.medium)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-            .foregroundColor(.primary)
+            .foregroundStyle(.primary)
+            .glassEffect(.regular, in: .capsule)
     }
 }
