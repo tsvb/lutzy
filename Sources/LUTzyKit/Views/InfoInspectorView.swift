@@ -46,31 +46,29 @@ struct InfoInspectorView: View {
     /// The original histogram + EXIF column. Only reached with an image open — the no-image case is
     /// handled one level up, before the tab switcher exists.
     private var infoContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        Form {
+            Section {
                 histogramSection
-                metadataSection
+            } header: {
+                HStack {
+                    Text("Histogram")
+                    Spacer()
+                    Text(histogramSourceLabel)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
+                }
             }
-            .padding(16)
+            metadataSection
         }
+        .formStyle(.grouped)
     }
 
     // MARK: - Histogram
 
     private var histogramSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Histogram")
-                    .font(.headline)
-                Spacer()
-                Text(histogramSourceLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.gray.opacity(0.15), in: Capsule())
-            }
-
             if let histogram = viewModel.histogram {
                 HistogramChart(data: histogram, channel: channel)
                     .frame(height: 120)
@@ -109,39 +107,24 @@ struct InfoInspectorView: View {
     private var metadataSection: some View {
         let sections = viewModel.metadata.sections
         if sections.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Info")
-                    .font(.headline)
+            Section("Info") {
                 Text("No metadata available for this image.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         } else {
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach(sections) { section in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(section.title)
-                            .font(.subheadline.weight(.semibold))
-                        ForEach(section.rows) { row in
-                            metadataRow(row)
+            ForEach(sections) { section in
+                Section(section.title) {
+                    ForEach(section.rows) { row in
+                        LabeledContent(row.label) {
+                            Text(row.value)
+                                .textSelection(.enabled)
+                                .multilineTextAlignment(.trailing)
                         }
+                        .font(.caption)
                     }
                 }
             }
-        }
-    }
-
-    private func metadataRow(_ row: ImageMetadata.Row) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(row.label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 92, alignment: .leading)
-            Text(row.value)
-                .font(.caption)
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
