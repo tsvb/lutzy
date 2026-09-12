@@ -132,8 +132,16 @@ public struct ContentView: View {
 
     /// A customizable toolbar (View ▸ Customize Toolbar…): every control has a stable id, and
     /// `ToolbarSpacer`s group them the way the old `Divider`s did, in the system's own idiom.
+    /// Split in two because a toolbar builder takes ten items at most.
     @ToolbarContentBuilder
     private var toolbarContent: some CustomizableToolbarContent {
+        viewControls
+        fileControls
+    }
+
+    /// Format, comparison, and the two side panels.
+    @ToolbarContentBuilder
+    private var viewControls: some CustomizableToolbarContent {
         // Format picker
         ToolbarItem(id: "format", placement: .primaryAction) {
             Picker("Format", selection: Bindable(viewModel).exportFormat) {
@@ -184,6 +192,11 @@ public struct ContentView: View {
             .disabled(viewModel.sourceImage == nil)
         }
 
+    }
+
+    /// Intensity, import, folders and export.
+    @ToolbarContentBuilder
+    private var fileControls: some CustomizableToolbarContent {
         ToolbarSpacer(.fixed, placement: .primaryAction)
 
         // LUT intensity
