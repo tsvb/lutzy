@@ -1,6 +1,6 @@
 # CLAUDE.md — project guidance for AI agents
 
-LUTzy is a native **macOS 14+** app (**Swift 6 language mode**, SwiftUI + Core Image, **zero third-party dependencies**) that applies `.cube` 3D LUTs to RAW/DNG and standard images, and can derive a `.cube` LUT from a (RAW, JPG) pair.
+LUTzy is a native **macOS 26+** app (**Swift 6 language mode**, SwiftUI + Core Image, **zero third-party dependencies**) that applies `.cube` 3D LUTs to RAW/DNG and standard images, and can derive a `.cube` LUT from a (RAW, JPG) pair.
 
 ## Build / run / test
 
@@ -13,33 +13,21 @@ LUTzy is a native **macOS 14+** app (**Swift 6 language mode**, SwiftUI + Core I
   inactive in both. Wiring it up needs an Xcode app target that does not exist yet.
 - Tests: `swift test`. CI runs debug build → tests → release build.
 
-**SDK and deployment target are different things — don't conflate them.** CI runs on `macos-26`
-(Xcode 26.x, macOS 26 SDK); `Package.swift` deploys to **macOS 14**. Building against a current SDK
-while deploying to 14 is the normal Apple model and is the *stricter* arrangement: the compiler
-refuses any API newer than the deployment target unless it is `#available`-guarded, so the guard is
-enforced rather than remembered. Use newer API behind `#available` — don't avoid it.
+**SDK and deployment target are different things — don't conflate them.** CI runs on GitHub's
+`xcode-27` label (Xcode 27, macOS 27 SDK); `Package.swift` deploys to **macOS 26**. Building against
+a current SDK while deploying one release back is the normal Apple model and is the *stricter*
+arrangement: the compiler refuses any API newer than the deployment target unless it is
+`#available`-guarded, so the guard is enforced rather than remembered. macOS 26 API — Liquid Glass,
+`ToolbarSpacer`, `CIRAWFilter`'s highlight-recovery pair — is used unguarded; macOS 27 API goes behind
+`#available(macOS 27, *)` with a macOS 26 fallback. Use newer API behind `#available` — don't avoid it.
 
-**Requires Xcode 26 or newer to build.** That is the cost of the above: the package references
-`CIRAWFilter`'s highlight-recovery pair — `isHighlightRecoveryEnabled` and `isHighlightRecoverySupported`
-— which only exist in the macOS 26 SDK. They are the only two properties `CIRAWFilter` gained after the
-macOS 14 deployment target; every other knob the package touches is present at 14. On an older Xcode the
-package will not compile, and no availability check can change that — `#available` gates a call at
-runtime; it cannot conjure a symbol the SDK never declared. That distinction cost a red build in Phase 2
-Step 2, when CI still ran `macos-14` (Xcode 15.4 / macOS 14.5 SDK) and the code built clean locally.
-
-If CI ever needs to move back to an older image, **the whole highlight-recovery feature has to go with
-it, not one line.** There are seven references across three files, and deleting only the one named above
-still leaves the build red:
-
-- `RAWDevelopSettings.apply(to:)` — the guard *and* its body (`:154-155`); the guard names the sibling
-  property, so it does not survive on its own.
-- `RenderEngine.rawCapabilities(for:)` (`:257-258`) — the capability probe, in a second file.
-- `RAWDevelopSettingsTests` (`:164-165`, `:200-202`) — compiled by `swift test`, which CI runs.
-- `RAWDevelopSettingsTests` (`:289-303`) — source-text assertions that pin the
-  `isHighlightRecoverySupported` check and the `#available` guard, and so fail once the knob is gone.
-
-`RAWCapabilities.isHighlightRecoverySupported` is LUTzy's own stored property, not the SDK's, and can
-stay.
+**Requires Xcode 27 or newer to build.** That is the cost of the above: a macOS 27 symbol has to be in
+the SDK before it can be referenced, guarded or not — `#available` gates a call at runtime; it cannot
+conjure a symbol the SDK never declared. The `macos-26` runner images ship Xcode 26.x and cannot
+compile the package. (The same distinction cost a red build in Phase 2 Step 2, when CI ran `macos-14`
+and the highlight-recovery reference built clean locally.) `RAWDevelopSettingsTests` pins that the
+highlight-recovery write no longer carries an `#available` guard: with a 26 floor that check is
+always true and the compiler flags it as unnecessary.
 
 ## Swift 6 language mode is on, for every target
 
@@ -81,7 +69,7 @@ The package is split so the app's code is testable (`@testable` can't import an 
 When a test needs something currently `private`, widen it to internal with a comment saying why —
 `RecipeExtractor.buildCube` and `workingSize` are the precedent.
 
-Constraints that must hold: **macOS 14 minimum**, **zero third-party dependencies** (Apple frameworks only). Don't introduce SPM/CocoaPods/Carthage deps.
+Constraints that must hold: **macOS 26 minimum**, **zero third-party dependencies** (Apple frameworks only). Don't introduce SPM/CocoaPods/Carthage deps.
 
 ## Agent & workflow safety (READ THIS)
 

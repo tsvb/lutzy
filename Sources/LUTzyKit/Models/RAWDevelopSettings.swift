@@ -141,17 +141,10 @@ struct RAWDevelopSettings: Codable, Sendable, Equatable {
             filter.isLensCorrectionEnabled = lensCorrectionEnabled
         }
 
-        // The only knob newer than the macOS 14 deployment target, so the only one needing
-        // `#available`. The SDK header still marks it `16_0`, which the Swift importer maps onto the
-        // renumbered macOS 26 — `26` is written because that is the version the compiler enforces.
-        //
-        // This guard is not optional politeness: with a 14.0 deployment target the compiler *refuses*
-        // the reference without it. That is the point of building against a current SDK — the
-        // requirement is checked rather than remembered. (It also means this file needs Xcode 26 or
-        // newer to compile at all; see CLAUDE.md.)
-        //
-        // A no-op on macOS 14/15, where the document keeps the setting and the decoder never sees it.
-        if let highlightRecoveryEnabled, #available(macOS 26, *), filter.isHighlightRecoverySupported {
+        // Highlight recovery arrived in the macOS 26 SDK. It used to be the one knob newer than the
+        // deployment target and carried an `#available(macOS 26, *)` guard; the floor is now macOS 26,
+        // so it is gated exactly like the eight adjustments above — on its own `is*Supported` flag.
+        if let highlightRecoveryEnabled, filter.isHighlightRecoverySupported {
             filter.isHighlightRecoveryEnabled = highlightRecoveryEnabled
         }
     }

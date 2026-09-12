@@ -2,7 +2,7 @@
 
 A macOS app that applies `.cube` LUTs to RAW and other images. It can also build a LUT from a RAW + JPEG pair.
 
-SwiftUI and Core Image, no third-party packages. macOS 14 to run, [Xcode 26 to compile](#build).
+SwiftUI and Core Image, no third-party packages. macOS 26 to run, [Xcode 27 to compile](#build).
 
 ## Features
 
@@ -82,12 +82,12 @@ swift test
 
 There is no `.xcodeproj`. `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`; the appiconset is empty; there is no `Info.plist` or bundle identifier. The entitlements file is real (sandbox, user-selected files, app-scoped bookmarks) and unused. An Xcode app target would apply it. This repo doesn't have one.
 
-- **Run** — macOS 14
-- **Compile** — Xcode 26 / macOS 26 SDK
+- **Run** — macOS 26
+- **Compile** — Xcode 27 / macOS 27 SDK
 
-Deployment target and SDK are different things. The compiler rejects API newer than 14 unless it's `#available`-guarded. Highlight recovery on `CIRAWFilter` (`isHighlightRecoveryEnabled` / `isHighlightRecoverySupported`) only exists in the 26 SDK, so an older Xcode can't build the package — `#available` does not conjure a missing symbol. The binary still runs on 14.
+Deployment target and SDK are different things. The compiler rejects API newer than 26 unless it's `#available(macOS 27, *)`-guarded, and a macOS 27 symbol has to be in the SDK before it can be referenced at all — `#available` does not conjure a missing symbol — so Xcode 26 can't build the package. The binary still runs on 26.
 
-`swift test` generates fixtures into a temp directory. Tests that need a real RAW/JPEG pair look in `realworldtest/` (gitignored) and skip if it isn't there. `LUTZY_BENCH=1` for the preview-cost tests. CI is debug build → test → release build on `macos-26`.
+`swift test` generates fixtures into a temp directory. Tests that need a real RAW/JPEG pair look in `realworldtest/` (gitignored) and skip if it isn't there. `LUTZY_BENCH=1` for the preview-cost tests. CI is debug build → test → release build on GitHub's `xcode-27` runner.
 
 <details>
 <summary>Layout and render path</summary>

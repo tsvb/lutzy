@@ -145,7 +145,8 @@ struct RAWCapabilities: Sendable, Equatable {
     var isLuminanceNoiseReductionSupported: Bool = false
     var isColorNoiseReductionSupported: Bool = false
     var isLensCorrectionSupported: Bool = false
-    /// Always false below macOS 26, where the property is not in the imported interface at all.
+    /// Read straight off `CIRAWFilter.isHighlightRecoverySupported`, a macOS 26 SDK property — and
+    /// macOS 26 is the deployment floor, so no availability check stands between them.
     var isHighlightRecoverySupported: Bool = false
 
     // MARK: - Per-image seeds

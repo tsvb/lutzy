@@ -617,7 +617,9 @@ Worth knowing before leaning on the suite:
   independently checks that each of the **nine** gated properties in `apply(to:)` is written inside a
   condition that **names** its own `is*Supported` flag, which is the part the pixel test cannot see:
   the eight per-file adjustments from a table, and `highlightRecoveryEnabled` separately and more
-  strictly, for its `#available(macOS 26, *)` guard as well as its flag.
+  strictly, for its `#available(macOS 26, *)` guard as well as its flag. (*Superseded 09/2026:* the
+  deployment floor is macOS 26, the guard is gone, and the ninth check now pins that no `#available`
+  is reintroduced there. Still nine gated writes.)
 
   (This said "eight" until the opposition pass. Eight is the count of gated *seeds* on
   `RAWCapabilities` — highlight recovery has no per-image seed — so it is right for seeds and wrong

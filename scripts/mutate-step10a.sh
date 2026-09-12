@@ -331,8 +331,8 @@ mutate "RAWDevelopSettings: write an unsupported adjustment anyway" "$RD" \
 mutate "RAWDevelopSettings: an adjustment gated on the wrong flag" "$RD" \
   's/if let sharpnessAmount, filter\.isSharpnessSupported \{/if let sharpnessAmount, filter.isContrastSupported {/' \
   "RAWDevelopSettingsTests"
-mutate "RAWDevelopSettings: highlight recovery keeps #available but loses its flag" "$RD" \
-  's/if let highlightRecoveryEnabled, #available\(macOS 26, \*\), filter\.isHighlightRecoverySupported \{/if let highlightRecoveryEnabled, #available(macOS 26, *) {/' \
+mutate "RAWDevelopSettings: highlight recovery loses its flag" "$RD" \
+  's/if let highlightRecoveryEnabled, filter\.isHighlightRecoverySupported \{/if let highlightRecoveryEnabled {/' \
   "RAWDevelopSettingsTests"
 
 echo
