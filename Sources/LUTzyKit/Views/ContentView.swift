@@ -156,37 +156,35 @@ public struct ContentView: View {
 
         ToolbarSpacer(.fixed, placement: .primaryAction)
 
+        // The three panel controls are toggles, not buttons: the icon stays put and the on state
+        // shows as a highlight. A compare button whose icon flipped to "rectangle" read, next to
+        // the two sidebar icons, as one option of a three-way layout picker.
+
         // Side-by-side toggle
         ToolbarItem(id: "compare", placement: .primaryAction) {
-            Button {
-                viewModel.toggleSideBySide()
-            } label: {
-                Label(
-                    viewModel.isSideBySide ? "Single View" : "Side by Side",
-                    systemImage: viewModel.isSideBySide ? "rectangle" : "rectangle.split.2x1"
-                )
+            Toggle(isOn: Bindable(viewModel).isSideBySide) {
+                Label("Side by Side", systemImage: "rectangle.split.2x1")
             }
+            .toggleStyle(.button)
             .help("Toggle side-by-side comparison (V)")
         }
 
         // Source folder browser
         ToolbarItem(id: "source", placement: .primaryAction) {
-            Button {
-                viewModel.toggleSourceBrowser()
-            } label: {
+            Toggle(isOn: Bindable(viewModel).isSourceBrowserPresented) {
                 Label("Source", systemImage: "sidebar.leading")
             }
+            .toggleStyle(.button)
             .help("Show the source folder file browser")
             .disabled(viewModel.collection.items.isEmpty)
         }
 
         // The inspector: Info (histogram + EXIF), Develop, Adjust.
         ToolbarItem(id: "inspector", placement: .primaryAction) {
-            Button {
-                viewModel.toggleInspector()
-            } label: {
+            Toggle(isOn: Bindable(viewModel).isInspectorPresented) {
                 Label("Info", systemImage: "sidebar.right")
             }
+            .toggleStyle(.button)
             .help("Show the inspector — info, develop and adjustments (⌘I)")
             .keyboardShortcut("i", modifiers: .command)
             .disabled(viewModel.sourceImage == nil)
@@ -221,6 +219,8 @@ public struct ContentView: View {
                     .contentTransition(.numericText(value: viewModel.lutIntensity))
                     .animation(.default, value: viewModel.lutIntensity)
             }
+            // The readout is the last thing in its glass group; without this "100%" sits on the edge.
+            .padding(.trailing, 6)
             .help("LUT intensity (0–100%)")
             .disabled(viewModel.selectedLUT == nil)
         }
@@ -264,33 +264,36 @@ public struct ContentView: View {
             }
         }
 
-        // Export
+        // Export. With a multi-image set loaded it becomes a split button: click exports this image,
+        // the chevron offers Export All. Two adjacent buttons with near-identical share glyphs
+        // (`square.and.arrow.up` and `…on.square`) were indistinguishable at toolbar size.
+        // ⌘S is bound once, on the File ▸ Export menu item (LUTzyApp.swift), and ⌘⇧E on File ▸
+        // Export All; binding either here too gave the window two competing handlers.
         ToolbarItem(id: "export", placement: .primaryAction) {
-            Button {
-                viewModel.exportDialog()
-            } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
-            }
-            // ⌘S is bound once, on the File ▸ Export menu item (LUTzyApp.swift).
-            // Binding it here too gave the window two competing handlers.
-            .help("Export the graded image (⌘S)")
-            .disabled(viewModel.sourceImage == nil)
-        }
-
-        // Batch export — only when a multi-image set is loaded. Export keeps the higher priority:
-        // the single export is the everyday action, the batch the occasional one.
-        if viewModel.collection.isActive {
-            if #available(macOS 27, *) {
-                ToolbarItem(id: "exportAll", placement: .primaryAction) {
+            if viewModel.collection.isActive {
+                Menu {
                     exportAllButton
+                } label: {
+                    exportLabel
+                } primaryAction: {
+                    viewModel.exportDialog()
                 }
-                .visibilityPriority(.low)
+                .help("Export the graded image (⌘S); the arrow offers Export All (⌘⇧E)")
+                .disabled(viewModel.sourceImage == nil)
             } else {
-                ToolbarItem(id: "exportAll", placement: .primaryAction) {
-                    exportAllButton
+                Button {
+                    viewModel.exportDialog()
+                } label: {
+                    exportLabel
                 }
+                .help("Export the graded image (⌘S)")
+                .disabled(viewModel.sourceImage == nil)
             }
         }
+    }
+
+    private var exportLabel: some View {
+        Label("Export", systemImage: "square.and.arrow.up")
     }
 
     private var lutFolderButton: some View {
@@ -306,7 +309,7 @@ public struct ContentView: View {
         Button {
             viewModel.batchExportDialog()
         } label: {
-            Label("Export All", systemImage: "square.and.arrow.up.on.square")
+            Label("Export All...", systemImage: "square.and.arrow.up.on.square")
         }
         // Not "the current LUT": `performBatchExport` hands every image the whole `EditDocument` —
         // RAW develop and adjustments included. Saying LUT understated it in the direction that

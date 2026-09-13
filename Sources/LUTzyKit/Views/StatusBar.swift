@@ -44,12 +44,14 @@ struct KeyHint: View {
 
     var body: some View {
         HStack(spacing: 3) {
+            // One step up the label hierarchy from tertiary/quaternary, which on the glass capsule
+            // in dark mode was close to invisible.
             Text(key)
                 .font(.system(.caption2, design: .monospaced))
-                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                .foregroundStyle(.secondary)
             Text(label)
                 .font(.caption2)
-                .foregroundColor(Color(nsColor: .quaternaryLabelColor))
+                .foregroundStyle(.tertiary)
         }
     }
 }
