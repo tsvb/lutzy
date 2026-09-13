@@ -276,6 +276,8 @@ final class AppViewModel {
     /// preview flow without a GPU — the reason Step 4 introduced the protocol.
     private let engine: any RenderEngining
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    /// Redeeming the file promises of a Photos drop. Superseded by the next drop.
+    @ObservationIgnored private var dropTask: Task<Void, Never>?
     @ObservationIgnored private var previewTask: Task<Void, Never>?
     @ObservationIgnored private var originalPreviewTask: Task<Void, Never>?
     @ObservationIgnored private var intensityTask: Task<Void, Never>?
@@ -503,6 +505,77 @@ final class AppViewModel {
         collection.addFromData(items)
         if let first = items.first {
             openImage(data: first.data, name: first.name)
+        }
+    }
+
+    // MARK: - Drops
+
+    /// Open whatever landed on the preview canvas. See `ImageDrop` for the three payload shapes.
+    ///
+    /// Promised files are fetched first — Photos writes them out on demand, which for a RAW or a
+    /// large edit takes long enough to say so in the status bar — and then treated exactly like
+    /// dropped URLs, because that is what they are once received.
+    func handleDrop(_ payload: ImageDrop.Payload) {
+        switch payload {
+        case .urls(let urls):
+            openDropped(urls: urls)
+
+        case .image(let data, let name):
+            collection.clear()
+            openImage(data: data, name: name)
+
+        case .promises(let receivers):
+            dropTask?.cancel()
+            statusMessage = "Receiving dropped files..."
+            dropTask = Task {
+                let directory: URL
+                do {
+                    directory = try ImageDrop.makeDropDirectory()
+                } catch {
+                    presentError("Error: could not make room for the dropped files.")
+                    return
+                }
+                let urls = await ImageDrop.receive(receivers, into: directory)
+                guard !Task.isCancelled else { return }
+                if urls.isEmpty {
+                    presentError("Error: the dropped files could not be received.")
+                    return
+                }
+                openDropped(urls: urls)
+                // Only now: the collection has adopted the new files, so the previous drop's
+                // directory is no longer referenced by anything.
+                ImageDrop.purgeDropDirectories(except: directory)
+            }
+        }
+    }
+
+    /// Dropped URLs: a single folder becomes the source folder; one file opens on its own; several
+    /// files become an in-session set, browsable in the filmstrip, with the first one open.
+    ///
+    /// Unsupported files are skipped from a set, but a lone unsupported file is still tried so the
+    /// user sees the decoder's message rather than silence.
+    func openDropped(urls: [URL]) {
+        guard let first = urls.first else { return }
+
+        var isDir: ObjCBool = false
+        if urls.count == 1, FileManager.default.fileExists(atPath: first.path, isDirectory: &isDir), isDir.boolValue {
+            openSourceFolder(url: first)
+            return
+        }
+
+        let supported = urls.filter {
+            ImageDecoder.supportedExtensions.contains($0.pathExtension.lowercased())
+        }
+        switch supported.count {
+        case 0:
+            collection.clear()
+            openImage(url: first)
+        case 1:
+            collection.clear()
+            openImage(url: supported[0])
+        default:
+            collection.adopt(urls: supported)
+            openImage(url: supported[0])
         }
     }
 

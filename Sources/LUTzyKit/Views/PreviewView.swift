@@ -33,11 +33,9 @@ struct PreviewView: View {
                     .padding(4)
             }
         }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else { return false }
-            open(dropped: url)
-            return true
-        } isTargeted: { isDropTargeted = $0 }
+        // A delegate rather than `dropDestination(for: URL.self)`: Photos drags carry file promises,
+        // not URLs, and only the delegate can reach the pasteboard to redeem them (see `ImageDrop`).
+        .onDrop(of: ImageDrop.acceptedTypes, delegate: ImageDropDelegate(viewModel: viewModel, isTargeted: $isDropTargeted))
     }
 
     // MARK: - Side-by-side
@@ -133,18 +131,6 @@ struct PreviewView: View {
         }
     }
 
-    // MARK: - Drop
-
-    /// A folder becomes the source folder; a file replaces whatever set was loaded.
-    private func open(dropped url: URL) {
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-            viewModel.openSourceFolder(url: url)
-        } else {
-            viewModel.collection.clear()
-            viewModel.openImage(url: url)
-        }
-    }
 }
 
 /// A Liquid Glass capsule over the image — it reads on any picture and follows the window's tint.

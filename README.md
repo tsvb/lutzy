@@ -9,7 +9,7 @@ SwiftUI and Core Image, no third-party packages. macOS 26 to run, [Xcode 27 to c
 - **RAW** via `CIRAWFilter`, not the embedded preview.
   DNG, CR2, CR3, NEF, ARW, ORF, RAF, RW2, PEF, SRW, X3F, RAW.
   JPEG, PNG, TIFF, BMP, HEIC.
-- **Import** — drop a file or a folder. <kbd>⌘O</kbd> file · <kbd>⌘⇧I</kbd> Photos (max 50) · <kbd>⌘⌥I</kbd> source folder.
+- **Import** — drop a file, a folder, several files, or pictures straight from Photos. <kbd>⌘O</kbd> file · <kbd>⌘⇧I</kbd> Photos (max 50) · <kbd>⌘⌥I</kbd> source folder.
 - **LUTs** — `.cube` 3D (`LUT_3D_SIZE`, `DOMAIN_MIN` / `DOMAIN_MAX`) through `CIColorCubeWithColorSpace` on Metal. Sidebar scans recursively, groups by subfolder, searchable. Intensity 0–100%. <kbd>⌘⇧L</kbd> picks the folder.
 - **Preview** — <kbd>V</kbd> side-by-side / single. Hold <kbd>Space</kbd> in single view for the original. <kbd>↑</kbd> <kbd>↓</kbd> walk the library.
 - **Inspector** <kbd>⌘I</kbd>
