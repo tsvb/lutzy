@@ -162,6 +162,9 @@ final class UpdateCoordinator {
                 let installed = try await install(release)
                 guard !Task.isCancelled else { return }
                 phase = .installing(release)
+                // Let the sheet come down before asking the app to quit: see `relaunch`.
+                isSheetPresented = false
+                try? await Task.sleep(for: .milliseconds(300))
                 UpdateInstaller.relaunch(installed)
             } catch {
                 guard !Task.isCancelled else { return }

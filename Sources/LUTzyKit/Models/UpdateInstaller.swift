@@ -188,6 +188,13 @@ enum UpdateInstaller {
     /// Relaunch once this process has gone. `open` is deferred to a shell that polls the PID, so
     /// there is never a moment with two copies running and Launch Services always starts the new
     /// bundle rather than reusing this one.
+    ///
+    /// **Quitting is not left to `NSApp.terminate` alone** — measured, not assumed. In the first
+    /// end-to-end run the swap landed, the shell was waiting, and the old process stayed up behind
+    /// its "Installing…" sheet: `terminate(_:)` sent from under a presented SwiftUI sheet did not
+    /// end the app. So the caller dismisses the sheet first, and if the process is still here a
+    /// second after `terminate`, it exits outright. There is nothing to save — preferences are
+    /// already with `cfprefsd` — and the whole point of this call is to stop existing.
     @MainActor
     static func relaunch(_ appURL: URL) {
         let script = "while /bin/kill -0 \"$1\" 2>/dev/null; do /bin/sleep 0.2; done; /usr/bin/open \"$0\""
@@ -196,6 +203,7 @@ enum UpdateInstaller {
         process.arguments = ["-c", script, appURL.path, String(ProcessInfo.processInfo.processIdentifier)]
         try? process.run()
         NSApp.terminate(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) }
     }
 
     // MARK: - The whole thing
