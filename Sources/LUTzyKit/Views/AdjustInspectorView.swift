@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Tone and colour adjustments — the nodes that run *after* the develop stage and *before* the LUT.
+/// Tone and colour adjustments — the nodes that run *after* the develop stage and *before* the LUT
+/// — plus the LUT's own intensity, which used to live in the toolbar.
 ///
 /// **One state, where `DevelopInspectorView` has three.** That asymmetry is the honest one: Develop's
 /// three states exist because *the file* answers a question — is there a decode stage, and has the
@@ -8,79 +9,81 @@ import SwiftUI
 /// already-developed image, so they mean the same thing for a RAW and a JPEG, and no row is ever
 /// absent or gated.
 ///
-/// Nine rows over five `AdjustmentNode` cases, one row per parameter. The list is not written out
-/// here — it comes from `AdjustmentControl.allCases`, so which rows appear and in what order is a
-/// value the tests can assert rather than a shape buried in a `ViewBuilder`.
+/// Three sections rather than one flat list: "LUT" (just Intensity — the one adjustment that only
+/// means anything with a look selected), "Light" (tone: exposure, brightness, contrast, highlights,
+/// shadows) and "Color" (saturation, vibrance, temperature, tint). The row lists come from
+/// `AdjustmentControl.allCases.filter { $0.group == … }`, so which rows appear and in what order is
+/// a value the tests can assert rather than a shape buried in a `ViewBuilder`.
 struct AdjustInspectorView: View {
     let viewModel: AppViewModel
-    /// Bumped per control on reset so its arrow bounces; the value itself is meaningless.
-    @State private var resets: [AdjustmentControl: Int] = [:]
 
     var body: some View {
         Form {
+            Section("LUT") {
+                AdjustmentRow(
+                    title: "Intensity",
+                    value: intensityPercentBinding,
+                    range: 0...100,
+                    neutral: 100,
+                    unit: "%",
+                    digits: 0,
+                    onReset: { viewModel.setLUTIntensity(1) }
+                )
+            }
+            .disabled(viewModel.selectedLUT == nil)
+
             Section {
-                ForEach(AdjustmentControl.allCases, id: \.self) { control in
-                    controlRow(control)
+                ForEach(AdjustmentControl.allCases.filter { $0.group == .light }, id: \.self) { control in
+                    row(for: control)
                 }
             } header: {
-                header
+                groupHeader(.light)
+            }
+
+            Section {
+                ForEach(AdjustmentControl.allCases.filter { $0.group == .color }, id: \.self) { control in
+                    row(for: control)
+                }
+            } header: {
+                groupHeader(.color)
             }
         }
         .formStyle(.grouped)
         .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
-    private var header: some View {
+    private var intensityPercentBinding: Binding<Double> {
+        Binding(
+            get: { viewModel.lutIntensity * 100 },
+            set: { viewModel.setLUTIntensity($0 / 100) }
+        )
+    }
+
+    private func groupHeader(_ group: AdjustmentGroup) -> some View {
         HStack {
-            Text("Adjustments")
+            Text(group.rawValue)
             Spacer()
-            Button("Reset") { viewModel.resetAllAdjustments() }
+            Button("Reset") { resetGroup(group) }
                 .buttonStyle(.link)
-                .disabled(!viewModel.hasAdjustments)
+                .disabled(!viewModel.hasAdjustments(in: group))
         }
     }
 
-    @ViewBuilder
-    private func controlRow(_ control: AdjustmentControl) -> some View {
-        let value = viewModel.adjustmentValue(for: control)
-        VStack(alignment: .leading, spacing: 4) {
-            LabeledContent {
-                HStack(spacing: 6) {
-                    Text(readout(for: control))
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText(value: value))
-                        .animation(.default, value: value)
-                    Button {
-                        resets[control, default: 0] += 1
-                        viewModel.resetAdjustment(control)
-                    } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                            .symbolEffect(.bounce, value: resets[control, default: 0])
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.mini)
-                    .help("Reset to neutral")
-                }
-            } label: {
-                Text(control.title)
-            }
-
-            Slider(value: viewModel.adjustmentBinding(for: control), in: control.range)
-                .labelsHidden()
+    private func resetGroup(_ group: AdjustmentGroup) {
+        for control in AdjustmentControl.allCases where control.group == group {
+            viewModel.resetAdjustment(control)
         }
     }
 
-    /// Kelvin reads as a whole number; everything else to two places. 5842.20 K is noise on a
-    /// slider whose useful travel is thousands of degrees wide.
-    private func readout(for control: AdjustmentControl) -> String {
-        let value = viewModel.adjustmentValue(for: control)
-        switch control {
-        case .temperature:
-            return String(format: "%.0f K", value)
-        case .exposure, .brightness, .contrast, .saturation, .highlights, .shadows, .tint, .vibrance:
-            return String(format: "%.2f", value)
-        }
+    private func row(for control: AdjustmentControl) -> some View {
+        AdjustmentRow(
+            title: control.title,
+            value: viewModel.adjustmentBinding(for: control),
+            range: control.range,
+            neutral: control.sliderMapped(control.neutral),
+            unit: control.unit,
+            digits: control == .temperature ? 0 : 2,
+            onReset: { viewModel.resetAdjustment(control) }
+        )
     }
 }

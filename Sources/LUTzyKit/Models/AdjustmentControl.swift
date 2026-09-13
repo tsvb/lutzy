@@ -185,6 +185,37 @@ enum AdjustmentControl: String, Sendable, CaseIterable, Hashable {
         case .vibrance: return -1...1
         }
     }
+
+    /// Which of the two Adjust-panel sections this row belongs to.
+    ///
+    /// **No `default:` arm**, the same reasoning as `isToggle` on `DevelopControl`: a tenth control
+    /// must be a compile error naming this file, not a row that silently drops into the wrong
+    /// section — or neither.
+    var group: AdjustmentGroup {
+        switch self {
+        case .exposure, .brightness, .contrast, .highlights, .shadows: return .light
+        case .saturation, .vibrance, .temperature, .tint: return .color
+        }
+    }
+
+    /// The unit suffix shown after the readout, or `nil` for a plain number.
+    var unit: String? {
+        switch self {
+        case .temperature: return "K"
+        case .exposure, .brightness, .contrast, .saturation, .highlights, .shadows, .tint, .vibrance:
+            return nil
+        }
+    }
+}
+
+/// The two sections `AdjustInspectorView` lists its rows under.
+///
+/// `Light` is tone (exposure, brightness, contrast, highlights, shadows); `Color` is everything that
+/// changes hue or chroma rather than luminance (saturation, vibrance, temperature, tint). The raw
+/// value is the section header text.
+enum AdjustmentGroup: String, CaseIterable, Sendable {
+    case light = "Light"
+    case color = "Color"
 }
 
 // MARK: - The sparse contract

@@ -182,39 +182,9 @@ public struct ContentView: View {
         }
     }
 
-    /// Intensity, import, folders and export.
+    /// Import, folders and export.
     @ToolbarContentBuilder
     private var fileControls: some CustomizableToolbarContent {
-        ToolbarSpacer(.fixed, placement: .primaryAction)
-
-        // LUT intensity
-        ToolbarItem(id: "intensity", placement: .primaryAction) {
-            HStack(spacing: 6) {
-                Text("Intensity")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Slider(
-                    value: Binding(
-                        get: { viewModel.lutIntensity },
-                        set: { viewModel.setLUTIntensity($0) }
-                    ),
-                    in: 0...1
-                )
-                .frame(width: 100)
-                Text("\(Int((viewModel.lutIntensity * 100).rounded()))%")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .trailing)
-                    .contentTransition(.numericText(value: viewModel.lutIntensity))
-                    .animation(.default, value: viewModel.lutIntensity)
-            }
-            // The readout is the last thing in its glass group; without this "100%" sits on the edge.
-            .padding(.trailing, 6)
-            .help("LUT intensity (0–100%)")
-            .disabled(viewModel.selectedLUT == nil)
-        }
-
         ToolbarSpacer(.fixed, placement: .primaryAction)
 
         // Import menu

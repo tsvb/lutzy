@@ -86,6 +86,38 @@ extension AppViewModel {
         }
     }
 
+    /// What `developValue(for:)` would read immediately after `resetDevelop(_:)` — the decoder's own
+    /// default, used as `AdjustmentRow`'s reset target and as the "off neutral" comparison that
+    /// decides whether its reset button is shown.
+    ///
+    /// Mirrors `developValue(for:)` exactly, with every stored (non-`nil`) half of the `??` chains
+    /// removed — which is what "as if this control had just been reset" means, since a reset writes
+    /// `nil`, not a literal. Kept beside it rather than derived from it (e.g. by resetting a scratch
+    /// copy of `document.rawDevelop`) so the two stay a single switch apart for review, the same
+    /// choice `setDevelop`/`resetDevelop` already made for the write side.
+    func developNeutralValue(for control: DevelopControl) -> Double {
+        let seed = rawCapabilities
+        switch control {
+        case .exposure: return 0
+        case .baselineExposure: return seed?.baselineExposure ?? 0
+        case .shadowBias: return seed?.shadowBias ?? 0
+        case .boost: return 1
+        case .boostShadow: return 1
+        case .whiteBalance: return seed?.asShotTemperature ?? 0
+        case .sharpness: return seed?.sharpnessAmount ?? 0
+        case .contrast: return seed?.contrastAmount ?? 0
+        case .detail: return seed?.detailAmount ?? 0
+        case .moireReduction: return seed?.moireReductionAmount ?? 0
+        case .localToneMap: return seed?.localToneMapAmount ?? 0
+        case .luminanceNoiseReduction: return seed?.luminanceNoiseReductionAmount ?? 0
+        case .colorNoiseReduction: return seed?.colorNoiseReductionAmount ?? 0
+        case .lensCorrection: return (seed?.lensCorrectionEnabled ?? false) ? 1 : 0
+        case .gamutMapping: return 1
+        case .extendedDynamicRange: return 0
+        case .highlightRecovery: return 1
+        }
+    }
+
     /// The tint half of white balance. Separate because `whiteBalance` is one row with two sliders.
     func developTintBinding() -> Binding<Double> {
         Binding(
