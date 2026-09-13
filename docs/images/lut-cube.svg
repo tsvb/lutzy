@@ -154,6 +154,6 @@
 <path d="M318 152 H398" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round"/>
 <path d="M392 146 L399 152 L392 158" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="358" y="140" text-anchor="middle" fill="#6E6E73" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">.cube</text>
-<text x="190" y="304" text-anchor="middle" fill="#6E6E73">every colour a photo can hold</text>
+<text x="190" y="304" text-anchor="middle" fill="#6E6E73">every color a photo can hold</text>
 <text x="530" y="304" text-anchor="middle" fill="#6E6E73">where the LUT sends each one</text>
 </svg>

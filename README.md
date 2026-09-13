@@ -1,4 +1,4 @@
-<img src="Sources/LUTzy/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="96" alt="The LUTzy icon: an RGB colour cube on a dark tile">
+<img src="Sources/LUTzy/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="96" alt="The LUTzy icon: an RGB color cube on a dark tile">
 
 # LUTzy
 
@@ -6,9 +6,9 @@ A macOS app that applies `.cube` LUTs to RAW and other images. It can also build
 
 SwiftUI and Core Image, no third-party packages. macOS 26 to run, [Xcode 27 to compile](#build).
 
-A 3D LUT is a table with a colour at every lattice point. The photo's colours are looked up in it, interpolated between the nearest points, and replaced. That is the whole trick, and it is why a LUT can be a look but never a sharpen or a blur.
+A 3D LUT is a table with a color at every lattice point. The photo's colors are looked up in it, interpolated between the nearest points, and replaced. That is the whole trick, and it is why a LUT can be a look but never a sharpen or a blur.
 
-<img src="docs/images/lut-cube.svg" width="720" alt="Two colour cubes. On the left, a regular lattice of coloured dots. On the right, the same dots after a LUT: shadows lifted and cooled, highlights warmed.">
+<img src="docs/images/lut-cube.svg" width="720" alt="Two color cubes. On the left, a regular lattice of colored dots. On the right, the same dots after a LUT: shadows lifted and cooled, highlights warmed.">
 
 ## Features
 
@@ -32,7 +32,7 @@ A 3D LUT is a table with a colour at every lattice point. The photo's colours ar
 
 The JPEG is treated as a look (the manufacturer's color science, or whatever picture profile was on). LUTzy writes the difference against a neutral RAW develop. Same frame required — aspect within 1%. Pixel size can differ.
 
-<img src="docs/images/derive.svg" width="720" alt="RAW is developed neutrally and the JPEG decoded; the pair is aligned, edges masked, sampled, and filled into a 33-cubed cube that is written as a .cube file and a report.">
+<img src="docs/images/derive.svg" width="720" alt="RAW is developed with neutral settings and the JPEG decoded; the pair is aligned, edges masked, sampled, and filled into a 33-cubed cube that is written as a .cube file and a report.">
 
 The result previews on the current image and stays in memory until **Save to LUT Folder…**.
 

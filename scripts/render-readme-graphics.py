@@ -62,7 +62,7 @@ def lut_cube_svg():
     out.append(f'<path d="M318 152 H398" stroke="{INK}" stroke-width="1.2" fill="none" stroke-linecap="round"/>')
     out.append(f'<path d="M392 146 L399 152 L392 158" stroke="{INK}" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>')
     out.append(f'<text x="358" y="140" text-anchor="middle" fill="{INK2}" font-family="{MONO}" font-size="12">.cube</text>')
-    out.append(f'<text x="190" y="304" text-anchor="middle" fill="{INK2}">every colour a photo can hold</text>')
+    out.append(f'<text x="190" y="304" text-anchor="middle" fill="{INK2}">every color a photo can hold</text>')
     out.append(f'<text x="530" y="304" text-anchor="middle" fill="{INK2}">where the LUT sends each one</text>')
     out.append('</svg>')
     return '\n'.join(out)
