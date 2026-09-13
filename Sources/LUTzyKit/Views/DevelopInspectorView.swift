@@ -82,9 +82,6 @@ struct DevelopInspectorView: View {
     /// the defect `developPanelState` exists to prevent — see this type's doc comment.
     private var notRAW: some View {
         VStack(spacing: 8) {
-            Image(systemName: "camera.aperture")
-                .font(.largeTitle)
-                .foregroundStyle(.tertiary)
             Text("No develop stage")
                 .font(.headline)
             Text("Develop controls come from the RAW decoder. This image is already rendered.")

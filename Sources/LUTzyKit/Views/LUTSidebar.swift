@@ -70,6 +70,8 @@ struct LUTSidebar: View {
                 scanningState
             } else if viewModel.library.allLUTs.isEmpty {
                 emptyState
+            } else if isSearching && filteredCategories.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             } else {
                 lutList
             }
@@ -94,25 +96,25 @@ struct LUTSidebar: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: viewModel.library.scanError == nil
-                  ? "cube.transparent" : "exclamationmark.triangle")
-                .font(.system(size: 32))
-                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-            Text(viewModel.library.scanError ?? "No LUTs loaded")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 16)
-            Button("Choose Folder...") {
-                viewModel.chooseLUTFolder()
+        if let scanError = viewModel.library.scanError {
+            ContentUnavailableView {
+                Label("Couldn't Scan LUT Folder", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(scanError)
+            } actions: {
+                Button("Choose Folder…") { viewModel.chooseLUTFolder() }
+                    .buttonStyle(.bordered)
             }
-            .buttonStyle(.glass)
-            Spacer()
+        } else {
+            ContentUnavailableView {
+                Label("No LUTs", systemImage: "cube.transparent")
+            } description: {
+                Text("Choose a folder of .cube files to build your LUT library.")
+            } actions: {
+                Button("Choose Folder…") { viewModel.chooseLUTFolder() }
+                    .buttonStyle(.bordered)
+            }
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var lutList: some View {

@@ -120,7 +120,7 @@ public struct ContentView: View {
                     FilmstripView(collection: viewModel.collection) { index in
                         viewModel.selectCollectionImage(at: index)
                     }
-                    .frame(height: 100)
+                    .frame(height: 84)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
@@ -180,18 +180,6 @@ public struct ContentView: View {
             .help("Show the source folder file browser")
             .disabled(viewModel.collection.items.isEmpty)
         }
-
-        // The inspector: Info (histogram + EXIF), Develop, Adjust.
-        ToolbarItem(id: "inspector", placement: .primaryAction) {
-            Toggle(isOn: Bindable(viewModel).isInspectorPresented) {
-                Label("Info", systemImage: "sidebar.right")
-            }
-            .toggleStyle(.button)
-            .help("Show the inspector — info, develop and adjustments (⌘I)")
-            .keyboardShortcut("i", modifiers: .command)
-            .disabled(viewModel.sourceImage == nil)
-        }
-
     }
 
     /// Intensity, import, folders and export.
@@ -291,6 +279,19 @@ public struct ContentView: View {
                 .help("Export the graded image (⌘S)")
                 .disabled(viewModel.sourceImage == nil)
             }
+        }
+
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        // The inspector: Info (histogram + EXIF), Develop, Adjust.
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
+            Toggle(isOn: Bindable(viewModel).isInspectorPresented) {
+                Label("Inspector", systemImage: "sidebar.right")
+            }
+            .toggleStyle(.button)
+            .help("Show the inspector — info, develop and adjustments (⌘I)")
+            .keyboardShortcut("i", modifiers: .command)
+            .disabled(viewModel.sourceImage == nil)
         }
     }
 

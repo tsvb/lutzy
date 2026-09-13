@@ -39,35 +39,29 @@ struct FilmstripThumbnail: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                if let thumbnail = item.thumbnail {
-                    Image(nsImage: thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 72, height: 72)
-                        .clipped()
-                } else {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(width: 72, height: 72)
-                        .overlay {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                        }
-                }
+        ZStack {
+            if let thumbnail = item.thumbnail {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 64, height: 64)
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.15))
+                    .frame(width: 64, height: 64)
+                    .overlay {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                    }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2.5)
-            )
-
-            Text(item.displayName)
-                .font(.system(size: 9))
-                .foregroundColor(isSelected ? .primary : .secondary)
-                .lineLimit(1)
-                .frame(width: 72)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .padding(3)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+        )
+        .accessibilityLabel(item.displayName)
     }
 }

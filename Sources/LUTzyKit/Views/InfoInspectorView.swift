@@ -54,10 +54,8 @@ struct InfoInspectorView: View {
                     Text("Histogram")
                     Spacer()
                     Text(histogramSourceLabel)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             metadataSection
@@ -132,17 +130,12 @@ struct InfoInspectorView: View {
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "info.circle")
-                .font(.system(size: 28, weight: .thin))
-                .foregroundStyle(.secondary.opacity(0.5))
-            // This stands in for the whole inspector, not just the Info tab, so it names all three.
-            Text("Open an image to see its histogram\nand EXIF, and to develop and adjust it")
-                .font(.caption)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        // This stands in for the whole inspector, not just the Info tab, so it names all three.
+        Text("Open an image to see its histogram and EXIF, and to develop and adjust it")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
     }
 }
