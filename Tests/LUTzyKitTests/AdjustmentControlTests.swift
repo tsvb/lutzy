@@ -66,6 +66,45 @@ final class AdjustmentControlTests: XCTestCase {
             XCTAssertFalse(control.title.hasPrefix("CI"), "\(control)'s title is a filter name")
         }
     }
+
+    /// The panel's two sections: exact membership, and — since `AdjustInspectorView` builds each
+    /// section as `AdjustmentControl.allCases.filter { $0.group == … }` — every control belongs to
+    /// exactly one group, and filtering by group preserves `allCases`' own relative order within
+    /// it. The panel itself lists the Light section before the Color section (two `Section`s in
+    /// that order), independent of the enum's declaration order.
+    func testGroupMembershipAndPanelOrder() {
+        let light: Set<AdjustmentControl> = [.exposure, .brightness, .contrast, .highlights, .shadows]
+        let color: Set<AdjustmentControl> = [.saturation, .vibrance, .temperature, .tint]
+        XCTAssertEqual(light.union(color), Set(AdjustmentControl.allCases),
+                       "every control must belong to exactly one group")
+        XCTAssertEqual(light.intersection(color), [], "no control may belong to both groups")
+
+        for control in AdjustmentControl.allCases {
+            let expected: AdjustmentGroup = light.contains(control) ? .light : .color
+            XCTAssertEqual(control.group, expected, "\(control)")
+        }
+
+        // Filtering by group must not reorder the rows within it.
+        let lightRows = AdjustmentControl.allCases.filter { $0.group == .light }
+        let colorRows = AdjustmentControl.allCases.filter { $0.group == .color }
+        XCTAssertEqual(Set(lightRows), light)
+        XCTAssertEqual(Set(colorRows), color)
+        XCTAssertEqual(lightRows, AdjustmentControl.allCases.filter(light.contains),
+                       "the Light section must keep allCases' own relative order")
+        XCTAssertEqual(colorRows, AdjustmentControl.allCases.filter(color.contains),
+                       "the Color section must keep allCases' own relative order")
+    }
+
+    /// Temperature alone carries a unit; every other row is a plain number.
+    func testOnlyTemperatureHasAUnit() {
+        for control in AdjustmentControl.allCases {
+            if control == .temperature {
+                XCTAssertEqual(control.unit, "K")
+            } else {
+                XCTAssertNil(control.unit, "\(control)")
+            }
+        }
+    }
 }
 
 // MARK: - The sparse contract

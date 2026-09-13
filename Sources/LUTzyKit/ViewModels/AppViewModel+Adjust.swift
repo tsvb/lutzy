@@ -61,4 +61,14 @@ extension AppViewModel {
     /// would agree either way; Step 11's undo path is what makes them diverge, so this is written to
     /// match now rather than after that lands.
     var hasAdjustments: Bool { !document.adjustments.allSatisfy(\.isIdentity) }
+
+    /// Whether any control in one Adjust-panel section is off its neutral — that section's own
+    /// Reset button's enabled state. `AdjustmentGroup.allCases` will not silently miss a new
+    /// section, since `hasAdjustments` above already establishes what "off neutral" means for a
+    /// single control.
+    func hasAdjustments(in group: AdjustmentGroup) -> Bool {
+        AdjustmentControl.allCases
+            .filter { $0.group == group }
+            .contains { adjustmentValue(for: $0) != $0.neutral }
+    }
 }

@@ -21,7 +21,8 @@ public struct ContentView: View {
 
     public var body: some View {
         mainContent
-            .navigationTitle("")
+            .navigationTitle(viewModel.sourceName.isEmpty ? "LUTzy" : viewModel.sourceName)
+            .navigationSubtitle(viewModel.selectedLUT?.name ?? "")
             .toolbarTitleDisplayMode(.inline)
             .toolbar(id: "main") {
                 toolbarContent
@@ -90,6 +91,7 @@ public struct ContentView: View {
         }
         .onKeyPress(keys: KeyCommandMap.keys, phases: KeyCommandMap.phases) { press in
             guard !isSearchFocused,
+                  !KeyCommandMap.textInputHasFocus(),
                   let action = KeyCommandMap.action(
                     for: press.key,
                     modifiers: press.modifiers,
@@ -118,7 +120,7 @@ public struct ContentView: View {
                     FilmstripView(collection: viewModel.collection) { index in
                         viewModel.selectCollectionImage(at: index)
                     }
-                    .frame(height: 100)
+                    .frame(height: 84)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
@@ -178,53 +180,11 @@ public struct ContentView: View {
             .help("Show the source folder file browser")
             .disabled(viewModel.collection.items.isEmpty)
         }
-
-        // The inspector: Info (histogram + EXIF), Develop, Adjust.
-        ToolbarItem(id: "inspector", placement: .primaryAction) {
-            Toggle(isOn: Bindable(viewModel).isInspectorPresented) {
-                Label("Info", systemImage: "sidebar.right")
-            }
-            .toggleStyle(.button)
-            .help("Show the inspector — info, develop and adjustments (⌘I)")
-            .keyboardShortcut("i", modifiers: .command)
-            .disabled(viewModel.sourceImage == nil)
-        }
-
     }
 
-    /// Intensity, import, folders and export.
+    /// Import, folders and export.
     @ToolbarContentBuilder
     private var fileControls: some CustomizableToolbarContent {
-        ToolbarSpacer(.fixed, placement: .primaryAction)
-
-        // LUT intensity
-        ToolbarItem(id: "intensity", placement: .primaryAction) {
-            HStack(spacing: 6) {
-                Text("Intensity")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Slider(
-                    value: Binding(
-                        get: { viewModel.lutIntensity },
-                        set: { viewModel.setLUTIntensity($0) }
-                    ),
-                    in: 0...1
-                )
-                .frame(width: 100)
-                Text("\(Int((viewModel.lutIntensity * 100).rounded()))%")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .trailing)
-                    .contentTransition(.numericText(value: viewModel.lutIntensity))
-                    .animation(.default, value: viewModel.lutIntensity)
-            }
-            // The readout is the last thing in its glass group; without this "100%" sits on the edge.
-            .padding(.trailing, 6)
-            .help("LUT intensity (0–100%)")
-            .disabled(viewModel.selectedLUT == nil)
-        }
-
         ToolbarSpacer(.fixed, placement: .primaryAction)
 
         // Import menu
@@ -249,19 +209,6 @@ public struct ContentView: View {
                 Label("Import", systemImage: "photo.on.rectangle")
             }
             .help("Open an image, a source folder, or import from Photos")
-        }
-
-        // LUT folder — set once, so on macOS 27 it is the first control to fold into the overflow
-        // menu when the window narrows (`visibilityPriority` is a 27 SDK addition).
-        if #available(macOS 27, *) {
-            ToolbarItem(id: "lutFolder", placement: .primaryAction) {
-                lutFolderButton
-            }
-            .visibilityPriority(.low)
-        } else {
-            ToolbarItem(id: "lutFolder", placement: .primaryAction) {
-                lutFolderButton
-            }
         }
 
         // Export. With a multi-image set loaded it becomes a split button: click exports this image,
@@ -290,19 +237,23 @@ public struct ContentView: View {
                 .disabled(viewModel.sourceImage == nil)
             }
         }
+
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        // The inspector: Info (histogram + EXIF), Develop, Adjust.
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
+            Toggle(isOn: Bindable(viewModel).isInspectorPresented) {
+                Label("Inspector", systemImage: "sidebar.right")
+            }
+            .toggleStyle(.button)
+            .help("Show the inspector — info, develop and adjustments (⌘I)")
+            .keyboardShortcut("i", modifiers: .command)
+            .disabled(viewModel.sourceImage == nil)
+        }
     }
 
     private var exportLabel: some View {
         Label("Export", systemImage: "square.and.arrow.up")
-    }
-
-    private var lutFolderButton: some View {
-        Button {
-            viewModel.chooseLUTFolder()
-        } label: {
-            Label("LUT Folder", systemImage: "folder")
-        }
-        .help("Choose the folder of .cube files")
     }
 
     private var exportAllButton: some View {

@@ -1,24 +1,51 @@
 import SwiftUI
 import Charts
 
-/// Compact analysis card shown after a successful recipe derivation.
-/// Tone curve chart + stat badges + camera info from EXIF.
+/// Compact analysis body shown after a successful recipe derivation.
+/// Tone curve chart + stat rows + camera info from EXIF. The "Result" section
+/// header (and its "Derive again" link) is owned by the presenting sheet, not
+/// this view — this renders only the body of that section.
 struct RecipeReportView: View {
     let report: RecipeReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Analysis")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(spacing: 4) {
+                    toneCurveChart
+                        .frame(width: 130, height: 130)
+                    Text("Tone curve, input to output")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
 
-            toneCurveChart
-                .frame(height: 130)
+                VStack(alignment: .leading, spacing: 4) {
+                    LabeledContent("Saturation") {
+                        Text(String(format: "%.2f×", report.saturationRatio))
+                    }
+                    LabeledContent("Sharpening") {
+                        Text(String(format: "%.1f×", report.sharpeningRatio))
+                    }
+                    LabeledContent("Cube coverage") {
+                        Text(coverageText)
+                    }
+                    LabeledContent("Samples") {
+                        Text(shortCount(report.sampleCount))
+                    }
+                    LabeledContent("Alignment") {
+                        Text(alignmentText)
+                    }
+                }
+            }
 
-            statRow
+            Text("Sharpening is measured for reference. A LUT cannot sharpen, so it is not applied.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             if let cam = report.cameraInfo, !cam.make.isEmpty || !cam.model.isEmpty {
-                Divider()
-                cameraInfoRow(cam)
+                Text(cameraInfoLine(cam))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -91,59 +118,17 @@ struct RecipeReportView: View {
         .chartLegend(.hidden)
     }
 
-    // MARK: - Stat badges
+    // MARK: - Stat text
 
-    private var statRow: some View {
-        HStack(spacing: 10) {
-            StatBadge(
-                label: "Saturation",
-                value: String(format: "%.2f×", report.saturationRatio),
-                tint: .orange
-            )
-            StatBadge(
-                label: "Sharpening",
-                value: String(format: "%.1f×", report.sharpeningRatio),
-                tint: .purple,
-                // "applied separately, not in LUT" promised a second stage that does not exist:
-                // `sharpeningRatio` is measured, carried on the report and shown here, and has no
-                // consumer anywhere in the render path. It is a diagnostic about the pair.
-                hint: "measured, not applied"
-            )
-            StatBadge(
-                label: "Coverage",
-                value: String(format: "%.0f%%", report.cubeCoveragePercent),
-                tint: report.cubeCoveragePercent >= 30 ? .green : .yellow
-            )
-            StatBadge(
-                label: "Samples",
-                value: shortCount(report.sampleCount),
-                tint: .blue
-            )
-            // Shown rather than dropped (docs/CODE_REVIEW.md §2): of everything on this report it is
-            // the one number that says the *pair* was wrong rather than the fit. Every other stat
-            // stays plausible under a mis-registered pair — the cube still fits, just to the wrong
-            // pixels — so a silent non-zero shift here was the failure nothing on screen could
-            // explain. Tinted on magnitude for that reason: 0 is the expected reading.
-            StatBadge(
-                label: "Alignment",
-                value: alignmentText,
-                tint: isWellAligned ? .green : .yellow,
-                hint: isWellAligned ? nil : "the pair may be mis-registered"
-            )
-        }
+    private var coverageText: String {
+        let side = report.cubeCoveragePercent >= 30 ? "above" : "below"
+        return String(format: "%.0f%%, %@ the 30%% floor", report.cubeCoveragePercent, side)
     }
 
     /// A shift of (0, 0) is the common case and reads better as a word than as coordinates.
     private var alignmentText: String {
         let (dx, dy) = report.alignmentShift
-        return dx == 0 && dy == 0 ? "aligned" : "\(dx > 0 ? "+" : "")\(dx), \(dy > 0 ? "+" : "")\(dy)"
-    }
-
-    /// One pixel of play: the search is integer-pixel and a ±1 result on a real pair is rounding,
-    /// not a crop difference.
-    private var isWellAligned: Bool {
-        let (dx, dy) = report.alignmentShift
-        return abs(dx) <= 1 && abs(dy) <= 1
+        return dx == 0 && dy == 0 ? "Aligned" : "\(dx > 0 ? "+" : "")\(dx), \(dy > 0 ? "+" : "")\(dy)"
     }
 
     private func shortCount(_ n: Int) -> String {
@@ -154,53 +139,15 @@ struct RecipeReportView: View {
 
     // MARK: - Camera info
 
-    @ViewBuilder
-    private func cameraInfoRow(_ cam: RecipeReport.CameraInfo) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(cam.make) \(cam.model)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                if let v = cam.exifContrast    { tag("Contrast: \(v)") }
-                if let v = cam.exifSaturation  { tag("Saturation: \(v)") }
-                if let v = cam.exifSharpness   { tag("Sharpness: \(v)") }
-                if let v = cam.exifWhiteBalance { tag("WB: \(v)") }
-                if let v = cam.exifCustomRendered, v != "Normal" { tag(v) }
-            }
-        }
-    }
-
-    private func tag(_ s: String) -> some View {
-        Text(s)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-    }
-}
-
-// MARK: - Stat badge
-
-private struct StatBadge: View {
-    let label: String
-    let value: String
-    let tint: Color
-    var hint: String? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(.body, design: .monospaced).weight(.semibold))
-                .foregroundStyle(tint)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-        .help(hint ?? "")
+    private func cameraInfoLine(_ cam: RecipeReport.CameraInfo) -> String {
+        var parts: [String] = []
+        let name = "\(cam.make) \(cam.model)".trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty { parts.append(name) }
+        if let v = cam.exifContrast { parts.append("Contrast: \(v)") }
+        if let v = cam.exifSaturation { parts.append("Saturation: \(v)") }
+        if let v = cam.exifSharpness { parts.append("Sharpness: \(v)") }
+        if let v = cam.exifWhiteBalance { parts.append("WB: \(v)") }
+        if let v = cam.exifCustomRendered, v != "Normal" { parts.append(v) }
+        return parts.joined(separator: " · ")
     }
 }

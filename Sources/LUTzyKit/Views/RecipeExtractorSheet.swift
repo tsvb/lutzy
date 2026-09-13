@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Modal sheet for deriving a .cube LUT from a (RAW, JPG) pair.
+/// Modal sheet for deriving a .cube LUT from a (RAW, JPEG) pair.
 /// Scratch-mode: the derived LUT lives in `coordinator.derivedLUT` until the
 /// user clicks Save. Observes `DeriveCoordinator` directly rather than the
 /// whole app view model — this sheet touches nothing else.
@@ -11,6 +11,7 @@ struct RecipeExtractorSheet: View {
 
     @State private var rawURL: URL?
     @State private var jpgURL: URL?
+    @State private var name: String = ""
 
     /// Which slot the open file importer is filling. Non-nil presents it.
     @State private var importTarget: ImportTarget?
@@ -21,40 +22,71 @@ struct RecipeExtractorSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
             header
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
 
-            VStack(spacing: 8) {
-                filePickerRow(
-                    label: "RAW",
-                    url: rawURL,
-                    placeholder: "Choose RAW/DNG…",
-                    onPick: { importTarget = .raw }
-                )
-                filePickerRow(
-                    label: "JPG",
-                    url: jpgURL,
-                    placeholder: "Choose JPG…",
-                    onPick: { importTarget = .jpg }
-                )
+            Form {
+                Section {
+                    fileRow(
+                        label: "RAW",
+                        url: $rawURL,
+                        target: .raw,
+                        droppableExtensions: ["raw", "dng"]
+                    )
+                    fileRow(
+                        label: "JPEG",
+                        url: $jpgURL,
+                        target: .jpg,
+                        droppableExtensions: ["jpg", "jpeg"]
+                    )
+                    LabeledContent("Name") {
+                        TextField("", text: $name)
+                    }
+                }
+
+                if coordinator.isDeriving {
+                    Section {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: coordinator.progress)
+                            Text(coordinator.stage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                if let report = coordinator.report, !coordinator.isDeriving {
+                    Section {
+                        RecipeReportView(report: report)
+                    } header: {
+                        HStack {
+                            Text("Result")
+                            Spacer()
+                            Button("Derive again") {
+                                if let r = rawURL, let j = jpgURL {
+                                    coordinator.derive(rawURL: r, jpgURL: j)
+                                }
+                            }
+                            .buttonStyle(.link)
+                            .disabled(coordinator.isDeriving)
+                        }
+                    }
+                }
             }
-
-            if coordinator.isDeriving {
-                progressBlock
-            }
-
-            if let report = coordinator.report, !coordinator.isDeriving {
-                Divider()
-                RecipeReportView(report: report)
-            }
-
-            Spacer(minLength: 0)
+            .formStyle(.grouped)
 
             footerButtons
+                .padding(20)
         }
-        .padding(20)
-        .frame(width: 540)
-        .frame(minHeight: coordinator.report == nil ? 280 : 540)
+        .frame(width: 560)
+        .frame(minHeight: coordinator.report == nil ? 260 : 540, maxHeight: 640)
+        .onChange(of: rawURL) { _, newValue in
+            guard name.isEmpty, let raw = newValue else { return }
+            name = raw.deletingPathExtension().lastPathComponent + " Look"
+        }
         .fileImporter(
             isPresented: Binding(
                 get: { importTarget != nil },
@@ -84,55 +116,46 @@ struct RecipeExtractorSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Derive LUT from JPG")
-                .font(.title2.bold())
-            Text("Extract a .cube LUT from a (RAW, JPG) pair by comparing pixel correspondences. The derived LUT lives as a preview until you save it.")
+            Text("Derive LUT from RAW and JPEG")
+                .font(.headline)
+            Text("LUTzy compares your JPEG to a neutral render of the RAW and saves the difference as a .cube LUT. Both files must be the same frame.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    // MARK: - File picker rows
+    // MARK: - File rows
 
-    private func filePickerRow(
+    private func fileRow(
         label: String,
-        url: URL?,
-        placeholder: String,
-        onPick: @escaping () -> Void
+        url: Binding<URL?>,
+        target: ImportTarget,
+        droppableExtensions: Set<String>
     ) -> some View {
-        HStack(spacing: 12) {
-            Text(label)
-                .font(.caption.bold())
-                .foregroundStyle(.secondary)
-                .frame(width: 36, alignment: .trailing)
-
-            HStack {
-                Image(systemName: url == nil ? "doc" : "doc.fill")
-                    .foregroundStyle(url == nil ? .secondary : .primary)
-                Text(url?.lastPathComponent ?? placeholder)
-                    .foregroundStyle(url == nil ? .secondary : .primary)
+        LabeledContent(label) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc")
+                    .foregroundStyle(url.wrappedValue == nil ? .tertiary : .secondary)
+                Text(url.wrappedValue?.lastPathComponent ?? "Choose a file or drop one here")
+                    .foregroundStyle(url.wrappedValue == nil ? .secondary : .primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+                Button("Choose…") { importTarget = target }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-
-            Button("Choose…") { onPick() }
-                .buttonStyle(.glass)
         }
-    }
-
-    // MARK: - Progress block
-
-    private var progressBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ProgressView(value: coordinator.progress)
-            Text(coordinator.stage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        .dropDestination(for: URL.self) { items, _ in
+            guard let dropped = items.first,
+                  droppableExtensions.contains(dropped.pathExtension.lowercased()) else {
+                return false
+            }
+            _ = dropped.startAccessingSecurityScopedResource()
+            url.wrappedValue?.stopAccessingSecurityScopedResource()
+            url.wrappedValue = dropped
+            return true
         }
     }
 
@@ -140,30 +163,38 @@ struct RecipeExtractorSheet: View {
 
     private var footerButtons: some View {
         HStack {
-            Button("Close") {
-                coordinator.dismiss()
-                dismiss()
-            }
-            .buttonStyle(.glass)
-            .keyboardShortcut(.cancelAction)
-
             Spacer()
 
-            if coordinator.derivedLUT != nil && !coordinator.isDeriving {
-                Button("Save to LUT Folder…") {
-                    coordinator.saveDialog()
+            if coordinator.derivedLUT != nil {
+                Button("Close") {
+                    coordinator.dismiss()
+                    dismiss()
                 }
-                .buttonStyle(.glass)
-            }
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
 
-            Button("Derive") {
-                if let r = rawURL, let j = jpgURL {
-                    coordinator.derive(rawURL: r, jpgURL: j)
+                Button("Save to LUT Folder…") {
+                    coordinator.saveDialog(suggestedName: name.isEmpty ? nil : name)
                 }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            } else {
+                Button("Cancel") {
+                    coordinator.dismiss()
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
+
+                Button("Derive") {
+                    if let r = rawURL, let j = jpgURL {
+                        coordinator.derive(rawURL: r, jpgURL: j)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(rawURL == nil || jpgURL == nil || coordinator.isDeriving)
             }
-            .buttonStyle(.glassProminent)
-            .keyboardShortcut(.defaultAction)
-            .disabled(rawURL == nil || jpgURL == nil || coordinator.isDeriving)
         }
     }
 

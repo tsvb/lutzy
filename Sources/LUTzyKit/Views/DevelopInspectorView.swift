@@ -16,8 +16,6 @@ import SwiftUI
 /// state that exists only inside a `ViewBuilder` cannot be asserted.
 struct DevelopInspectorView: View {
     let viewModel: AppViewModel
-    /// Bumped per control on reset so its arrow bounces; the value itself is meaningless.
-    @State private var resets: [DevelopControl: Int] = [:]
 
     var body: some View {
         Group {
@@ -82,9 +80,6 @@ struct DevelopInspectorView: View {
     /// the defect `developPanelState` exists to prevent — see this type's doc comment.
     private var notRAW: some View {
         VStack(spacing: 8) {
-            Image(systemName: "camera.aperture")
-                .font(.largeTitle)
-                .foregroundStyle(.tertiary)
             Text("No develop stage")
                 .font(.headline)
             Text("Develop controls come from the RAW decoder. This image is already rendered.")
@@ -98,51 +93,31 @@ struct DevelopInspectorView: View {
 
     @ViewBuilder
     private func controlRow(_ control: DevelopControl) -> some View {
-        let value = viewModel.developValue(for: control)
-        VStack(alignment: .leading, spacing: 4) {
-            LabeledContent {
-                HStack(spacing: 6) {
-                    if control.isToggle {
-                        Toggle(control.title, isOn: Binding(
-                            get: { value != 0 },
-                            set: { viewModel.developBinding(for: control).wrappedValue = $0 ? 1 : 0 }
-                        ))
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                    } else {
-                        Text(String(format: "%.2f", value))
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .contentTransition(.numericText(value: value))
-                            .animation(.default, value: value)
-                    }
-                    Button {
-                        resets[control, default: 0] += 1
-                        viewModel.resetDevelop(control)
-                    } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                            .symbolEffect(.bounce, value: resets[control, default: 0])
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.mini)
-                    .help("Reset to the decoder's default")
-                }
-            } label: {
-                Text(control.title)
-            }
+        if control.isToggle {
+            let value = viewModel.developValue(for: control)
+            Toggle(control.title, isOn: Binding(
+                get: { value != 0 },
+                set: { viewModel.developBinding(for: control).wrappedValue = $0 ? 1 : 0 }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.small)
+        } else {
+            AdjustmentRow(
+                title: control.title,
+                value: viewModel.developBinding(for: control),
+                range: control.range,
+                neutral: viewModel.developNeutralValue(for: control),
+                onReset: { viewModel.resetDevelop(control) }
+            )
 
-            if !control.isToggle {
-                Slider(value: viewModel.developBinding(for: control), in: control.range)
-                    .labelsHidden()
-                if control == .whiteBalance {
-                    LabeledContent("Tint") {
-                        Slider(value: viewModel.developTintBinding(), in: DevelopControl.tintRange)
-                            .labelsHidden()
-                    }
-                    .font(.caption)
-                }
+            if control == .whiteBalance {
+                AdjustmentRow(
+                    title: "Tint",
+                    value: viewModel.developTintBinding(),
+                    range: DevelopControl.tintRange,
+                    neutral: viewModel.rawCapabilities?.asShotTint ?? 0,
+                    onReset: { viewModel.resetDevelop(.whiteBalance) }
+                )
             }
         }
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 //
 // Plain-key shortcuts for the main window — Space, the arrows, V and the brackets.
@@ -11,9 +12,11 @@ import SwiftUI
 // earlier version used an `NSEvent` local monitor because nothing in the detail pane was focusable
 // and `.onKeyPress` never fired; making the canvas focusable is the fix, not a workaround.)
 //
-// ⌘-anything is left alone so it reaches the menu bar, and nothing fires while the search field is
-// being typed into. The mapping itself is a pure table, `KeyCommandMap`, so it can be tested without
-// a window.
+// ⌘-anything is left alone so it reaches the menu bar, and nothing fires while a text field, text
+// view or slider has focus — the sidebar search field (tracked via `isSearchFocused`, a SwiftUI
+// `@FocusState` that never sees the field editor AppKit actually installs) plus any TextField or
+// Slider the inspector adds, checked with `KeyCommandMap.textInputHasFocus()`. The mapping itself is
+// a pure table, `KeyCommandMap`, so it can be tested without a window.
 //
 
 /// What a plain key does. A value rather than a call so the mapping can be asserted.
@@ -36,6 +39,22 @@ enum KeyCommandMap {
 
     /// Down and up for Space; repeat so a held arrow keeps stepping, as it did under AppKit.
     static var phases: KeyPress.Phases { [.down, .repeat, .up] }
+
+    /// True when the key window's first responder is a text-editing view or a slider.
+    ///
+    /// SwiftUI's `TextField`/`SecureField` install AppKit's shared field editor — an `NSTextView` —
+    /// as first responder while being edited, not the `NSTextField` itself; `NSTextField` is checked
+    /// too so a raw AppKit text field (or a `TextEditor`'s underlying view) is also caught. A
+    /// `Slider` is included so arrow keys reach it — a slider takes focus but is not text input, and
+    /// stepping it with the arrow keys must not also step the LUT/image selection underneath. This
+    /// is a supplement to `isSearchFocused` in `ContentView`, not a replacement: the search field
+    /// uses a SwiftUI `@FocusState`, which flips on before AppKit installs the field editor this
+    /// checks, so relying on this alone would miss the first keystroke.
+    @MainActor
+    static func textInputHasFocus() -> Bool {
+        guard let responder = NSApp.keyWindow?.firstResponder else { return false }
+        return responder is NSTextView || responder is NSTextField || responder is NSSlider
+    }
 
     /// - Returns: what `key` should do, or `nil` to let the press through untouched.
     static func action(

@@ -109,10 +109,6 @@ struct PreviewView: View {
                                 ComparisonBadge(text: "Original")
                             }
                             Spacer()
-                            // LUT name badge
-                            if !viewModel.isShowingOriginal, let lut = viewModel.selectedLUT {
-                                ComparisonBadge(text: lut.name)
-                            }
                         }
                         Spacer()
                     }
@@ -125,18 +121,15 @@ struct PreviewView: View {
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 48, weight: .thin))
-                .foregroundColor(.secondary.opacity(0.5))
-
-            Text("Drop an image or folder here")
-                .font(.title3)
-                .foregroundColor(.secondary)
-
-            Text("⌘O open  \u{2022}  ⌘⇧I import from Photos  \u{2022}  ⌘⌥I source folder")
-                .font(.caption)
-                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+        ContentUnavailableView {
+            Label("Drop an image or folder here", systemImage: "photo.on.rectangle.angled")
+        } description: {
+            VStack(spacing: 4) {
+                Text("⌘O open  \u{2022}  ⌘⇧I import from Photos  \u{2022}  ⌘⌥I source folder")
+                Text("↑↓ cycle LUTs  \u{2022}  V side by side  \u{2022}  Space compare original")
+            }
+        } actions: {
+            Button("Open…") { viewModel.openImageDialog() }
         }
     }
 

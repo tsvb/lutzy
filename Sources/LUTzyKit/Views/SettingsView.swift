@@ -24,7 +24,18 @@ struct SettingsView: View {
                 Text("Applied the next time LUTzy opens. The toolbar changes the current window.")
             }
 
-            Section("LUT sidebar") {
+            Section("LUT library") {
+                LabeledContent("Folder") {
+                    HStack(spacing: 8) {
+                        if let name = LUTLibrary.currentFolderName {
+                            Text(name)
+                                .foregroundStyle(.secondary)
+                        }
+                        Button("Choose…") {
+                            NotificationCenter.default.post(name: .chooseLUTFolder, object: nil)
+                        }
+                    }
+                }
                 LabeledContent("Collapsed folders") {
                     Button("Expand All") { collapsedLUTCategories = "" }
                         .disabled(collapsedLUTCategories.isEmpty)
