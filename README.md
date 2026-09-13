@@ -1,22 +1,29 @@
+<img src="Sources/LUTzy/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="96" alt="The LUTzy icon: an RGB colour cube on a dark tile">
+
 # LUTzy
 
 A macOS app that applies `.cube` LUTs to RAW and other images. It can also build a LUT from a RAW + JPEG pair.
 
 SwiftUI and Core Image, no third-party packages. macOS 26 to run, [Xcode 27 to compile](#build).
 
+A 3D LUT is a table with a colour at every lattice point. The photo's colours are looked up in it, interpolated between the nearest points, and replaced. That is the whole trick, and it is why a LUT can be a look but never a sharpen or a blur.
+
+<img src="docs/images/lut-cube.svg" width="720" alt="Two colour cubes. On the left, a regular lattice of coloured dots. On the right, the same dots after a LUT: shadows lifted and cooled, highlights warmed.">
+
 ## Features
 
 - **RAW** via `CIRAWFilter`, not the embedded preview.
   DNG, CR2, CR3, NEF, ARW, ORF, RAF, RW2, PEF, SRW, X3F, RAW.
   JPEG, PNG, TIFF, BMP, HEIC.
-- **Import** — drop a file, a folder, several files, or pictures straight from Photos. <kbd>⌘O</kbd> file · <kbd>⌘⇧I</kbd> Photos (max 50) · <kbd>⌘⌥I</kbd> source folder.
-- **LUTs** — `.cube` 3D (`LUT_3D_SIZE`, `DOMAIN_MIN` / `DOMAIN_MAX`) through `CIColorCubeWithColorSpace` on Metal. Sidebar scans recursively, groups by subfolder, searchable. Intensity 0–100%. <kbd>⌘⇧L</kbd> picks the folder.
+- **Import** — drop a file, a folder, several files, pictures straight from Photos, or a bitmap from any app. <kbd>⌘O</kbd> file · <kbd>⌘⇧I</kbd> Photos (max 50) · <kbd>⌘⌥I</kbd> source folder.
+- **LUTs** — `.cube` 3D (`LUT_3D_SIZE`, `DOMAIN_MIN` / `DOMAIN_MAX`) through `CIColorCubeWithColorSpace` on Metal. Sidebar scans recursively, groups by subfolder, searchable. Intensity 0–100%, in the Adjust inspector. <kbd>⌘⇧L</kbd> picks the folder.
 - **Preview** — <kbd>V</kbd> side-by-side / single. Hold <kbd>Space</kbd> in single view for the original. <kbd>↑</kbd> <kbd>↓</kbd> walk the library.
 - **Inspector** <kbd>⌘I</kbd>
   - **Info** — histogram of what's on screen (graded, or original while Space is down) plus EXIF / TIFF / GPS
   - **Develop** — the `CIRAWFilter` knobs this file's decoder actually supports
   - **Adjust** — nine sliders after develop, before the LUT: exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, vibrance
 - **Filmstrip** when a source folder is open. <kbd>←</kbd> <kbd>→</kbd> or <kbd>[</kbd> <kbd>]</kbd> step through; the current look stays on. <kbd>⌘R</kbd> rescans.
+- **Window** — Liquid Glass toolbar, customizable (View ▸ Customize Toolbar…). The file and LUT names sit in the title. <kbd>⌘,</kbd> sets launch defaults: side-by-side, source browser, export format.
 - **Export** — 16-bit TIFF, JPEG (quality 0.95), or PNG, always full resolution, named `{photo}_{LUT}.ext` (spaces in the LUT name become underscores). <kbd>⌘⇧E</kbd> Export All writes the whole look — develop, adjustments, LUT, intensity — and counts failures instead of aborting.
 
 ## Derive LUT from JPG
@@ -25,11 +32,7 @@ SwiftUI and Core Image, no third-party packages. macOS 26 to run, [Xcode 27 to c
 
 The JPEG is treated as a look (the manufacturer's color science, or whatever picture profile was on). LUTzy writes the difference against a neutral RAW develop. Same frame required — aspect within 1%. Pixel size can differ.
 
-```
-RAW  ──► CIRAWFilter (neutral) ─┐
-                                ├─► align ─► smooth samples ─► 33³ cube ─┬─► .cube
-JPEG ─► decode ─► edge mask ────┘                                        └─► report
-```
+<img src="docs/images/derive.svg" width="720" alt="RAW is developed neutrally and the JPEG decoded; the pair is aligned, edges masked, sampled, and filled into a 33-cubed cube that is written as a .cube file and a report.">
 
 The result previews on the current image and stays in memory until **Save to LUT Folder…**.
 
@@ -81,7 +84,7 @@ swift test
 > [!IMPORTANT]
 > `swift run` and Run from Xcode both produce a SwiftPM executable, not a sandboxed `.app`. LUT folder and source folder do not persist across launches.
 
-There is no `.xcodeproj`. `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`; the appiconset is empty; there is no `Info.plist` or bundle identifier. The entitlements file is real (sandbox, user-selected files, app-scoped bookmarks) and unused. An Xcode app target would apply it. This repo doesn't have one.
+There is no `.xcodeproj`. `Package.swift` excludes `Assets.xcassets` and `LUTzy.entitlements`, and a SwiftPM executable has no `Info.plist` or bundle identifier, so `swift run` uses neither the icon in the appiconset nor the entitlements file. The release script below applies the icon and an `Info.plist`. The entitlements (sandbox, user-selected files, app-scoped bookmarks) are real and still unused; wiring them up needs an Xcode app target this repo doesn't have.
 
 - **Run** — macOS 26
 - **Compile** — Xcode 27 / macOS 27 SDK
@@ -102,6 +105,18 @@ Swift 6 language mode on every target. No `@unchecked Sendable`, `nonisolated(un
 </details>
 
 Pipeline notes: [docs/PHASE2_SPEC.md](docs/PHASE2_SPEC.md). Standing review: [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md).
+
+## Release
+
+```bash
+DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)" \
+NOTARY_PROFILE="your-notarytool-profile" \
+scripts/release-dmg.sh 0.1.1
+```
+
+Does what an Xcode archive would: universal release build, a hand-written `LUTzy.app` with an `Info.plist` and the icon, signed with Developer ID and the hardened runtime (no sandbox yet), notarized and stapled, then packed into a DMG that is notarized and stapled again. Output lands in `build/release/`. Needs `create-dmg` (`brew install create-dmg`) and a notarytool keychain profile.
+
+The icon is drawn by `scripts/render-icon.swift`: the RGB cube a `.cube` file indexes, seen from its green corner, rendered into every slot of the appiconset. Run it again rather than editing the PNGs.
 
 ## License
 
