@@ -160,7 +160,7 @@ final class DeriveCoordinator {
 
     /// Ask where to put the derived LUT, defaulting to the configured LUT
     /// folder so the library picks it up on the next scan.
-    func saveDialog() {
+    func saveDialog(suggestedName: String? = nil) {
         guard let lut = derivedLUT, scratchURL != nil else {
             onStatus?("No derived LUT to save")
             return
@@ -171,7 +171,7 @@ final class DeriveCoordinator {
         if let cubeType = UTType(filenameExtension: "cube") {
             panel.allowedContentTypes = [cubeType]
         }
-        panel.nameFieldStringValue = lut.name + ".cube"
+        panel.nameFieldStringValue = (suggestedName ?? lut.name) + ".cube"
         if let folder = libraryFolder?() {
             panel.directoryURL = folder
         }
