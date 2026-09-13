@@ -48,7 +48,7 @@ struct FilmstripThumbnail: View {
                     .clipped()
             } else {
                 Rectangle()
-                    .fill(Color.secondary.opacity(0.15))
+                    .fill(.fill.quaternary)
                     .frame(width: 64, height: 64)
                     .overlay {
                         ProgressView()

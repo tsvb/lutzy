@@ -74,7 +74,7 @@ struct InfoInspectorView: View {
                     .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(.separator, lineWidth: 1)
                     )
             } else {
                 RoundedRectangle(cornerRadius: 6)

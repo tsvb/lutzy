@@ -61,7 +61,7 @@ struct LUTSidebar: View {
             ProgressView().controlSize(.small)
             Text("Scanning LUT folder…")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -108,11 +108,11 @@ struct LUTSidebar: View {
                     HStack {
                         Text(category.name)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Text("\(category.luts.count)")
                             .font(.caption2)
-                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                            .foregroundStyle(.tertiary)
                     }
                 }
             }

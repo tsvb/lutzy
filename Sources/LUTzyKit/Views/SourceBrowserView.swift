@@ -118,7 +118,7 @@ private struct SourceBrowserRow: View {
             Text(item.displayName)
                 .font(.callout)
                 .fontWeight(isSelected ? .medium : .regular)
-                .foregroundColor(isSelected ? .primary : .secondary)
+                .foregroundStyle(isSelected ? .primary : .secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 0)
@@ -137,7 +137,7 @@ private struct SourceBrowserRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 4))
         } else {
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.secondary.opacity(0.15))
+                .fill(.fill.quaternary)
                 .frame(width: 38, height: 38)
                 .overlay(ProgressView().controlSize(.small))
         }
