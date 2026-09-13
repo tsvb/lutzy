@@ -184,6 +184,23 @@ final class ImageCollection {
         self.isActive = !items.isEmpty
     }
 
+    // MARK: - URL import (dropped files)
+
+    /// Adopt a set of files — several images dropped at once — as the collection, in the order
+    /// given. There is no source folder: like a Photos import, this is a one-off set, so the
+    /// persisted folder bookmark is untouched and `sourceFolderURL` is cleared.
+    func adopt(urls: [URL]) {
+        thumbnailTask?.cancel()
+        scanTask?.cancel()
+        sourceFolderURL = nil
+        selectedIndex = 0
+        items = urls.map { url in
+            Item(url: url, displayName: url.deletingPathExtension().lastPathComponent, imageData: nil)
+        }
+        isActive = !items.isEmpty
+        generateThumbnails()
+    }
+
     // MARK: - Navigation
 
     func selectNext() {
