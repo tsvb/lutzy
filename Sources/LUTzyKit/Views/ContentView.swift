@@ -90,6 +90,7 @@ public struct ContentView: View {
         }
         .onKeyPress(keys: KeyCommandMap.keys, phases: KeyCommandMap.phases) { press in
             guard !isSearchFocused,
+                  !KeyCommandMap.textInputHasFocus(),
                   let action = KeyCommandMap.action(
                     for: press.key,
                     modifiers: press.modifiers,
