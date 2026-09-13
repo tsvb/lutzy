@@ -40,18 +40,20 @@ enum ImageDrop {
         payload(from: pasteboard) != nil
     }
 
-    /// Classify a pasteboard. URLs win over promises so a Finder drag that also advertises a
-    /// promise (some apps do) is read directly; promises win over bitmap data because the promised
-    /// file is the full-resolution original and the bitmap is usually a preview.
+    /// Classify a pasteboard. **Promises win over URLs**, measured rather than assumed: a Photos
+    /// drag also writes a `public.file-url`, and it points at a small derivative inside the Photos
+    /// library (`…_4_5005_c.jpeg`, sandbox-inaccessible from a bundled app) while the promise
+    /// delivers the 8 MB original under its own name. Finder writes no promise, so its URLs are
+    /// still read directly. Both win over bitmap data, which is usually a preview.
     static func payload(from pasteboard: NSPasteboard) -> Payload? {
+        if let receivers = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver],
+           !receivers.isEmpty {
+            return .promises(receivers)
+        }
         let fileOptions: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: fileOptions) as? [URL],
            !urls.isEmpty {
             return .urls(urls)
-        }
-        if let receivers = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self]) as? [NSFilePromiseReceiver],
-           !receivers.isEmpty {
-            return .promises(receivers)
         }
         for type in imageDataTypes {
             if let data = pasteboard.data(forType: type), !data.isEmpty {
@@ -67,10 +69,12 @@ enum ImageDrop {
     /// Ask every receiver for its files and wait for all of them. Files land in a fresh directory
     /// from `makeDropDirectory()`; the URLs come back in arrival order, failures dropped.
     ///
-    /// Completion is counted against `fileNames`, which Photos fills in before the drop lands. A
-    /// receiver that promised nothing contributes nothing and is not waited on.
+    /// Completion is counted against `fileTypes`, one entry per promised file. Not `fileNames`:
+    /// Photos leaves that empty until the file has actually been written (observed on a real
+    /// drag — `fileNames=[] fileTypes=["public.jpeg"]`), so counting names would wait for nothing
+    /// and report nothing. A receiver that promised nothing contributes nothing and is not waited on.
     static func receive(_ receivers: [NSFilePromiseReceiver], into directory: URL) async -> [URL] {
-        let expected = receivers.reduce(0) { $0 + $1.fileNames.count }
+        let expected = receivers.reduce(0) { $0 + max($1.fileTypes.count, $1.fileNames.count) }
         guard expected > 0 else { return [] }
 
         let queue = OperationQueue()
