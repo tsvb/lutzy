@@ -241,19 +241,6 @@ public struct ContentView: View {
             .help("Open an image, a source folder, or import from Photos")
         }
 
-        // LUT folder — set once, so on macOS 27 it is the first control to fold into the overflow
-        // menu when the window narrows (`visibilityPriority` is a 27 SDK addition).
-        if #available(macOS 27, *) {
-            ToolbarItem(id: "lutFolder", placement: .primaryAction) {
-                lutFolderButton
-            }
-            .visibilityPriority(.low)
-        } else {
-            ToolbarItem(id: "lutFolder", placement: .primaryAction) {
-                lutFolderButton
-            }
-        }
-
         // Export. With a multi-image set loaded it becomes a split button: click exports this image,
         // the chevron offers Export All. Two adjacent buttons with near-identical share glyphs
         // (`square.and.arrow.up` and `…on.square`) were indistinguishable at toolbar size.
@@ -297,15 +284,6 @@ public struct ContentView: View {
 
     private var exportLabel: some View {
         Label("Export", systemImage: "square.and.arrow.up")
-    }
-
-    private var lutFolderButton: some View {
-        Button {
-            viewModel.chooseLUTFolder()
-        } label: {
-            Label("LUT Folder", systemImage: "folder")
-        }
-        .help("Choose the folder of .cube files")
     }
 
     private var exportAllButton: some View {

@@ -37,34 +37,6 @@ struct LUTSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(spacing: 8) {
-                Text("LUTs")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                Spacer()
-                if filteredCategories.count > 1 {
-                    Button(action: toggleAll) {
-                        Image(systemName: allExpanded ? "rectangle.compress.vertical"
-                                                       : "rectangle.expand.vertical")
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundColor(.secondary)
-                    .disabled(isSearching)
-                    .help(allExpanded ? "Collapse all folders" : "Expand all folders")
-                }
-                Text("\(viewModel.library.allLUTs.count)")
-                    .font(.caption)
-                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color(nsColor: .quaternaryLabelColor), in: Capsule())
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-
-            Divider()
-
             // LUT list
             if viewModel.library.isScanning && viewModel.library.allLUTs.isEmpty {
                 scanningState
@@ -122,10 +94,14 @@ struct LUTSidebar: View {
             get: { viewModel.selectedLUT },
             set: { viewModel.selectLUT($0) }
         )) {
+            Text("None")
+                .foregroundStyle(.secondary)
+                .tag(Optional<CubeLUT>.none)
+
             ForEach(filteredCategories) { category in
                 Section(isExpanded: isExpandedBinding(category.id)) {
                     ForEach(category.luts) { lut in
-                        LUTRow(lut: lut, isSelected: viewModel.selectedLUT == lut)
+                        LUTRow(lut: lut)
                             .tag(lut)
                     }
                 } header: {
@@ -147,11 +123,6 @@ struct LUTSidebar: View {
 
     // MARK: - Folder collapse state
 
-    /// True when no visible folder is collapsed (drives the toggle-all icon).
-    private var allExpanded: Bool {
-        collapsed.isDisjoint(with: Set(filteredCategories.map(\.id)))
-    }
-
     /// Expansion binding for one folder. While searching, folders are forced
     /// open so matches are always visible and writes are ignored.
     private func isExpandedBinding(_ id: String) -> Binding<Bool> {
@@ -163,33 +134,22 @@ struct LUTSidebar: View {
             }
         )
     }
-
-    private func toggleAll() {
-        let ids = Set(filteredCategories.map(\.id))
-        if allExpanded {
-            collapsed.formUnion(ids)   // everything open → collapse all
-        } else {
-            collapsed.subtract(ids)    // some closed → expand all
-        }
-    }
 }
 
 struct LUTRow: View {
     let lut: CubeLUT
-    let isSelected: Bool
+
+    /// Display-only: underscores read as spaces, but `lut.name` itself is left untouched — it is
+    /// still the identity used for matching, resolving, and export naming elsewhere.
+    private var displayName: String {
+        lut.name.replacingOccurrences(of: "_", with: " ")
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.3))
-                .frame(width: 4, height: 20)
-
-            Text(lut.name)
-                .font(.system(.body, design: .default))
-                .lineLimit(1)
-
-            Spacer()
-        }
-        .contentShape(Rectangle())
+        Text(displayName)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(lut.name)
+            .contentShape(Rectangle())
     }
 }

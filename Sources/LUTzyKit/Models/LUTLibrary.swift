@@ -34,6 +34,19 @@ final class LUTLibrary {
 
     private static let settingsKey = "lutFolderBookmark"
 
+    /// The saved folder's last path component, for display only (Settings). Resolves the bookmark
+    /// without starting security-scoped access, so it costs nothing beyond a `UserDefaults` read.
+    static var currentFolderName: String? {
+        guard let data = UserDefaults.standard.data(forKey: settingsKey) else { return nil }
+        var isStale = false
+        return try? URL(
+            resolvingBookmarkData: data,
+            options: [.withSecurityScope],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ).lastPathComponent
+    }
+
     /// Folder whose security scope we hold open, so it can be released when we
     /// move to a different folder or the library goes away.
     ///
