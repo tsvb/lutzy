@@ -22,42 +22,7 @@ struct SourceBrowserView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            list
-        }
-        .background(.bar)
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "folder")
-                .foregroundColor(.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(collection.sourceFolderURL?.lastPathComponent ?? "Source")
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text("\(collection.items.count) image\(collection.items.count == 1 ? "" : "s")")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            Button {
-                viewModel.refreshSource()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.borderless)
-            .foregroundColor(.secondary)
-            .help("Rescan source folder")
-            .disabled(collection.sourceFolderURL == nil)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        list
     }
 
     // MARK: - List
@@ -66,16 +31,10 @@ struct SourceBrowserView: View {
         ScrollViewReader { proxy in
             List(selection: selection) {
                 ForEach(groups) { group in
-                    if showHeaders {
-                        Section {
-                            rows(group)
-                        } header: {
-                            Text(group.name)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
+                    Section {
                         rows(group)
+                    } header: {
+                        header(for: group)
                     }
                 }
             }
@@ -86,6 +45,23 @@ struct SourceBrowserView: View {
                     proxy.scrollTo(collection.items[idx].id, anchor: .center)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func header(for group: Group) -> some View {
+        if group.isRoot {
+            HStack {
+                Text(group.name)
+                Spacer()
+                Text("\(group.entries.count) image\(group.entries.count == 1 ? "" : "s")")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
+        } else {
+            Text(group.name)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -103,14 +79,11 @@ struct SourceBrowserView: View {
 
     // MARK: - Grouping
 
-    /// Only show subfolder section headers when there's actually more than one
-    /// group (i.e. the source has subfolders).
-    private var showHeaders: Bool { groups.count > 1 }
-
     private struct Group: Identifiable {
         let id: String
         let name: String
         let entries: [(index: Int, item: ImageCollection.Item)]
+        var isRoot: Bool { id == "·root" }
     }
 
     /// Items grouped by subfolder, preserving each item's index in

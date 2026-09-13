@@ -466,7 +466,7 @@ final class AppViewModel {
                 } else {
                     self.imageSource = nil
                 }
-                self.statusMessage = "\(name)  \(Int(ci.extent.width))\u{00D7}\(Int(ci.extent.height))"
+                self.statusMessage = "\(Int(ci.extent.width)) \u{00D7} \(Int(ci.extent.height))"
                 self.isLoading = false
 
                 self.scheduleOriginalPreview()

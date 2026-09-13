@@ -21,7 +21,8 @@ public struct ContentView: View {
 
     public var body: some View {
         mainContent
-            .navigationTitle("")
+            .navigationTitle(viewModel.sourceName.isEmpty ? "LUTzy" : viewModel.sourceName)
+            .navigationSubtitle(viewModel.selectedLUT?.name ?? "")
             .toolbarTitleDisplayMode(.inline)
             .toolbar(id: "main") {
                 toolbarContent

@@ -109,10 +109,6 @@ struct PreviewView: View {
                                 ComparisonBadge(text: "Original")
                             }
                             Spacer()
-                            // LUT name badge
-                            if !viewModel.isShowingOriginal, let lut = viewModel.selectedLUT {
-                                ComparisonBadge(text: lut.name)
-                            }
                         }
                         Spacer()
                     }
@@ -137,6 +133,10 @@ struct PreviewView: View {
             Text("⌘O open  \u{2022}  ⌘⇧I import from Photos  \u{2022}  ⌘⌥I source folder")
                 .font(.caption)
                 .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+
+            Text("↑↓ cycle LUTs  \u{2022}  V side by side  \u{2022}  Space compare original")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
     }
 
