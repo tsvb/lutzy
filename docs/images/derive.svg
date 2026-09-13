@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="150" viewBox="0 0 720 150" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13">
+<text x="0" y="44" text-anchor="start" fill="#6E6E73" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">RAW</text>
+<text x="0" y="116" text-anchor="start" fill="#6E6E73" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">JPEG</text>
+<path d="M44 40 H72" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M65 35 L72 40 L65 45" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="80" y="44" text-anchor="start" fill="#6E6E73">develop, neutral</text>
+<path d="M44 112 H72" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M65 107 L72 112 L65 117" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="80" y="116" text-anchor="start" fill="#6E6E73">decode</text>
+<path d="M192 40 H228 V76 H244" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M128 112 H228 V76" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M237 71 L244 76 L237 81" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="252" y="80" text-anchor="start" fill="#6E6E73">align</text>
+<path d="M292 76 H316" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M309 71 L316 76 L309 81" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="324" y="80" text-anchor="start" fill="#6E6E73">mask edges</text>
+<path d="M404 76 H428" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M421 71 L428 76 L421 81" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="436" y="80" text-anchor="start" fill="#6E6E73">sample</text>
+<path d="M490 76 H514" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M507 71 L514 76 L507 81" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="522" y="80" text-anchor="start" fill="#6E6E73">33³ cube</text>
+<path d="M590 76 H616 V40 H640" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M633 35 L640 40 L633 45" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="648" y="44" text-anchor="start" fill="#6E6E73" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12">.cube</text>
+<path d="M616 76 V112 H640" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M633 107 L640 112 L633 117" stroke="#8E8E93" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="648" y="116" text-anchor="start" fill="#6E6E73">report</text>
+</svg>
