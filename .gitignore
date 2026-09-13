@@ -33,3 +33,4 @@ build/
 
 # Local real-world test assets (large RAW/JPG fixtures, not for version control)
 realworldtest/
+build/
