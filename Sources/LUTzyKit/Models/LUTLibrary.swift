@@ -1,9 +1,10 @@
 import Foundation
-import Combine
+import Observation
 
 /// Manages a folder of .cube LUT files, scanning and grouping by subfolder.
+@Observable
 @MainActor
-final class LUTLibrary: ObservableObject {
+final class LUTLibrary {
 
     struct Category: Identifiable {
         let id: String      // category name
@@ -11,12 +12,12 @@ final class LUTLibrary: ObservableObject {
         let luts: [CubeLUT]
     }
 
-    @Published var categories: [Category] = []
-    @Published var allLUTs: [CubeLUT] = []
-    @Published var folderURL: URL?
-    @Published var scanError: String?
+    var categories: [Category] = []
+    var allLUTs: [CubeLUT] = []
+    var folderURL: URL?
+    var scanError: String?
     /// True while a folder scan is running. Drives the sidebar's progress hint.
-    @Published var isScanning: Bool = false
+    var isScanning: Bool = false
 
     /// Fired after every scan publishes its results, whatever started it.
     ///
@@ -29,14 +30,17 @@ final class LUTLibrary: ObservableObject {
     /// `restoreFolder`, and the rescan after a save — instead of relying on the next person to
     /// remember. The library stays ignorant of the renderer, which is why this is a closure the owner
     /// wires rather than an engine reference held here.
-    var onScanned: (() -> Void)?
+    @ObservationIgnored var onScanned: (() -> Void)?
 
     private static let settingsKey = "lutFolderBookmark"
 
     /// Folder whose security scope we hold open, so it can be released when we
     /// move to a different folder or the library goes away.
-    private var scopedURL: URL?
-    private var scanTask: Task<Void, Never>?
+    ///
+    /// `@ObservationIgnored` for the same reason as `ImageCollection.scopedURL`: `deinit` is
+    /// `nonisolated` and reads it, which a tracked (`@MainActor`-accessed) property would forbid.
+    @ObservationIgnored private var scopedURL: URL?
+    @ObservationIgnored private var scanTask: Task<Void, Never>?
 
     deinit {
         scopedURL?.stopAccessingSecurityScopedResource()

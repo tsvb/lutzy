@@ -2,15 +2,20 @@ import SwiftUI
 
 /// Sidebar showing the LUT library grouped by category.
 struct LUTSidebar: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
+    /// Owned by `ContentView`, which suspends the plain-key shortcuts while this is true.
+    var searchFocus: FocusState<Bool>.Binding
     @State private var searchText = ""
 
-    /// Names of collapsed folders. Stored as a set of category names (a folder
-    /// absent from the set is expanded), so newly-discovered folders default to
-    /// expanded. Persisted across launches and re-scans.
-    private static let collapsedKey = "lutzy.collapsedLUTCategories"
-    @State private var collapsed: Set<String> =
-        Set(UserDefaults.standard.stringArray(forKey: LUTSidebar.collapsedKey) ?? [])
+    /// Names of collapsed folders, newline-joined in `UserDefaults` (a folder absent from the set
+    /// is expanded, so newly-discovered folders default to expanded). `@AppStorage` rather than a
+    /// hand-persisted `@State` so the Settings window's "Expand All" is reflected here at once.
+    @AppStorage(AppPreference.collapsedLUTCategories) private var collapsedRaw = ""
+
+    private var collapsed: Set<String> {
+        get { Set(collapsedRaw.split(separator: "\n").map(String.init)) }
+        nonmutating set { collapsedRaw = newValue.sorted().joined(separator: "\n") }
+    }
 
     private var isSearching: Bool { !searchText.isEmpty }
 
@@ -58,31 +63,6 @@ struct LUTSidebar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
-            // Search (matches LUT names and folder names)
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                TextField("Search", text: $searchText)
-                    .textFieldStyle(.plain)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Clear search")
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
-            .onExitCommand { searchText = "" }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
-
             Divider()
 
             // LUT list
@@ -95,6 +75,10 @@ struct LUTSidebar: View {
             }
         }
         .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
+        // The system search field, in the sidebar's own slot: matches LUT names and folder names,
+        // clears on Escape, and reports its focus so the plain-key shortcuts stand down while typing.
+        .searchable(text: $searchText, placement: .sidebar, prompt: "Search LUTs")
+        .searchFocused(searchFocus)
     }
 
     private var scanningState: some View {
@@ -125,7 +109,7 @@ struct LUTSidebar: View {
             Button("Choose Folder...") {
                 viewModel.chooseLUTFolder()
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.glass)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -156,6 +140,7 @@ struct LUTSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     // MARK: - Folder collapse state
@@ -173,7 +158,6 @@ struct LUTSidebar: View {
             set: { expand in
                 guard !isSearching else { return }
                 if expand { collapsed.remove(id) } else { collapsed.insert(id) }
-                persistCollapsed()
             }
         )
     }
@@ -185,11 +169,6 @@ struct LUTSidebar: View {
         } else {
             collapsed.subtract(ids)    // some closed → expand all
         }
-        persistCollapsed()
-    }
-
-    private func persistCollapsed() {
-        UserDefaults.standard.set(Array(collapsed), forKey: Self.collapsedKey)
     }
 }
 

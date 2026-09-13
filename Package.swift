@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 // LUTzy is split into a library plus a thin `@main` executable so the app's own
@@ -7,7 +7,7 @@ import PackageDescription
 // point, the app delegate, and the asset catalog.
 let package = Package(
     name: "LUTzy",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v26)],
     products: [
         .executable(name: "LUTzy", targets: ["LUTzy"]),
         .library(name: "LUTzyKit", targets: ["LUTzyKit"]),

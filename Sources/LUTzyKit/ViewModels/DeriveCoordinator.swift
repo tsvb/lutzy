@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Observation
 import UniformTypeIdentifiers
 
 /// Owns the "Derive LUT from JPG" flow: the sheet's presentation, the
@@ -13,29 +14,30 @@ import UniformTypeIdentifiers
 /// Like `ExportCoordinator`, the save is split into a panel-free
 /// `performSave(to:)` core and a `saveDialog` wrapper, and status/error text
 /// leaves through closures so presentation stays with `AppViewModel`.
+@Observable
 @MainActor
-final class DeriveCoordinator: ObservableObject {
+final class DeriveCoordinator {
 
-    @Published var isSheetPresented: Bool = false
-    @Published private(set) var isDeriving: Bool = false
-    @Published private(set) var progress: Double = 0
-    @Published private(set) var stage: String = ""
-    @Published private(set) var derivedLUT: CubeLUT?
-    @Published private(set) var report: RecipeReport?
+    var isSheetPresented: Bool = false
+    private(set) var isDeriving: Bool = false
+    private(set) var progress: Double = 0
+    private(set) var stage: String = ""
+    private(set) var derivedLUT: CubeLUT?
+    private(set) var report: RecipeReport?
 
-    var onStatus: ((String) -> Void)?
-    var onError: ((String) -> Void)?
+    @ObservationIgnored var onStatus: ((String) -> Void)?
+    @ObservationIgnored var onError: ((String) -> Void)?
     /// Fired when a derive succeeds, so the app can preview the new look.
-    var onDerived: ((CubeLUT) -> Void)?
+    @ObservationIgnored var onDerived: ((CubeLUT) -> Void)?
     /// Where the Save panel should open, and what to re-scan afterwards.
-    var libraryFolder: (() -> URL?)?
+    @ObservationIgnored var libraryFolder: (() -> URL?)?
     /// Called after a successful save so the sidebar picks the new file up.
-    var onSaved: ((URL) -> Void)?
+    @ObservationIgnored var onSaved: ((URL) -> Void)?
 
     /// The in-memory cube serialized to a temp .cube, so saving later is a
     /// single `FileManager.copy`. Cleared when a new derive starts.
-    private var scratchURL: URL?
-    private var task: Task<Void, Never>?
+    @ObservationIgnored private var scratchURL: URL?
+    @ObservationIgnored private var task: Task<Void, Never>?
 
     // MARK: - Sheet
 

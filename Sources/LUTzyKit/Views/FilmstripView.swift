@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Horizontal thumbnail strip for browsing imported images.
 struct FilmstripView: View {
-    @ObservedObject var collection: ImageCollection
+    let collection: ImageCollection
     let onSelect: (Int) -> Void
 
     var body: some View {

@@ -3,7 +3,8 @@ import SwiftUI
 /// Main image preview area. Supports side-by-side (original vs LUT)
 /// and single-image mode. Hold Space to flash original in single mode.
 struct PreviewView: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
+    @State private var isDropTargeted = false
 
     private let bgColor = Color(nsColor: NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1))
 
@@ -25,9 +26,18 @@ struct PreviewView: View {
                 emptyState
             }
         }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            handleDrop(providers)
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .padding(4)
+            }
         }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first else { return false }
+            open(dropped: url)
+            return true
+        } isTargeted: { isDropTargeted = $0 }
     }
 
     // MARK: - Side-by-side
@@ -90,24 +100,19 @@ struct PreviewView: View {
                     .animation(.easeInOut(duration: 0.15), value: viewModel.isShowingOriginal)
                     .animation(.easeInOut(duration: 0.15), value: viewModel.selectedLUT)
 
-                // Comparison badge
-                if viewModel.isShowingOriginal && viewModel.isComparisonAvailable {
+                // One glass container so the two badges blend if they ever overlap.
+                GlassEffectContainer {
                     VStack {
                         HStack {
-                            ComparisonBadge(text: "Original")
+                            // Comparison badge
+                            if viewModel.isShowingOriginal && viewModel.isComparisonAvailable {
+                                ComparisonBadge(text: "Original")
+                            }
                             Spacer()
-                        }
-                        Spacer()
-                    }
-                    .padding(20)
-                }
-
-                // LUT name badge
-                if !viewModel.isShowingOriginal, let lut = viewModel.selectedLUT {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            ComparisonBadge(text: lut.name)
+                            // LUT name badge
+                            if !viewModel.isShowingOriginal, let lut = viewModel.selectedLUT {
+                                ComparisonBadge(text: lut.name)
+                            }
                         }
                         Spacer()
                     }
@@ -137,27 +142,23 @@ struct PreviewView: View {
 
     // MARK: - Drop
 
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
-            guard let data = item as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-            Task { @MainActor in
-                var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                    viewModel.openSourceFolder(url: url)
-                } else {
-                    viewModel.collection.clear()
-                    viewModel.openImage(url: url)
-                }
-            }
+    /// A folder becomes the source folder; a file replaces whatever set was loaded.
+    private func open(dropped url: URL) {
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            viewModel.openSourceFolder(url: url)
+        } else {
+            viewModel.collection.clear()
+            viewModel.openImage(url: url)
         }
-        return true
     }
 }
 
+/// A Liquid Glass capsule over the image — it reads on any picture and follows the window's tint.
 struct ComparisonBadge: View {
     let text: String
+    /// Overlays step back with the window, like the system's own chrome does.
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         Text(text)
@@ -165,7 +166,8 @@ struct ComparisonBadge: View {
             .fontWeight(.medium)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-            .foregroundColor(.primary)
+            .foregroundStyle(.primary)
+            .glassEffect(.regular, in: .capsule)
+            .opacity(appearsActive ? 1 : 0.6)
     }
 }

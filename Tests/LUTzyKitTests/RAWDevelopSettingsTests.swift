@@ -161,9 +161,7 @@ final class RAWDevelopSettingsTests: XCTestCase {
             XCTAssertEqual(filter.colorNoiseReductionAmount, 0.8, accuracy: 0.0001)
         }
         if filter.isLensCorrectionSupported { XCTAssertFalse(filter.isLensCorrectionEnabled) }
-        if #available(macOS 26, *), filter.isHighlightRecoverySupported {
-            XCTAssertFalse(filter.isHighlightRecoveryEnabled)
-        }
+        if filter.isHighlightRecoverySupported { XCTAssertFalse(filter.isHighlightRecoveryEnabled) }
 
         XCTAssertNotNil(filter.outputImage, "a configured filter must still produce an image")
     }
@@ -197,9 +195,7 @@ final class RAWDevelopSettingsTests: XCTestCase {
         XCTAssertEqual(subject.isLensCorrectionEnabled, reference.isLensCorrectionEnabled)
         XCTAssertEqual(subject.isGamutMappingEnabled, reference.isGamutMappingEnabled)
         XCTAssertEqual(subject.extendedDynamicRangeAmount, reference.extendedDynamicRangeAmount)
-        if #available(macOS 26, *) {
-            XCTAssertEqual(subject.isHighlightRecoveryEnabled, reference.isHighlightRecoveryEnabled)
-        }
+        XCTAssertEqual(subject.isHighlightRecoveryEnabled, reference.isHighlightRecoveryEnabled)
     }
 
     // MARK: - The gates themselves, which leave no runtime trace to assert on
@@ -286,19 +282,21 @@ final class RAWDevelopSettingsTests: XCTestCase {
             )
         }
 
-        // `highlightRecoveryEnabled` is gated on BOTH `#available(macOS 26, *)` and its own
-        // `isHighlightRecoverySupported` flag — the only knob newer than the deployment target. Both
-        // conditions have to survive, or the test would pass against code that dropped either one.
+        // `highlightRecoveryEnabled` is gated on its own `isHighlightRecoverySupported` flag, like the
+        // eight above. It used to carry an `#available(macOS 26, *)` guard as well, from when the
+        // deployment target was macOS 14; the floor is macOS 26 now, so that guard is dead code the
+        // compiler warns about, and this pins its *absence* so it is not reintroduced by habit.
         let highlightCondition = try condition(for: "highlightRecoveryEnabled")
         XCTAssertTrue(
             highlightCondition.contains("isHighlightRecoverySupported"),
             "highlightRecoveryEnabled is written without checking isHighlightRecoverySupported. "
             + "Condition found: \"\(highlightCondition.trimmingCharacters(in: .whitespacesAndNewlines))\""
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             highlightCondition.contains("#available"),
-            "highlightRecoveryEnabled is written without an #available guard — this is the one knob "
-            + "newer than the macOS 14 deployment target. "
+            "highlightRecoveryEnabled is behind an #available guard again. The deployment floor is "
+            + "macOS 26, where the property always exists, so the guard is an always-true check the "
+            + "compiler flags as unnecessary. "
             + "Condition found: \"\(highlightCondition.trimmingCharacters(in: .whitespacesAndNewlines))\""
         )
 

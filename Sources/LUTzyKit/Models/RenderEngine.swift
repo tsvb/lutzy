@@ -253,11 +253,6 @@ actor RenderEngine: RenderEngining {
         guard case .raw = source.kind else { return nil }
         guard let filter = RenderPipeline.rawFilter(for: source.backing) else { return nil }
 
-        var highlightRecovery = false
-        if #available(macOS 26, *) {
-            highlightRecovery = filter.isHighlightRecoverySupported
-        }
-
         return RAWCapabilities(
             isSharpnessSupported: filter.isSharpnessSupported,
             isContrastSupported: filter.isContrastSupported,
@@ -267,7 +262,7 @@ actor RenderEngine: RenderEngining {
             isLuminanceNoiseReductionSupported: filter.isLuminanceNoiseReductionSupported,
             isColorNoiseReductionSupported: filter.isColorNoiseReductionSupported,
             isLensCorrectionSupported: filter.isLensCorrectionSupported,
-            isHighlightRecoverySupported: highlightRecovery,
+            isHighlightRecoverySupported: filter.isHighlightRecoverySupported,
             asShotTemperature: Double(filter.neutralTemperature),
             asShotTint: Double(filter.neutralTint),
             baselineExposure: Double(filter.baselineExposure),

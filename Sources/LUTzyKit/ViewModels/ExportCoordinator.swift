@@ -1,6 +1,7 @@
 import Foundation
 import CoreImage
 import AppKit
+import Observation
 
 /// Owns everything about writing images to disk: the single export, the batch
 /// run, and the naming rules both share.
@@ -24,16 +25,17 @@ import AppKit
 /// It also removes the `[processor]` capture into `Task.detached` that §2 of the spec flags: the
 /// non-`Sendable` singleton is gone from both loops, and the work now happens inside the actor that
 /// owns the context.
+@Observable
 @MainActor
-final class ExportCoordinator: ObservableObject {
+final class ExportCoordinator {
 
-    @Published var format: ExportFormat = .jpeg
-    @Published private(set) var isExporting: Bool = false
+    var format: ExportFormat = .jpeg
+    private(set) var isExporting: Bool = false
     /// Progress (0...1) during a multi-image "Export All" run.
-    @Published private(set) var batchProgress: Double = 0
+    private(set) var batchProgress: Double = 0
 
-    var onStatus: ((String) -> Void)?
-    var onError: ((String) -> Void)?
+    @ObservationIgnored var onStatus: ((String) -> Void)?
+    @ObservationIgnored var onError: ((String) -> Void)?
 
     /// The renderer. `any RenderEngining` rather than the concrete actor for the same reason
     /// `AppViewModel` holds one: a test can then assert *what was asked to be encoded* — which
@@ -42,6 +44,11 @@ final class ExportCoordinator: ObservableObject {
 
     init(engine: any RenderEngining = RenderEngine.shared) {
         self.engine = engine
+        // Launch default from Settings (⌘,). Read once: see `AppPreference`.
+        if let raw = UserDefaults.standard.string(forKey: AppPreference.defaultExportFormat),
+           let format = ExportFormat(rawValue: raw) {
+            self.format = format
+        }
     }
 
     /// Quality for the lossy encoders. Hardcoded as it always was; a UI for it is Step 12's

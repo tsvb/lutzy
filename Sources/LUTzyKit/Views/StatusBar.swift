@@ -4,7 +4,8 @@ import SwiftUI
 // reminder of the keys that do something on the right.
 
 struct StatusBar: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         HStack(spacing: 0) {
@@ -16,7 +17,7 @@ struct StatusBar: View {
 
             Spacer()
 
-            // Hints
+            // Hints, on one glass capsule rather than one per key — five capsules read as buttons.
             HStack(spacing: 12) {
                 KeyHint(key: "↑↓", label: "cycle LUTs")
                 if viewModel.collection.isActive {
@@ -26,9 +27,13 @@ struct StatusBar: View {
                 KeyHint(key: "Space", label: "compare")
                 KeyHint(key: "⌘S", label: "export")
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .glassEffect(.regular, in: .capsule)
+            .opacity(appearsActive ? 1 : 0.6)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.vertical, 5)
         .background(.bar)
     }
 }
@@ -39,12 +44,14 @@ struct KeyHint: View {
 
     var body: some View {
         HStack(spacing: 3) {
+            // One step up the label hierarchy from tertiary/quaternary, which on the glass capsule
+            // in dark mode was close to invisible.
             Text(key)
                 .font(.system(.caption2, design: .monospaced))
-                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                .foregroundStyle(.secondary)
             Text(label)
                 .font(.caption2)
-                .foregroundColor(Color(nsColor: .quaternaryLabelColor))
+                .foregroundStyle(.tertiary)
         }
     }
 }

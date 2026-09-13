@@ -5,9 +5,11 @@ name: CI
 # official checkout — matches the project's zero-dependency ethos.
 on:
   push:
-    branches: [main]
+    # `claude/**` so an agent branch is built on every push, before it has a PR.
+    branches: [main, 'claude/**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # Cancel an in-progress run if newer commits are pushed to the same ref.
 concurrency:
@@ -16,22 +18,19 @@ concurrency:
 
 jobs:
   build:
-    # The runner sets the **SDK**; `Package.swift` sets the **deployment target**, and that stays at
-    # macOS 14. Those are different things, and conflating them cost a red build: this job used to run
-    # `macos-14` (Xcode 15.4, macOS 14.5 SDK), where any API newer than the SDK simply does not exist
-    # and `#available` cannot reach it — an availability check gates a call at runtime, it cannot
-    # conjure a symbol the SDK never declared.
-    #
-    # Building against a current SDK while deploying to macOS 14 is the normal Apple model and is the
-    # *stricter* of the two: with a 14.0 deployment target the compiler refuses newer API unless it is
-    # `#available`-guarded, so the guard is enforced rather than merely remembered. `macos-14` is also
-    # deprecated by GitHub.
+    # The runner sets the **SDK**; `Package.swift` sets the **deployment target**. The target is
+    # macOS 26, so macOS 26 API (Liquid Glass, `ToolbarSpacer`, `CIRAWFilter` highlight recovery) is
+    # used unguarded, and only macOS 27 API goes behind `#available(macOS 27, *)`. That needs the
+    # macOS 27 SDK, which ships with Xcode 27 — GitHub offers it on the `xcode-27` label (arm64,
+    # preview while Xcode 27 is in beta). The `macos-26` images carry Xcode 26.x and cannot compile a
+    # macOS 27 symbol, guarded or not: an availability check gates a call at runtime, it cannot
+    # conjure a symbol the SDK never declared. (The same mistake once cost a red build on `macos-14`.)
     #
     # Building on a *lower* SDK than the developer's is what silently diverges, so the image default
     # is deliberate — and "Show toolchain" prints the SDK it resolved, so any future drift is visible
     # in the log rather than inferred from a failure.
-    name: swift build (macOS 26 SDK, deploys to macOS 14)
-    runs-on: macos-26
+    name: swift build (macOS 27 SDK, deploys to macOS 26)
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
 

@@ -1,17 +1,24 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import AppKit
 
 /// Modal sheet for deriving a .cube LUT from a (RAW, JPG) pair.
 /// Scratch-mode: the derived LUT lives in `coordinator.derivedLUT` until the
 /// user clicks Save. Observes `DeriveCoordinator` directly rather than the
 /// whole app view model — this sheet touches nothing else.
 struct RecipeExtractorSheet: View {
-    @ObservedObject var coordinator: DeriveCoordinator
+    let coordinator: DeriveCoordinator
     @Environment(\.dismiss) private var dismiss
 
     @State private var rawURL: URL?
     @State private var jpgURL: URL?
+
+    /// Which slot the open file importer is filling. Non-nil presents it.
+    @State private var importTarget: ImportTarget?
+
+    private enum ImportTarget: Identifiable {
+        case raw, jpg
+        var id: Self { self }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -22,13 +29,13 @@ struct RecipeExtractorSheet: View {
                     label: "RAW",
                     url: rawURL,
                     placeholder: "Choose RAW/DNG…",
-                    onPick: pickRAW
+                    onPick: { importTarget = .raw }
                 )
                 filePickerRow(
                     label: "JPG",
                     url: jpgURL,
                     placeholder: "Choose JPG…",
-                    onPick: pickJPG
+                    onPick: { importTarget = .jpg }
                 )
             }
 
@@ -48,6 +55,29 @@ struct RecipeExtractorSheet: View {
         .padding(20)
         .frame(width: 540)
         .frame(minHeight: coordinator.report == nil ? 280 : 540)
+        .fileImporter(
+            isPresented: Binding(
+                get: { importTarget != nil },
+                set: { if !$0 { importTarget = nil } }
+            ),
+            allowedContentTypes: importTarget == .raw ? Self.rawTypes : [.jpeg],
+            allowsMultipleSelection: false
+        ) { result in
+            guard let target = importTarget, case .success(let urls) = result, let url = urls.first else {
+                return
+            }
+            // Picked URLs are security-scoped. Nothing here is sandboxed today, so this is a no-op
+            // that becomes load-bearing the day an app target applies `LUTzy.entitlements`.
+            _ = url.startAccessingSecurityScopedResource()
+            switch target {
+            case .raw:
+                rawURL?.stopAccessingSecurityScopedResource()
+                rawURL = url
+            case .jpg:
+                jpgURL?.stopAccessingSecurityScopedResource()
+                jpgURL = url
+            }
+        }
     }
 
     // MARK: - Header
@@ -91,7 +121,7 @@ struct RecipeExtractorSheet: View {
             .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
 
             Button("Choose…") { onPick() }
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
         }
     }
 
@@ -114,6 +144,7 @@ struct RecipeExtractorSheet: View {
                 coordinator.dismiss()
                 dismiss()
             }
+            .buttonStyle(.glass)
             .keyboardShortcut(.cancelAction)
 
             Spacer()
@@ -122,6 +153,7 @@ struct RecipeExtractorSheet: View {
                 Button("Save to LUT Folder…") {
                     coordinator.saveDialog()
                 }
+                .buttonStyle(.glass)
             }
 
             Button("Derive") {
@@ -129,41 +161,21 @@ struct RecipeExtractorSheet: View {
                     coordinator.derive(rawURL: r, jpgURL: j)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
             .keyboardShortcut(.defaultAction)
             .disabled(rawURL == nil || jpgURL == nil || coordinator.isDeriving)
         }
     }
 
-    // MARK: - File pickers
+    // MARK: - File types
 
-    private func pickRAW() {
-        let panel = NSOpenPanel()
-        panel.title = "Select RAW or DNG"
-        panel.allowsMultipleSelection = false
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        // RAW + DNG types — match what ImageDecoder knows how to load
+    /// RAW + DNG types — match what ImageDecoder knows how to load.
+    private static var rawTypes: [UTType] {
         var types: [UTType] = [.rawImage]
         if let dng = UTType(filenameExtension: "dng") { types.append(dng) }
         for ext in ["cr2", "cr3", "nef", "arw", "orf", "raf", "rw2", "pef", "srw"] {
             if let t = UTType(filenameExtension: ext) { types.append(t) }
         }
-        panel.allowedContentTypes = types
-        if panel.runModal() == .OK, let url = panel.url {
-            rawURL = url
-        }
-    }
-
-    private func pickJPG() {
-        let panel = NSOpenPanel()
-        panel.title = "Select JPG"
-        panel.allowsMultipleSelection = false
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.jpeg]
-        if panel.runModal() == .OK, let url = panel.url {
-            jpgURL = url
-        }
+        return types
     }
 }

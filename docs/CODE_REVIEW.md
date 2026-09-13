@@ -413,8 +413,16 @@ review-alignment pass.
   `AppViewModelTests` stand on.
 - ~~**`ContentView.swift` holds several unrelated top-level types.**~~ **[fixed]** — the menu commands
   and `MenuCommandReceivers` moved to `MenuCommands.swift`, `StatusBar`/`KeyHint` to `StatusBar.swift`,
-  and `KeyboardShortcuts`/`KeyMonitor` to `KeyboardShortcuts.swift`. `ContentView.swift` is down to
+  and `KeyboardShortcuts`/`KeyMonitor` to `KeyboardShortcuts.swift` (which holds the `KeyCommandMap`
+  table since the 09/2026 move to `.onKeyPress`). `ContentView.swift` is down to
   ~231 lines: the layout and the toolbar, nothing else.
+- **Observation instead of Combine** *(09/2026 UI modernization)* — `AppViewModel`, the two
+  coordinators, `ImageCollection` and `LUTLibrary` are `@Observable`. The forwarding loop in
+  `AppViewModel.init` that re-sent each child's `objectWillChange` is gone; a view is invalidated on
+  the property it read, through any number of objects, and
+  `AppViewModelTests.testANestedCoordinatorMutationIsObservedThroughThePassthrough` pins that. The
+  one non-obvious annotation is `@ObservationIgnored` on the two `scopedURL`s: `deinit` is
+  `nonisolated` and reads them, which a tracked (`@MainActor`-accessed) property would forbid.
 - ~~`HistogramChart` lives at the bottom of `InfoInspectorView.swift`, away from `Histogram.swift`.~~
   **[fixed]** — it is `Views/HistogramChart.swift` now. Moved there rather than into
   `Models/Histogram.swift` as this bullet suggested: that file is the *data*, and the Models layer does
@@ -617,7 +625,9 @@ Worth knowing before leaning on the suite:
   independently checks that each of the **nine** gated properties in `apply(to:)` is written inside a
   condition that **names** its own `is*Supported` flag, which is the part the pixel test cannot see:
   the eight per-file adjustments from a table, and `highlightRecoveryEnabled` separately and more
-  strictly, for its `#available(macOS 26, *)` guard as well as its flag.
+  strictly, for its `#available(macOS 26, *)` guard as well as its flag. (*Superseded 09/2026:* the
+  deployment floor is macOS 26, the guard is gone, and the ninth check now pins that no `#available`
+  is reintroduced there. Still nine gated writes.)
 
   (This said "eight" until the opposition pass. Eight is the count of gated *seeds* on
   `RAWCapabilities` — highlight recovery has no per-image seed — so it is right for seeds and wrong

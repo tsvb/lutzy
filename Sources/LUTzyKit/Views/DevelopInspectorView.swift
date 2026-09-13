@@ -15,21 +15,25 @@ import SwiftUI
 /// (`AppViewModel.DevelopPanelState`) rather than here: this repo has no SwiftUI view tests, so a
 /// state that exists only inside a `ViewBuilder` cannot be asserted.
 struct DevelopInspectorView: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
+    /// Bumped per control on reset so its arrow bounces; the value itself is meaningless.
+    @State private var resets: [DevelopControl: Int] = [:]
 
     var body: some View {
         Group {
             switch viewModel.developPanelState {
             case .ready(let capabilities):
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        header
+                Form {
+                    Section {
                         ForEach(capabilities.availableControls, id: \.self) { control in
                             controlRow(control)
                         }
+                    } header: {
+                        header
                     }
-                    .padding(16)
                 }
+                .formStyle(.grouped)
+        .scrollEdgeEffectStyle(.soft, for: .top)
             case .probing:
                 probing
             case .noDevelopStage:
@@ -40,7 +44,7 @@ struct DevelopInspectorView: View {
 
     private var header: some View {
         HStack {
-            Text("RAW Develop").font(.headline)
+            Text("RAW Develop")
             Spacer()
             Button("Reset") { viewModel.resetAllDevelop() }
                 .buttonStyle(.link)
@@ -58,7 +62,7 @@ struct DevelopInspectorView: View {
     /// for the picture on screen. A spinner claims nothing.
     private var probing: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
+            header.font(.headline)
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("Reading the decoder's develop controls\u{2026}")
@@ -94,41 +98,50 @@ struct DevelopInspectorView: View {
 
     @ViewBuilder
     private func controlRow(_ control: DevelopControl) -> some View {
+        let value = viewModel.developValue(for: control)
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(control.title).font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                if !control.isToggle {
-                    Text(String(format: "%.2f", viewModel.developValue(for: control)))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
+            LabeledContent {
+                HStack(spacing: 6) {
+                    if control.isToggle {
+                        Toggle(control.title, isOn: Binding(
+                            get: { value != 0 },
+                            set: { viewModel.developBinding(for: control).wrappedValue = $0 ? 1 : 0 }
+                        ))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    } else {
+                        Text(String(format: "%.2f", value))
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .contentTransition(.numericText(value: value))
+                            .animation(.default, value: value)
+                    }
+                    Button {
+                        resets[control, default: 0] += 1
+                        viewModel.resetDevelop(control)
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                            .symbolEffect(.bounce, value: resets[control, default: 0])
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.mini)
+                    .help("Reset to the decoder's default")
                 }
-                Button {
-                    viewModel.resetDevelop(control)
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.mini)
-                .help("Reset to the decoder's default")
+            } label: {
+                Text(control.title)
             }
 
-            if control.isToggle {
-                Toggle(control.title, isOn: Binding(
-                    get: { viewModel.developValue(for: control) != 0 },
-                    set: { viewModel.developBinding(for: control).wrappedValue = $0 ? 1 : 0 }
-                ))
-                .labelsHidden()
-            } else {
-                Slider(
-                    value: viewModel.developBinding(for: control),
-                    in: control.range
-                )
+            if !control.isToggle {
+                Slider(value: viewModel.developBinding(for: control), in: control.range)
+                    .labelsHidden()
                 if control == .whiteBalance {
-                    HStack {
-                        Text("Tint").font(.caption2).foregroundStyle(.secondary)
+                    LabeledContent("Tint") {
                         Slider(value: viewModel.developTintBinding(), in: DevelopControl.tintRange)
+                            .labelsHidden()
                     }
+                    .font(.caption)
                 }
             }
         }

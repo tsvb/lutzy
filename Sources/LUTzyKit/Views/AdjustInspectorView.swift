@@ -12,23 +12,27 @@ import SwiftUI
 /// here — it comes from `AdjustmentControl.allCases`, so which rows appear and in what order is a
 /// value the tests can assert rather than a shape buried in a `ViewBuilder`.
 struct AdjustInspectorView: View {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
+    /// Bumped per control on reset so its arrow bounces; the value itself is meaningless.
+    @State private var resets: [AdjustmentControl: Int] = [:]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
+        Form {
+            Section {
                 ForEach(AdjustmentControl.allCases, id: \.self) { control in
                     controlRow(control)
                 }
+            } header: {
+                header
             }
-            .padding(16)
         }
+        .formStyle(.grouped)
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     private var header: some View {
         HStack {
-            Text("Adjustments").font(.headline)
+            Text("Adjustments")
             Spacer()
             Button("Reset") { viewModel.resetAllAdjustments() }
                 .buttonStyle(.link)
@@ -38,24 +42,33 @@ struct AdjustInspectorView: View {
 
     @ViewBuilder
     private func controlRow(_ control: AdjustmentControl) -> some View {
+        let value = viewModel.adjustmentValue(for: control)
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(control.title).font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Text(readout(for: control))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                Button {
-                    viewModel.resetAdjustment(control)
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
+            LabeledContent {
+                HStack(spacing: 6) {
+                    Text(readout(for: control))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText(value: value))
+                        .animation(.default, value: value)
+                    Button {
+                        resets[control, default: 0] += 1
+                        viewModel.resetAdjustment(control)
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                            .symbolEffect(.bounce, value: resets[control, default: 0])
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.mini)
+                    .help("Reset to neutral")
                 }
-                .buttonStyle(.borderless)
-                .controlSize(.mini)
-                .help("Reset to neutral")
+            } label: {
+                Text(control.title)
             }
 
             Slider(value: viewModel.adjustmentBinding(for: control), in: control.range)
+                .labelsHidden()
         }
     }
 

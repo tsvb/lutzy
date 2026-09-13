@@ -71,6 +71,8 @@ Two real fixes fell out, both in code the earlier steps had not touched:
   thread — so it may not touch the non-`Sendable` `Any?` token AppKit returns. Teardown became an
   explicit `stop()` on the main actor, called from `onDisappear`. That is the better shape anyway:
   `NSEvent.removeMonitor` wants the main thread, and reaching it from a `deinit` never guaranteed one.
+  (`KeyMonitor` itself went in the 09/2026 UI modernization — the shortcuts are `.onKeyPress` now —
+  but the lesson stands, and `ImageCollection.deinit` is where it applies today.)
 - `PreviewCostBenchmark.timeAsync` passed a non-`Sendable` closure to an unstructured `Task`. Marked
   `@Sendable`; every call site already captured only values.
 
@@ -515,6 +517,10 @@ least one section, which is most of why it was so long.
   one: the compiler now *refuses* newer API unless it is guarded. The cost is that the package
   requires Xcode 26+ to build; see `CLAUDE.md`. Step 10 is all new `CIRAWFilter` surface and depends
   on this arrangement.
+  - *Superseded 09/2026 by the UI modernization:* the deployment target is **macOS 26** and CI builds
+    with the macOS 27 SDK on `xcode-27`. The `#available(macOS 26, *)` guard on highlight recovery is
+    gone — it would be an always-true check — and `RAWDevelopSettingsTests` now pins its *absence*.
+    Only macOS 27 API needs `#available` now. The two bullets above are kept as history.
 - `isDustRemovalSupported` and `isBaselineExposureAvailable` **do not exist** — fabricated.
 
 **This codebase:**

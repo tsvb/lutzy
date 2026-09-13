@@ -59,7 +59,7 @@ public struct LUTzyCommands: Commands {
 
 /// Bridges the menu's notifications back to the view model.
 struct MenuCommandReceivers: ViewModifier {
-    @ObservedObject var viewModel: AppViewModel
+    let viewModel: AppViewModel
 
     func body(content: Content) -> some View {
         content
