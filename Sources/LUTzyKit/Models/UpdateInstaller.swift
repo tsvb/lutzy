@@ -202,8 +202,12 @@ enum UpdateInstaller {
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", script, appURL.path, String(ProcessInfo.processInfo.processIdentifier)]
         try? process.run()
+        UpdateCoordinator.log.info("relaunch helper started; terminating")
         NSApp.terminate(nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            UpdateCoordinator.log.info("terminate was ignored; exiting")
+            exit(0)
+        }
     }
 
     // MARK: - The whole thing
@@ -215,12 +219,16 @@ enum UpdateInstaller {
         guard let dmgURL = release.diskImageURL else { throw InstallError.noDiskImage }
 
         let dmg = try await download(dmgURL)
+        UpdateCoordinator.log.info("downloaded \(dmg.lastPathComponent)")
         defer { try? FileManager.default.removeItem(at: dmg.deletingLastPathComponent()) }
         let mountPoint = try await mount(dmg)
+        UpdateCoordinator.log.info("mounted at \(mountPoint.path)")
         do {
             let newApp = try findApp(in: mountPoint)
             try verify(newApp, against: identity)
+            UpdateCoordinator.log.info("signature verified for team \(identity.teamID)")
             try swap(newApp: newApp, into: currentApp)
+            UpdateCoordinator.log.info("swapped into \(currentApp.path)")
         } catch {
             await detach(mountPoint)
             throw error

@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Observation
+import os
 
 /// Owns the update flow: the daily background check, the manual one, the sheet, and the install.
 ///
@@ -42,6 +43,10 @@ final class UpdateCoordinator {
     @ObservationIgnored private var task: Task<Void, Never>?
 
     static let automaticInterval: TimeInterval = 24 * 60 * 60
+
+    /// `log stream --predicate 'subsystem == "com.timvbs.LUTzy"'` shows every step of a check and
+    /// an install. This is the only way to see what the updater did on someone else's machine.
+    nonisolated static let log = Logger(subsystem: "com.timvbs.LUTzy", category: "updates")
 
     init(
         currentVersion: AppVersion? = AppVersion.current,
@@ -104,6 +109,7 @@ final class UpdateCoordinator {
             isSheetPresented = true
         }
         let fetch = self.fetch
+        Self.log.info("check started (manual: \(userInitiated), running: \(self.currentVersion?.description ?? "dev"))")
         task = Task {
             let result: Result<Release, Error>
             do { result = .success(try await fetch()) } catch { result = .failure(error) }
@@ -111,17 +117,21 @@ final class UpdateCoordinator {
             lastCheck = Date()
             switch result {
             case .failure(let error):
+                Self.log.error("check failed: \(error.localizedDescription)")
                 if userInitiated { phase = .failed(error.localizedDescription) }
                 else { phase = nil }
             case .success(let release):
                 if isNewer(release) {
                     if userInitiated || release.version != skippedVersion {
+                        Self.log.info("update available: \(release.version.description)")
                         phase = .available(release)
                         isSheetPresented = true
                     } else {
+                        Self.log.info("update \(release.version.description) available but skipped")
                         phase = nil
                     }
                 } else {
+                    Self.log.info("up to date (latest \(release.version.description))")
                     phase = userInitiated ? .upToDate : nil
                 }
             }
@@ -155,12 +165,14 @@ final class UpdateCoordinator {
     /// message replaces it and nothing has changed on disk.
     func installAndRelaunch(_ release: Release) {
         guard canInstallInPlace else { return openReleasePage(release) }
+        Self.log.info("install started: \(release.version.description)")
         phase = .downloading(release)
         let install = self.install
         task = Task {
             do {
                 let installed = try await install(release)
                 guard !Task.isCancelled else { return }
+                Self.log.info("install landed at \(installed.path); relaunching")
                 phase = .installing(release)
                 // Let the sheet come down before asking the app to quit: see `relaunch`.
                 isSheetPresented = false
@@ -168,6 +180,7 @@ final class UpdateCoordinator {
                 UpdateInstaller.relaunch(installed)
             } catch {
                 guard !Task.isCancelled else { return }
+                Self.log.error("install failed: \(error.localizedDescription)")
                 phase = .failed(error.localizedDescription)
             }
         }

@@ -16,6 +16,9 @@
 #   scripts/release-dmg.sh 0.1.1
 #
 # Output lands in build/release/.
+#
+# LUTZY_SKIP_NOTARIZE=1 builds and signs the app and the DMG but skips both notarization rounds and
+# the stapling: for a local test of the update path, never for something you ship.
 set -euo pipefail
 
 VERSION="${1:?Usage: release-dmg.sh <version>, e.g. 0.1.1}"
@@ -76,11 +79,15 @@ echo "==> Signing app"
 codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APP" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
-echo "==> Notarizing app (round 1 of 2)"
-ditto -c -k --keepParent "$APP" "$OUT/LUTzy.zip"
-xcrun notarytool submit "$OUT/LUTzy.zip" --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple "$APP"
-rm "$OUT/LUTzy.zip"
+if [ "${LUTZY_SKIP_NOTARIZE:-0}" = "1" ]; then
+  echo "==> Skipping notarization (LUTZY_SKIP_NOTARIZE=1)"
+else
+  echo "==> Notarizing app (round 1 of 2)"
+  ditto -c -k --keepParent "$APP" "$OUT/LUTzy.zip"
+  xcrun notarytool submit "$OUT/LUTzy.zip" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "$APP"
+  rm "$OUT/LUTzy.zip"
+fi
 
 echo "==> Building DMG"
 create-dmg --volname "LUTzy $VERSION" --window-size 540 360 --icon-size 128 \
@@ -88,11 +95,15 @@ create-dmg --volname "LUTzy $VERSION" --window-size 540 360 --icon-size 128 \
   "$DMG" "$APP"
 codesign --force --timestamp --sign "$DEVELOPER_ID_APP" "$DMG"
 
-echo "==> Notarizing DMG (round 2 of 2)"
-xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple "$DMG"
+if [ "${LUTZY_SKIP_NOTARIZE:-0}" = "1" ]; then
+  echo "==> Skipping DMG notarization and the Gatekeeper check (LUTZY_SKIP_NOTARIZE=1)"
+else
+  echo "==> Notarizing DMG (round 2 of 2)"
+  xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "$DMG"
 
-echo "==> Gatekeeper"
-spctl -a -vv -t install "$APP"
-spctl --assess --type open --context context:primary-signature -vv "$DMG"
+  echo "==> Gatekeeper"
+  spctl -a -vv -t install "$APP"
+  spctl --assess --type open --context context:primary-signature -vv "$DMG"
+fi
 echo "Done: $DMG"
