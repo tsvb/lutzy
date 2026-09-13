@@ -24,6 +24,7 @@ A 3D LUT is a table with a color at every lattice point. The photo's colors are 
   - **Adjust** — nine sliders after develop, before the LUT: exposure, brightness, contrast, saturation, highlights, shadows, temperature, tint, vibrance
 - **Filmstrip** when a source folder is open. <kbd>←</kbd> <kbd>→</kbd> or <kbd>[</kbd> <kbd>]</kbd> step through; the current look stays on. <kbd>⌘R</kbd> rescans.
 - **Window** — Liquid Glass toolbar, customizable (View ▸ Customize Toolbar…). The file and LUT names sit in the title. <kbd>⌘,</kbd> sets launch defaults: side-by-side, source browser, export format.
+- **Updates** — once a day the packaged app looks at this repo's [releases](https://github.com/tsvb/lutzy/releases) and offers anything newer. LUTzy ▸ Check for Updates… asks now. Install downloads the DMG, verifies the app inside is signed by the same Developer ID team as the running copy, swaps it in place, and relaunches. Off switch and skip-this-version in Settings.
 - **Export** — 16-bit TIFF, JPEG (quality 0.95), or PNG, always full resolution, named `{photo}_{LUT}.ext` (spaces in the LUT name become underscores). <kbd>⌘⇧E</kbd> Export All writes the whole look — develop, adjustments, LUT, intensity — and counts failures instead of aborting.
 
 ## Derive LUT from JPG
@@ -69,7 +70,7 @@ The RAW is developed with the same default `CIRAWFilter` settings the rest of th
 | <kbd>⌘D</kbd> | derive |
 | <kbd>⌘S</kbd> | export |
 | <kbd>⌘⇧E</kbd> | export all |
-| <kbd>⌘,</kbd> | settings — launch defaults and the sidebar's collapsed folders |
+| <kbd>⌘,</kbd> | settings — launch defaults, update checks, and the sidebar's collapsed folders |
 
 Letter keys go through SwiftUI's `.onKeyPress` on the split view; the preview canvas is focusable and holds focus by default so the handler always has a focused descendant. <kbd>⌘</kbd> shortcuts go through the menu bar.
 
@@ -115,6 +116,8 @@ scripts/release-dmg.sh 0.1.1
 ```
 
 Does what an Xcode archive would: universal release build, a hand-written `LUTzy.app` with an `Info.plist` and the icon, signed with Developer ID and the hardened runtime (no sandbox yet), notarized and stapled, then packed into a DMG that is notarized and stapled again. Output lands in `build/release/`. Needs `create-dmg` (`brew install create-dmg`) and a notarytool keychain profile.
+
+Publish the DMG as a GitHub release tagged `vX.Y.Z`, the same triple passed to the script. The in-app updater reads `releases/latest` and picks the first `.dmg` asset, so a release without one is offered as a page to open rather than an install.
 
 The icon is drawn by `scripts/render-icon.swift`: the RGB cube a `.cube` file indexes, seen from its green corner, rendered into every slot of the appiconset. Run it again rather than editing the PNGs.
 

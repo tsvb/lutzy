@@ -17,6 +17,10 @@ public struct LUTzyCommands: Commands {
     public init() {}
 
     public var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { post(.checkForUpdates) }
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("Open Image...") { post(.openImage) }
                 .keyboardShortcut("o")
@@ -87,6 +91,9 @@ struct MenuCommandReceivers: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .deriveRecipe)) { _ in
                 viewModel.presentRecipeExtractor()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .checkForUpdates)) { _ in
+                viewModel.updates.checkNow()
+            }
     }
 }
 
@@ -101,4 +108,5 @@ extension Notification.Name {
     static let openSourceFolder = Notification.Name("LUTzy.openSourceFolder")
     static let refreshSourceFolder = Notification.Name("LUTzy.refreshSourceFolder")
     static let deriveRecipe = Notification.Name("LUTzy.deriveRecipe")
+    static let checkForUpdates = Notification.Name("LUTzy.checkForUpdates")
 }

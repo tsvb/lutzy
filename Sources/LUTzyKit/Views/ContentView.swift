@@ -39,6 +39,9 @@ public struct ContentView: View {
             .sheet(isPresented: Bindable(viewModel.derive).isSheetPresented) {
                 RecipeExtractorSheet(coordinator: viewModel.derive)
             }
+            .sheet(isPresented: Bindable(viewModel.updates).isSheetPresented) {
+                UpdateSheet(coordinator: viewModel.updates)
+            }
             .modifier(MenuCommandReceivers(viewModel: viewModel))
             .alert(
                 "Something went wrong",
@@ -87,6 +90,9 @@ public struct ContentView: View {
         .defaultFocus($isCanvasFocused, true)
         .task { isCanvasFocused = true }
         .onChange(of: viewModel.derive.isSheetPresented) { _, presented in
+            if !presented { isCanvasFocused = true }
+        }
+        .onChange(of: viewModel.updates.isSheetPresented) { _, presented in
             if !presented { isCanvasFocused = true }
         }
         .onKeyPress(keys: KeyCommandMap.keys, phases: KeyCommandMap.phases) { press in
