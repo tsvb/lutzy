@@ -263,6 +263,8 @@ final class AppViewModel {
     let export: ExportCoordinator
     /// The "Derive LUT from JPG" flow and its scratch-until-saved result.
     let derive = DeriveCoordinator()
+    /// Release checks and the in-place update. Its automatic check is kicked off from `init`.
+    let updates: UpdateCoordinator
 
     // Convenience passthroughs so views and the menu don't have to know which
     // collaborator owns a given piece of state.
@@ -284,9 +286,10 @@ final class AppViewModel {
 
     // MARK: - Init
 
-    init(engine: any RenderEngining = RenderEngine.shared) {
+    init(engine: any RenderEngining = RenderEngine.shared, updates: UpdateCoordinator = UpdateCoordinator()) {
         self.engine = engine
         self.export = ExportCoordinator(engine: engine)
+        self.updates = updates
         // Launch defaults from Settings (⌘,). Read once: see `AppPreference`.
         self.isSideBySide = UserDefaults.standard.bool(forKey: AppPreference.defaultSideBySide, default: true)
 
@@ -305,6 +308,10 @@ final class AppViewModel {
                 forKey: AppPreference.showSourceBrowserOnRestore, default: true)
             openFirstImageWhenScanned()
         }
+
+        // Quiet unless there is something newer; a no-op in a `swift run` build or a test, which
+        // have no version to compare. See `UpdateCoordinator`.
+        updates.checkAutomaticallyIfDue()
     }
 
     /// Point the coordinators' status/error output at this view model, which

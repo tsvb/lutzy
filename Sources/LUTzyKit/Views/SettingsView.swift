@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage(AppPreference.showSourceBrowserOnRestore) private var showSourceBrowserOnRestore = true
     @AppStorage(AppPreference.defaultExportFormat) private var defaultExportFormat = ExportFormat.jpeg.rawValue
     @AppStorage(AppPreference.collapsedLUTCategories) private var collapsedLUTCategories = ""
+    @AppStorage(AppPreference.automaticUpdateChecks) private var automaticUpdateChecks = true
 
     var body: some View {
         Form {
@@ -40,6 +41,23 @@ struct SettingsView: View {
                     Button("Expand All") { collapsedLUTCategories = "" }
                         .disabled(collapsedLUTCategories.isEmpty)
                 }
+            }
+
+            Section {
+                Toggle("Check for updates automatically", isOn: $automaticUpdateChecks)
+                LabeledContent("Version") {
+                    HStack(spacing: 8) {
+                        Text(AppVersion.current?.description ?? "development build")
+                            .foregroundStyle(.secondary)
+                        Button("Check Now") {
+                            NotificationCenter.default.post(name: .checkForUpdates, object: nil)
+                        }
+                    }
+                }
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Once a day, LUTzy looks at its GitHub releases. An update is installed only after its signature is verified against this copy.")
             }
         }
         .formStyle(.grouped)

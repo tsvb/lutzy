@@ -19,6 +19,12 @@ enum AppPreference {
     static let showSourceBrowserOnRestore = "lutzy.showSourceBrowserOnRestore"
     /// `ExportFormat.rawValue` to start with. Default JPEG.
     static let defaultExportFormat = "lutzy.defaultExportFormat"
+    /// Whether the launch-time release check runs. Default `true`. Read live by `UpdateCoordinator`.
+    static let automaticUpdateChecks = "lutzy.automaticUpdateChecks"
+    /// `Date` of the last completed release check, automatic or manual.
+    static let lastUpdateCheck = "lutzy.lastUpdateCheck"
+    /// A version string the user chose to skip; the automatic check stays quiet about it.
+    static let skippedUpdateVersion = "lutzy.skippedUpdateVersion"
 }
 
 extension UserDefaults {
