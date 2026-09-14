@@ -1,6 +1,7 @@
 import Foundation
 import CoreImage
 import CryptoKit
+import simd
 
 /// Parses a .cube 3D LUT file and creates a CIFilter for GPU-accelerated color grading.
 struct CubeLUT: Identifiable, Hashable, Sendable {
@@ -10,6 +11,9 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
     let url: URL
     let size: Int
     private let tableData: Data  // flattened RGBARGBA... float32 for Core Image
+    /// `referencePatches` pushed through this cube, in order — the sidebar's fingerprint of the
+    /// look. Computed once at init from the same floats the table is built from.
+    let swatches: [SIMD3<Float>]
 
     // MARK: - Hashable
 
@@ -44,6 +48,7 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         }
         let table = floats.withUnsafeBufferPointer { Data(buffer: $0) }
         self.tableData = table
+        self.swatches = Self.referencePatches.map { Self.sample(table: floats, size: size, at: $0) }
         // The table has to be built before the ID, because the ID is made from it.
         self.id = sourceURL?.path ?? Self.derivedID(name: name, table: table)
     }
@@ -156,6 +161,55 @@ struct CubeLUT: Identifiable, Hashable, Sendable {
         self.tableData = floats.withUnsafeBufferPointer { buffer in
             Data(buffer: buffer)
         }
+        self.swatches = Self.referencePatches.map { Self.sample(table: floats, size: lutSize, at: $0) }
+    }
+
+    // MARK: - Sampling
+
+    /// The colours the sidebar shows through every LUT: a three-step gray ramp for the tone curve,
+    /// then the four hues a photograph is mostly made of. Working-space values in 0…1.
+    static let referencePatches: [SIMD3<Float>] = [
+        SIMD3(0.18, 0.18, 0.18),   // shadow
+        SIMD3(0.45, 0.45, 0.45),   // mid-gray
+        SIMD3(0.85, 0.85, 0.85),   // highlight
+        SIMD3(0.85, 0.60, 0.48),   // skin
+        SIMD3(0.42, 0.62, 0.86),   // sky
+        SIMD3(0.36, 0.52, 0.24),   // foliage
+        SIMD3(0.72, 0.18, 0.20),   // red
+    ]
+
+    /// Look one colour up, trilinearly — the same interpolation `CIColorCube` does on the GPU,
+    /// on the CPU, for a handful of samples. Reads the table in place; no copy.
+    func sample(_ color: SIMD3<Float>) -> SIMD3<Float> {
+        tableData.withUnsafeBytes { raw in
+            Self.sample(table: raw.bindMemory(to: Float.self), size: size, at: color)
+        }
+    }
+
+    private static func sample<T: RandomAccessCollection>(
+        table: T, size: Int, at color: SIMD3<Float>
+    ) -> SIMD3<Float> where T.Element == Float, T.Index == Int {
+        let n = size - 1
+        guard n > 0 else { return color }
+        let c = simd_clamp(color, .zero, .one) * Float(n)
+        let lo = SIMD3<Int>(Int(c.x), Int(c.y), Int(c.z))
+        let hi = simd_min(lo &+ SIMD3(repeating: 1), SIMD3(repeating: n))
+        let f = c - SIMD3<Float>(Float(lo.x), Float(lo.y), Float(lo.z))
+
+        // R varies fastest, then G, then B: see the parser above.
+        func entry(_ r: Int, _ g: Int, _ b: Int) -> SIMD3<Float> {
+            let i = ((b * size + g) * size + r) * 4
+            return SIMD3(table[i], table[i + 1], table[i + 2])
+        }
+        func lerp(_ a: SIMD3<Float>, _ b: SIMD3<Float>, _ t: Float) -> SIMD3<Float> { a + (b - a) * t }
+
+        let c00 = lerp(entry(lo.x, lo.y, lo.z), entry(hi.x, lo.y, lo.z), f.x)
+        let c10 = lerp(entry(lo.x, hi.y, lo.z), entry(hi.x, hi.y, lo.z), f.x)
+        let c01 = lerp(entry(lo.x, lo.y, hi.z), entry(hi.x, lo.y, hi.z), f.x)
+        let c11 = lerp(entry(lo.x, hi.y, hi.z), entry(hi.x, hi.y, hi.z), f.x)
+        let c0 = lerp(c00, c10, f.y)
+        let c1 = lerp(c01, c11, f.y)
+        return lerp(c0, c1, f.z)
     }
 
     // MARK: - Inspection
