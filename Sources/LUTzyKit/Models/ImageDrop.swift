@@ -77,11 +77,15 @@ enum ImageDrop {
         let expected = receivers.reduce(0) { $0 + max($1.fileTypes.count, $1.fileNames.count) }
         guard expected > 0 else { return [] }
 
-        let queue = OperationQueue()
-        queue.qualityOfService = .userInitiated
+        // **The reader runs on the main queue — measured, not assumed.** This enum is `@MainActor`,
+        // so the reader closure is main-actor isolated, and Swift 6 checks that at the call: handed
+        // a private `OperationQueue`, the first real Photos drag died in `dispatch_assert_queue`
+        // (`_swift_task_checkIsolatedSwift`, LUTzy-2026-09-13-093026.ips). The reader does nothing
+        // but yield into the stream, so there is nothing to gain from a background queue anyway;
+        // the file writing itself is Photos' work, not this closure's.
         let stream = AsyncStream<URL?> { continuation in
             for receiver in receivers {
-                receiver.receivePromisedFiles(atDestination: directory, options: [:], operationQueue: queue) { url, error in
+                receiver.receivePromisedFiles(atDestination: directory, options: [:], operationQueue: .main) { url, error in
                     continuation.yield(error == nil ? url : nil)
                 }
             }
