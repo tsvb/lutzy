@@ -94,9 +94,13 @@ struct LUTSidebar: View {
             get: { viewModel.selectedLUT },
             set: { viewModel.selectLUT($0) }
         )) {
-            Text("None")
-                .foregroundStyle(.secondary)
-                .tag(Optional<CubeLUT>.none)
+            // The untouched patches, so every LUT below reads as a change from this row.
+            HStack(spacing: 8) {
+                SwatchStrip(colors: CubeLUT.referencePatches)
+                Text("None")
+                    .foregroundStyle(.secondary)
+            }
+            .tag(Optional<CubeLUT>.none)
 
             ForEach(filteredCategories) { category in
                 Section(isExpanded: isExpandedBinding(category.id)) {
@@ -146,10 +150,35 @@ struct LUTRow: View {
     }
 
     var body: some View {
-        Text(displayName)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .help(lut.name)
-            .contentShape(Rectangle())
+        HStack(spacing: 8) {
+            SwatchStrip(colors: lut.swatches)
+            Text(displayName)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .help("\(lut.name) — \(lut.size)³")
+        .contentShape(Rectangle())
+    }
+}
+
+/// Seven reference colours after a LUT, as one small strip. It is the sidebar's only ornament,
+/// and it is information: the gray ramp shows the tone curve, the four hues show where the look
+/// pushes skin, sky, foliage and red. See `CubeLUT.referencePatches`.
+struct SwatchStrip: View {
+    let colors: [SIMD3<Float>]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(colors.enumerated()), id: \.offset) { _, c in
+                Color(.sRGB, red: Double(c.x), green: Double(c.y), blue: Double(c.z))
+            }
+        }
+        .frame(width: 56, height: 18)
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        }
+        .accessibilityHidden(true)
     }
 }

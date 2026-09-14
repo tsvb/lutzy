@@ -377,3 +377,49 @@ final class CubeLUTTests: TempDirectoryTestCase {
         return (CGFloat(bytes[0]), CGFloat(bytes[1]), CGFloat(bytes[2]))
     }
 }
+
+// MARK: - Sampling (the sidebar swatches)
+
+extension CubeLUTTests {
+
+    func testIdentityCubeSamplesReturnTheInput() throws {
+        let url = try Fixtures.writeCube(Fixtures.identityCubeText(size: 17), named: "id.cube", in: tempDirectory)
+        let lut = try CubeLUT(url: url)
+        for patch in CubeLUT.referencePatches {
+            let out = lut.sample(patch)
+            XCTAssertEqual(out.x, patch.x, accuracy: 0.002)
+            XCTAssertEqual(out.y, patch.y, accuracy: 0.002)
+            XCTAssertEqual(out.z, patch.z, accuracy: 0.002)
+        }
+        XCTAssertEqual(lut.swatches.count, CubeLUT.referencePatches.count)
+        XCTAssertEqual(lut.swatches[3].x, CubeLUT.referencePatches[3].x, accuracy: 0.002,
+                       "swatches are the reference patches through the cube")
+    }
+
+    func testSamplingHonoursRedFastestOrdering() {
+        // A 2³ cube that swaps red and blue: entry (r,g,b) holds (b,g,r).
+        var cube: [SIMD3<Float>] = []
+        for b in 0..<2 { for g in 0..<2 { for r in 0..<2 {
+            cube.append(SIMD3(Float(b), Float(g), Float(r)))
+        } } }
+        let lut = CubeLUT(cube: cube, size: 2, name: "swap")
+        let out = lut.sample(SIMD3(1, 0.5, 0))
+        XCTAssertEqual(out.x, 0, accuracy: 0.001)
+        XCTAssertEqual(out.y, 0.5, accuracy: 0.001)
+        XCTAssertEqual(out.z, 1, accuracy: 0.001)
+        XCTAssertEqual(lut.swatches[6].z, 0.72, accuracy: 0.001, "red patch comes out blue")
+    }
+
+    func testSamplingInterpolatesBetweenLatticePoints() {
+        // 2³ identity: any input should come back unchanged, which only holds with interpolation.
+        var cube: [SIMD3<Float>] = []
+        for b in 0..<2 { for g in 0..<2 { for r in 0..<2 {
+            cube.append(SIMD3(Float(r), Float(g), Float(b)))
+        } } }
+        let lut = CubeLUT(cube: cube, size: 2, name: "id2")
+        let out = lut.sample(SIMD3(0.3, 0.6, 0.9))
+        XCTAssertEqual(out.x, 0.3, accuracy: 0.001)
+        XCTAssertEqual(out.y, 0.6, accuracy: 0.001)
+        XCTAssertEqual(out.z, 0.9, accuracy: 0.001)
+    }
+}
