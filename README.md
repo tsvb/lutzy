@@ -124,3 +124,5 @@ The icon is drawn by `scripts/render-icon.swift`: the RGB cube a `.cube` file in
 ## License
 
 [MIT](LICENSE)
+
+Made by [Tim VanBenschoten](https://timvanbenschoten.com).
