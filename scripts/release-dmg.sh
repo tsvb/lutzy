@@ -46,6 +46,10 @@ ICONSET="$OUT/LUTzy.iconset"; mkdir -p "$ICONSET"
 cp Sources/LUTzy/Assets.xcassets/AppIcon.appiconset/icon_*.png "$ICONSET"/
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/LUTzy.icns"
 
+echo "==> Credits"
+# Shown under the version in About LUTzy: the author and a link to the project page.
+cp Sources/LUTzy/Credits.rtf "$APP/Contents/Resources/Credits.rtf"
+
 echo "==> Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 cat > "$APP/Contents/Info.plist" <<EOF

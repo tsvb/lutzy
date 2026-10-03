@@ -23,7 +23,7 @@ let package = Package(
         .executableTarget(
             name: "LUTzy",
             dependencies: ["LUTzyKit"],
-            exclude: ["Assets.xcassets", "LUTzy.entitlements"],
+            exclude: ["Assets.xcassets", "LUTzy.entitlements", "Credits.rtf"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
