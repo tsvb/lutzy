@@ -21,6 +21,13 @@ public struct LUTzyCommands: Commands {
             Button("Check for Updates…") { post(.checkForUpdates) }
         }
 
+        // The default Help item only says "Help isn't available"; point it at the project page.
+        CommandGroup(replacing: .help) {
+            Button("LUTzy Website") {
+                NSWorkspace.shared.open(URL(string: "https://timvanbenschoten.com/code/lutzy")!)
+            }
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("Open Image...") { post(.openImage) }
                 .keyboardShortcut("o")
