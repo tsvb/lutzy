@@ -66,6 +66,13 @@ file's convention. Graph assembly *and* rasterization now live inside `actor Ren
 boundary, and the main actor builds no filter graph at all — what keeps `createCGImage` off it is the
 actor hop, not the task type. The funnel and the 60 ms debounce are unchanged and still accurate.
 
+**The debounce is superseded too** (11/2026). It was a trailing timer restarted by every tick, so a
+drag that never paused for 60 ms never rendered — the preview froze for the whole drag. `schedulePreview`
+and `scheduleOriginalPreview` are now render loops: leading edge, latest wins, at most one render in
+flight, so the preview tracks the pointer as fast as the engine can draw. The funnel is unchanged.
+`RenderEngine.makeCGImage` and `histogram` also check for cancellation on entry now; before, a request
+cancelled while queued behind another still rendered in full, once per LUT on a held ↓.
+
 ### B3 — Launch blocked on disk I/O · Medium · [fixed]
 
 `LUTLibrary.scan` parsed every `.cube` synchronously on the main actor — a 33³ LUT is ~36k lines of text

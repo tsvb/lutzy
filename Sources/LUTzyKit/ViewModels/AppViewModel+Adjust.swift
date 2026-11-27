@@ -20,13 +20,13 @@ extension AppViewModel {
     /// A two-way binding for one row. Slider space on both sides — `sliderMapped` is self-inverse,
     /// so the same call converts each way.
     ///
-    /// **Debounced**, because every row here is a continuous control: there are no toggles in this
-    /// panel, unlike Develop's three.
+    /// A slider tick renders at once when the engine is idle and coalesces when it is not — see
+    /// `updateDocument(_:)`. No flag to pass: sliders, toggles and resets share one path.
     func adjustmentBinding(for control: AdjustmentControl) -> Binding<Double> {
         Binding(
             get: { self.adjustmentValue(for: control) },
             set: { newValue in
-                self.updateDocument(debounced: true) { document in
+                self.updateDocument { document in
                     document.adjustments = control.setting(
                         control.sliderMapped(newValue), in: document.adjustments
                     )
@@ -35,8 +35,7 @@ extension AppViewModel {
         )
     }
 
-    /// Return one row to its neutral. Undebounced — `updateDocument(debounced:)`'s contract is that
-    /// discrete controls fire immediately.
+    /// Return one row to its neutral.
     func resetAdjustment(_ control: AdjustmentControl) {
         updateDocument { document in
             document.adjustments = control.setting(control.neutral, in: document.adjustments)

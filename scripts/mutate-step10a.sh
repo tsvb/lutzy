@@ -254,31 +254,43 @@ mutate "AppViewModel: never probe on open" "$VM" \
   's/                self\.refreshCapabilities\(\)\n//' \
   "DevelopInspectorTests"
 mutate "AppViewModel: probe on every render" "$VM" \
-  's/^        let \(requested, lut\) = displayRequest$/        refreshCapabilities()\n        let (requested, lut) = displayRequest/m' \
+  's/^            let \(requested, lut\) = displayRequest$/            refreshCapabilities()\n            let (requested, lut) = displayRequest/m' \
   "DevelopInspectorTests"
 
-echo "=== debounce, and the burst accumulator ==="
-mutate "AppViewModel: ignore the debounce flag, always render immediately" "$VM" \
-  's/        guard debounced else \{/        if true {/' \
-  "DevelopInspectorTests"
-mutate "AppViewModel: debounce drops the document update too" "$VM" \
-  's/^        document = updated$/        if !debounced { document = updated }/m' \
+echo "=== the render loops: leading edge, latest wins ==="
+# These replace seven debounce mutants, retired with the debounce itself: the 60 ms trailing timer
+# restarted on every tick, so a drag that never paused never rendered. The anchors they named —
+# `guard debounced`, `pendingDevelopChange`, `debounced: !control.isToggle` — no longer exist, and a
+# mutant whose anchor is gone is NO-OP, not caught. What they protected (a burst never renders a
+# partial state; a develop change anywhere in a burst moves the baseline; nothing leaks across an
+# open) is still pinned, by the same tests, now against `updateDocument` and the render loops.
+mutate "AppViewModel: every edit starts another preview loop instead of joining the running one" "$VM" \
+  's/        guard previewTask == nil else \{ return \}\n//' \
+  "PreviewSchedulingTests"
+mutate "AppViewModel: every edit starts another baseline loop instead of joining the running one" "$VM" \
+  's/        guard originalPreviewTask == nil else \{ return \}\n//' \
+  "PreviewSchedulingTests"
+mutate "AppViewModel: the preview loop never goes round again for a newer edit" "$VM" \
+  's/            if generation == previewGeneration \{ break \}/            break/' \
+  "PreviewSchedulingTests"
+mutate "AppViewModel: the histogram is tallied per frame, not when the loop settles" "$VM" \
+  's/(            if generation == previewGeneration \{ break \})/            updateHistogram()\n$1/; s/        previewTask = nil\n        updateHistogram\(\)\n/        previewTask = nil\n/' \
+  "PreviewSchedulingTests"
+mutate "AppViewModel: a develop edit no longer moves the comparison baseline" "$VM" \
+  's/        if developChanged \{ scheduleOriginalPreview\(\) \}\n//' \
+  "DevelopInspectorTests|AdjustInspectorTests"
+mutate "AppViewModel: every edit moves the comparison baseline" "$VM" \
+  's/        if developChanged \{ scheduleOriginalPreview\(\) \}/        scheduleOriginalPreview()/' \
+  "AdjustInspectorTests"
+mutate "AppViewModel: the document is never updated, only re-rendered" "$VM" \
+  's/^        document = updated\n\n        if developChanged/        if developChanged/m' \
   "DevelopInspectorTests|PreviewCutoverTests"
-# Finding 1 from Task 4's review: a coalesced burst shares one developTask, so only the last call's
-# flag survives to fire. Assigning instead of OR-ing loses a develop change made earlier in the burst
-# and the side-by-side baseline never re-renders.
-mutate "AppViewModel: the burst accumulator assigns instead of OR-ing" "$VM" \
-  's/pendingDevelopChange = pendingDevelopChange \|\| developChanged/pendingDevelopChange = developChanged/' \
-  "DevelopInspectorTests"
-# ...and the flag describes the image being left, so it must not survive onto whatever opens next.
-# **This one SURVIVED on the first run** — a real gap, not an equivalence: nothing checked that
-# `load()` clears the flag, so a debounced develop edit cancelled by the next open leaked its
-# pending baseline render onto the following image. Closed by
-# `DevelopInspectorTests.testAPendingDevelopFlagDoesNotSurviveOpeningAnotherImage`, written for this
-# mutation rather than deleting it.
-mutate "AppViewModel: a pending develop flag survives onto the next image" "$VM" \
-  's/^        pendingDevelopChange = false\n//m' \
-  "DevelopInspectorTests"
+mutate "RenderEngine: a cancelled preview request is rendered anyway" "$RE" \
+  's/        guard !Task\.isCancelled else \{ return nil \}\n        guard let image = buildImage/        guard let image = buildImage/' \
+  "RenderEngineTests"
+mutate "RenderEngine: a cancelled histogram request is tallied anyway" "$RE" \
+  's/        guard !Task\.isCancelled else \{ return nil \}\n        guard maxDimension > 0/        guard maxDimension > 0/' \
+  "RenderEngineTests"
 
 echo "=== the histogram belongs to the Info tab ==="
 mutate "AppViewModel: tally a histogram for the Develop tab too" "$VM" \
@@ -286,14 +298,6 @@ mutate "AppViewModel: tally a histogram for the Develop tab too" "$VM" \
   "DevelopInspectorTests"
 mutate "AppViewModel: returning to Info never recomputes" "$VM" \
   's/        didSet \{ if inspectorTab == \.info \{ updateHistogram\(\) \} \}/        didSet { }/' \
-  "DevelopInspectorTests"
-
-echo "=== the toggle immediate-write path ==="
-mutate "AppViewModel+Develop: toggles pick up the 60 ms slider debounce" "$VMD" \
-  's/self\.updateDocument\(debounced: !control\.isToggle\)/self.updateDocument(debounced: true)/' \
-  "DevelopInspectorTests"
-mutate "AppViewModel+Develop: the debounce decision is inverted" "$VMD" \
-  's/self\.updateDocument\(debounced: !control\.isToggle\)/self.updateDocument(debounced: control.isToggle)/' \
   "DevelopInspectorTests"
 
 echo "=== nil semantics ==="

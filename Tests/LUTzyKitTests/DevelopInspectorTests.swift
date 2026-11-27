@@ -199,10 +199,12 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
         XCTAssertEqual(viewModel.developPanelState, .ready(caps))
     }
 
-    // MARK: - Debounce
+    // MARK: - Coalescing
 
     /// A slider drag is many ticks. Rendering each one would be two full renders per tick, because
-    /// a develop change also re-rasterizes the side-by-side baseline.
+    /// a develop change also re-rasterizes the side-by-side baseline. Twenty ticks in one main-actor
+    /// turn — the tightest a drag can be — must collapse, because the render loop reads the request
+    /// when it starts rather than when it is scheduled.
     func testADragIssuesFarFewerRendersThanTicks() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
@@ -212,21 +214,21 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
 
         // Twenty ticks in quick succession, as a drag produces.
         for step in 1...20 {
-            viewModel.updateDocument(debounced: true) {
+            viewModel.updateDocument {
                 $0.rawDevelop.exposure = Double(step) / 20.0
             }
         }
-        // Let the debounce settle and the final render land.
+        // Let the final render land.
         try await waitUntil("the settled render") {
             await fake.previewRequests.contains { $0.document.rawDevelop.exposure == 1.0 }
         }
 
         let issued = await fake.previewRequests.count - atRest
-        XCTAssertLessThan(issued, 10, "20 ticks issued \(issued) renders — the debounce is not working")
+        XCTAssertLessThan(issued, 10, "20 ticks issued \(issued) renders — the render loop is not coalescing")
         XCTAssertGreaterThan(issued, 0)
     }
 
-    /// ...and the value the user let go on is the one that gets rendered. A debounce that dropped
+    /// ...and the value the user let go on is the one that gets rendered. A coalescer that dropped
     /// the *last* event would leave the screen showing a value the slider is not on.
     func testTheFinalValueOfADragIsTheOneRendered() async throws {
         let fake = FakeRenderEngine()
@@ -235,69 +237,64 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
         try await waitUntil("the opening render") { await !fake.previewRequests.isEmpty }
 
         for step in 1...10 {
-            viewModel.updateDocument(debounced: true) { $0.rawDevelop.exposure = Double(step) }
+            viewModel.updateDocument { $0.rawDevelop.exposure = Double(step) }
         }
 
         try await waitUntil("the final value to render") {
             await fake.previewRequests.contains { $0.document.rawDevelop.exposure == 10.0 }
         }
         XCTAssertEqual(viewModel.document.rawDevelop.exposure, 10.0,
-                       "the document must hold the released value immediately, debounce or not")
+                       "the document must hold the released value immediately")
     }
 
-    /// Discrete controls stay immediate — a checkbox that lagged 60 ms would feel broken.
+    /// **An edit renders without waiting** — the defect this replaced. The old path parked every
+    /// slider tick behind a 60 ms trailing timer that the next tick restarted, so a drag that never
+    /// paused never rendered; the preview froze until the pointer stopped.
     ///
-    /// The discriminator here is **sequence, not elapsed time**. Waiting up to some deadline (the
-    /// previous version of this test waited up to 1 s against a 60 ms debounce) would pass even if
-    /// the immediate path were secretly rerouted through the debounce, since 1 s comfortably outlasts
-    /// 60 ms either way. Instead: issue a debounced edit with one value, then immediately (no
-    /// `await` in between) an undebounced edit with a *different* value, then spin on `Task.yield()`
-    /// — scheduling turns, not wall-clock time — until the undebounced value's render shows up.
-    /// Hundreds of yields still complete in a tiny fraction of 60 ms on any real scheduler, so this
-    /// only succeeds if the undebounced edit truly skipped the debounce; if it were routed through
-    /// the same 60 ms sleep, the loop exhausts and the render is never seen. At that moment, the
-    /// debounced edit's own value must not have rendered on its own either — that would mean its
-    /// timer fired (or was never cancelled) independently of the undebounced edit, which should
-    /// never happen since every call — debounced or not — cancels the prior develop task.
-    func testAnUndebouncedEditRendersWithoutWaiting() async throws {
+    /// The discriminator is **sequence, not elapsed time**: spin on `Task.yield()` — scheduling
+    /// turns, not wall-clock — and require the render to appear. Hundreds of yields complete in a
+    /// tiny fraction of any plausible debounce, so this fails if a timer of any length is put back
+    /// in front of the render, where a deadline-based wait would pass either way.
+    ///
+    /// The second edit, with no suspension in between, pins the other half of the contract: the
+    /// request is read when the render *starts*, so the first edit's value never renders on its own.
+    func testAnEditRendersWithoutWaiting() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
         try await openStandardImage(viewModel)
         try await waitUntil("the opening render") { await !fake.previewRequests.isEmpty }
 
-        // Debounced first — on its own this renders only ~60 ms from now.
-        viewModel.updateDocument(debounced: true) { $0.rawDevelop.exposure = 0.42 }
-        // Immediately after, with no suspension in between: an undebounced edit, distinct value.
+        viewModel.updateDocument { $0.rawDevelop.exposure = 0.42 }
         viewModel.updateDocument { $0.rawDevelop.gamutMappingEnabled = false }
 
-        var sawUndebounced = false
+        var sawBoth = false
         for _ in 0..<1000 {
-            sawUndebounced = await fake.previewRequests.contains {
-                $0.document.rawDevelop.gamutMappingEnabled == false
+            sawBoth = await fake.previewRequests.contains {
+                $0.document.rawDevelop.exposure == 0.42 && $0.document.rawDevelop.gamutMappingEnabled == false
             }
-            if sawUndebounced { break }
+            if sawBoth { break }
             await Task.yield()
         }
-        XCTAssertTrue(sawUndebounced, "the undebounced edit must render without waiting for the debounce")
+        XCTAssertTrue(sawBoth, "the edits must render without waiting on a timer")
 
-        // The debounced edit's value must never have rendered by itself (i.e. before the undebounced
-        // edit's mutation had also landed) — it should have been pre-empted, not raced.
         let requestsSoFar = await fake.previewRequests
         XCTAssertFalse(
             requestsSoFar.contains {
                 $0.document.rawDevelop.exposure == 0.42 && $0.document.rawDevelop.gamutMappingEnabled != false
             },
-            "the debounced edit's own timer must not have fired independently"
+            "the first edit rendered on its own — the loop captured its request at schedule time, "
+            + "not when the render started"
         )
     }
 
     // MARK: - Coalesced bursts
 
-    /// **Finding 1 regression.** A coalesced burst shares one `developTask`; only the last call's
-    /// task survives to fire. Before the fix, `developChanged` was captured per call, so a burst
-    /// that changed `rawDevelop` first and something else (here, `adjustments`) last would fire with
-    /// the *last* call's `developChanged == false` — the comparison baseline would never re-render,
-    /// leaving the side-by-side panel showing stale, pre-edit pixels indefinitely.
+    /// **Finding 1 regression.** When edits were debounced, a burst shared one timer task and only
+    /// the last call's survived to fire; `developChanged` captured per call meant a burst that
+    /// changed `rawDevelop` first and something else (here, `adjustments`) last fired with
+    /// `developChanged == false`, and the comparison baseline never re-rendered. The debounce is
+    /// gone, but the shape of the bug is not: any scheme that decides "does the baseline move?" from
+    /// the last edit alone reintroduces it, so the burst stays pinned.
     func testAMixedBurstStillRendersTheComparisonBaseline() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
@@ -305,11 +302,10 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
         try await waitUntil("the opening render") { await !fake.previewRequests.isEmpty }
 
         // First call in the burst changes rawDevelop...
-        viewModel.updateDocument(debounced: true) { $0.rawDevelop.exposure = 0.8 }
-        // ...a second call within the debounce window changes only adjustments. No `await` in
-        // between, so both land before either's debounce timer has any chance to fire — exactly
-        // what a coalesced burst of slider ticks produces.
-        viewModel.updateDocument(debounced: true) { $0.adjustments = [.exposure(ev: 0.3)] }
+        viewModel.updateDocument { $0.rawDevelop.exposure = 0.8 }
+        // ...a second call in the same turn changes only adjustments. No `await` in between, so
+        // both land before either render starts — exactly what a burst of slider ticks produces.
+        viewModel.updateDocument { $0.adjustments = [.exposure(ev: 0.3)] }
 
         let expectedBaseline = viewModel.document.originalForComparison
 
@@ -318,27 +314,25 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
         }
     }
 
-    /// **A pending develop flag describes the image being left.** `load()` clears
-    /// `pendingDevelopChange` deliberately, and until now nothing checked that it did: a debounced
-    /// develop edit whose 60 ms timer is cancelled by the next image opening leaves the flag set,
-    /// and then the *first unrelated edit on the new image* re-rasterizes a comparison baseline for
-    /// develop settings that were never touched on it — a second full render on a file the user has
-    /// only just opened.
+    /// **A develop edit pending at an open describes the image being left.** Written against the
+    /// debounce, where `load()` had to clear a `pendingDevelopChange` flag or the *first unrelated
+    /// edit on the new image* re-rasterized a comparison baseline for develop settings never touched
+    /// on it. Found by `scripts/mutate-step10a.sh`: deleting that one line left every other test
+    /// green.
     ///
-    /// Found by `scripts/mutate-step10a.sh`: deleting that one line left every other test in this
-    /// file green. It is the harness's own worked example of a survivor being a gap rather than an
-    /// equivalence.
-    func testAPendingDevelopFlagDoesNotSurviveOpeningAnotherImage() async throws {
+    /// The flag is gone; the hazard is the same one in a new place. A develop edit schedules the
+    /// baseline's render loop, and opening another image in the same turn must cancel that loop —
+    /// `cancelPreviewRenders()` — rather than let it run, or be re-armed, against the new file.
+    func testADevelopEditPendingAtOpenDoesNotLeakOntoTheNextImage() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
         try await openStandardImage(viewModel)
         try await waitUntil("the opening render") { await !fake.previewRequests.isEmpty }
 
-        // A debounced develop edit on the first image: this sets the pending flag and arms the
-        // timer...
-        viewModel.updateDocument(debounced: true) { $0.rawDevelop.exposure = 0.7 }
-        // ...and opening another image immediately — no `await` in between, so the timer cannot have
-        // fired — cancels that task. The flag it left behind belongs to the image being closed.
+        // A develop edit on the first image schedules both render loops...
+        viewModel.updateDocument { $0.rawDevelop.exposure = 0.7 }
+        // ...and opening another image immediately — no `await` in between, so neither loop has
+        // started — cancels them. What they would have drawn belongs to the image being closed.
         let second = try Fixtures.writeGradientPNG(
             width: 20, height: 16, named: "second.png", in: tempDirectory
         )
@@ -353,7 +347,7 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
 
         // An edit on the new image that touches nothing in `rawDevelop`. The baseline only moves
         // with develop, so this must not re-rasterize it.
-        viewModel.updateDocument(debounced: true) { $0.adjustments = [.exposure(ev: 0.3)] }
+        viewModel.updateDocument { $0.adjustments = [.exposure(ev: 0.3)] }
         try await waitUntil("the edited render") {
             await fake.previewRequests.contains { !$0.document.adjustments.isEmpty }
         }
@@ -362,8 +356,8 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
         let baselinesAfter = await fake.previewRequests.filter { $0.document.adjustments.isEmpty }.count
         XCTAssertEqual(
             baselinesAfter, baselinesBefore,
-            "an edit that changed no develop setting re-rasterized the comparison baseline, so the "
-            + "pending develop flag from the previous image survived the open"
+            "an edit that changed no develop setting re-rasterized the comparison baseline, so a "
+            + "develop edit from the previous image survived the open"
         )
     }
 
@@ -633,27 +627,21 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
         }
     }
 
-    // MARK: - Toggles take the immediate path
+    // MARK: - Sliders and toggles share one path
 
-    /// `developBinding` passes `debounced: !control.isToggle`. Nothing exercised the `false` side of
-    /// that expression, so a regression to always-debounce — dropping the negation, or the whole
-    /// argument — would have gone green while every checkbox in the panel picked up a 60 ms lag.
+    /// `developBinding` used to pass `debounced: !control.isToggle`, and this test pinned the toggle
+    /// half. The split is gone — every write renders at once — so what is left to pin is that a
+    /// toggle written straight after a slider, through the same binding factory, renders **with**
+    /// the slider's value and never lets the slider's value render alone.
     ///
-    /// Same discriminator as `testAnUndebouncedEditRendersWithoutWaiting`: **sequence, not elapsed
-    /// time**. A slider write goes first with a distinct value, then, with no suspension in between,
-    /// a toggle write through the same binding. Spinning on `Task.yield()` — scheduling turns, not
-    /// wall-clock — hundreds of times still costs a tiny fraction of the 60 ms debounce, so the
-    /// toggle's render can only appear if it truly skipped the timer. If the toggle were routed
-    /// through the debounce, the loop exhausts and the render never shows.
-    func testWritingAToggleThroughTheBindingSkipsTheDebounce() async throws {
+    /// Same discriminator as `testAnEditRendersWithoutWaiting`: **sequence, not elapsed time**.
+    func testWritingAToggleThroughTheBindingRendersWithoutWaiting() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
         try await openStandardImage(viewModel)
         try await waitUntil("the opening render") { await !fake.previewRequests.isEmpty }
 
-        // A slider control first — this one *should* wait ~60 ms.
         viewModel.developBinding(for: .exposure).wrappedValue = 0.42
-        // ...and immediately a toggle, through the same binding factory.
         XCTAssertTrue(DevelopControl.gamutMapping.isToggle, "this test needs a toggle control")
         viewModel.developBinding(for: .gamutMapping).wrappedValue = 0
 
@@ -665,28 +653,23 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
             if sawToggle { break }
             await Task.yield()
         }
-        XCTAssertTrue(
-            sawToggle,
-            "a toggle written through developBinding must render immediately — developBinding is "
-            + "passing debounced: true for a Bool control"
-        )
+        XCTAssertTrue(sawToggle, "a toggle written through developBinding must render immediately")
 
         // The toggle's 0 must have become `false`, not 0.0 in some numeric field.
         XCTAssertEqual(viewModel.document.rawDevelop.gamutMappingEnabled, false)
-        // And the slider's debounced edit must not have fired on its own timer in the meantime.
         let soFar = await fake.previewRequests
         XCTAssertFalse(
             soFar.contains {
                 $0.document.rawDevelop.exposure == 0.42
                     && $0.document.rawDevelop.gamutMappingEnabled != false
             },
-            "the slider's debounce should have been pre-empted, not raced"
+            "the slider's value rendered on its own, before the toggle written in the same turn"
         )
     }
 
-    /// The mirror image: a *slider* written through the same binding must still be debounced, or the
-    /// test above could be satisfied by making everything immediate.
-    func testWritingASliderThroughTheBindingStillDebounces() async throws {
+    /// The mirror image: a *slider* drag through the same binding must still coalesce, or the test
+    /// above could be satisfied by a binding that renders every tick.
+    func testWritingASliderThroughTheBindingStillCoalesces() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
         try await openStandardImage(viewModel)
@@ -703,7 +686,7 @@ final class DevelopInspectorTests: TempDirectoryTestCase {
 
         let issued = await fake.previewRequests.count - atRest
         XCTAssertLessThan(issued, 10,
-                          "20 slider ticks issued \(issued) renders — developBinding stopped debouncing")
+                          "20 slider ticks issued \(issued) renders — developBinding stopped coalescing")
     }
 
     func testResettingAControlReturnsItToUnset() async throws {

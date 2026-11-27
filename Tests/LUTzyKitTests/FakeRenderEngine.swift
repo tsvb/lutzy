@@ -84,11 +84,14 @@ actor FakeRenderEngine: RenderEngining {
         lut: CubeLUT?,
         scale: RenderScale,
         space: WorkingSpace
-    ) -> sending CGImage? {
+    ) async -> sending CGImage? {
         previewRequests.append(Request(
             document: document, lutID: lut?.lutID, scale: scale, space: space, format: nil,
             source: source
         ))
+        if previewIsGated {
+            await withCheckedContinuation { parkedPreviews.append($0) }
+        }
         // Rebuilt per call rather than handing out the stored one: the result is `sending`, so it has
         // to be an image nothing else holds a reference to.
         return Self.solidImage()
@@ -147,6 +150,31 @@ actor FakeRenderEngine: RenderEngining {
     /// Distinctively seeded rather than `.everyGateOpen`: that value leaves every seed at its
     /// field default, so a getter reading a seed and a getter returning a hardcoded constant produce
     /// the same number and no test can tell them apart. See `RAWCapabilities.distinctivelySeeded`.
+    // MARK: - Holding a preview render in flight
+
+    /// Whether an incoming `makeCGImage` should park until `releasePreviews()`.
+    ///
+    /// `AppViewModel`'s render loops coalesce **edits made while a render is in flight**. Against an
+    /// ungated fake a render is never in flight long enough to edit during, so without this the
+    /// coalescing path could only be reached by racing the scheduler. Same shape as `gateProbe()`,
+    /// and recorded before parking for the same reason: a test that has seen the request count move
+    /// knows the continuation is already stored.
+    private var previewIsGated = false
+    private var parkedPreviews: [CheckedContinuation<Void, Never>] = []
+
+    func gatePreviews() { previewIsGated = true }
+
+    /// How many preview renders are parked right now.
+    var parkedPreviewCount: Int { parkedPreviews.count }
+
+    /// Let every parked preview render finish, and stop parking new ones.
+    func releasePreviews() {
+        previewIsGated = false
+        let parked = parkedPreviews
+        parkedPreviews = []
+        parked.forEach { $0.resume() }
+    }
+
     var stubbedCapabilities: RAWCapabilities? = .distinctivelySeeded
 
     /// Whether an incoming probe should park until `releaseProbe()` is called.

@@ -135,6 +135,15 @@ actor RenderEngine: RenderEngining {
         scale: RenderScale,
         space: WorkingSpace = .current
     ) -> sending CGImage? {
+        // A superseded request skips the GPU entirely. An actor hop is not a cancellation point, so
+        // a caller cancelled while queued behind another render still arrives here; without this
+        // check every LUT on a held ↓ — and every image on a held → — would be rasterized and
+        // thrown away, and the backlog grows faster than the actor drains it. Checked once, on
+        // entry: `createCGImage` itself cannot be interrupted, so there is no later point to poll.
+        //
+        // `encode` deliberately has no equivalent. Nothing cancels an export, and an export that
+        // silently produced nothing would be worse than one that finished late.
+        guard !Task.isCancelled else { return nil }
         guard let image = buildImage(source, document, lut, scale, space) else { return nil }
         let rect = image.extent.integral
         guard rect.isRasterizable else { return nil }
@@ -206,6 +215,9 @@ actor RenderEngine: RenderEngining {
         space: WorkingSpace = .current,
         maxDimension: Int = 512
     ) -> HistogramData? {
+        // Same reason as `makeCGImage`: a tally for a frame that has already been replaced is
+        // superseded work, and `histogramTask` is cancelled on every new request.
+        guard !Task.isCancelled else { return nil }
         guard maxDimension > 0, let image = buildImage(source, document, lut, scale, space) else {
             return nil
         }
