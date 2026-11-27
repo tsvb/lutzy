@@ -276,8 +276,9 @@ one of the ten repointed mutants is caught.
 Two earlier runs reported one SURVIVED and were both wrong, in the same way and for the same reason:
 other commands were running. `--check` and the sibling harness mutate tracked sources through the
 *same* `$file.bak` path, and a concurrent `swift build`/`swift test` contends for `.build`. Re-running
-the flagged mutation alone showed `testWritingAToggleThroughTheBindingSkipsTheDebounce` failing with a
-precise message both times. Both scripts now say to run them alone, and to treat a SURVIVED as a
+the flagged mutation alone showed `testWritingAToggleThroughTheBindingRendersWithoutWaiting` failing with
+a precise message both times. (It was named for skipping the debounce until the debounce was removed
+in 11/2026; the test survived the rename.) Both scripts now say to run them alone, and to treat a SURVIVED as a
 hypothesis to re-check by hand — **"N failures" is not evidence that the intended test failed**, which
 is the same reasoning error this review keeps finding in the repo's own record.
 
