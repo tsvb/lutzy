@@ -33,7 +33,7 @@ a baked image, which buys four things at once:
 | | |
 |---|---|
 | ✅ `LUTzyKit` library + thin `@main` executable, 95 XCTest cases, `swift test` in CI | Step 0 is **done** |
-| ✅ Preview rasterization and decode run off the main actor; intensity slider debounced | the "full filter graph on the main thread" bug is **fixed** |
+| ✅ Preview rasterization and decode run off the main actor; intensity slider coalesced (originally a 60 ms debounce; now a render loop, see §6) | the "full filter graph on the main thread" bug is **fixed** |
 | ✅ LUT intensity ships today — `lutIntensity`, `CubeLUT.apply(to:intensity:)`, toolbar slider | the original called this "NEW behavior… exists nowhere". It exists. |
 | ✅ EXIF orientation baked at load for every non-RAW decode | the original's "standard images have NO orientation baking" is stale |
 | ✅ `AppViewModel` split into `ExportCoordinator` + `DeriveCoordinator` | the `[processor]`-capture hazard it inherited is gone as of Step 7 |
@@ -298,8 +298,12 @@ leaf by leaf, delete the old path last.
 | 11 | Per-image undo keyed by `Item.id`, plus an `EditDocumentStore` | ⌘Z scoped per image |
 | 12 | *(deferred)* export descriptor, metadata/ICC | — |
 
-Debounce **continuous edits only**. Open and filmstrip navigation must render immediately, or stepping
-through a folder picks up latency for no reason.
+Never put a timer in front of a render. Open and filmstrip navigation must render immediately, or
+stepping through a folder picks up latency for no reason — and continuous edits must too. The 60 ms
+trailing debounce that once sat in front of slider renders was restarted by every tick, so a drag that
+never paused never rendered at all. Edits now go through render loops that are **leading edge, latest
+wins, at most one render in flight**: an edit renders at once when the engine is idle, and edits made
+mid-render collapse into one follow-up of the newest document (`AppViewModel.schedulePreview()`).
 
 ### The cutover's one real trap, measured at Step 5
 

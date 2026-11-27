@@ -66,6 +66,13 @@ file's convention. Graph assembly *and* rasterization now live inside `actor Ren
 boundary, and the main actor builds no filter graph at all — what keeps `createCGImage` off it is the
 actor hop, not the task type. The funnel and the 60 ms debounce are unchanged and still accurate.
 
+**The debounce is superseded too** (11/2026). It was a trailing timer restarted by every tick, so a
+drag that never paused for 60 ms never rendered — the preview froze for the whole drag. `schedulePreview`
+and `scheduleOriginalPreview` are now render loops: leading edge, latest wins, at most one render in
+flight, so the preview tracks the pointer as fast as the engine can draw. The funnel is unchanged.
+`RenderEngine.makeCGImage` and `histogram` also check for cancellation on entry now; before, a request
+cancelled while queued behind another still rendered in full, once per LUT on a held ↓.
+
 ### B3 — Launch blocked on disk I/O · Medium · [fixed]
 
 `LUTLibrary.scan` parsed every `.cube` synchronously on the main actor — a 33³ LUT is ~36k lines of text
@@ -269,8 +276,9 @@ one of the ten repointed mutants is caught.
 Two earlier runs reported one SURVIVED and were both wrong, in the same way and for the same reason:
 other commands were running. `--check` and the sibling harness mutate tracked sources through the
 *same* `$file.bak` path, and a concurrent `swift build`/`swift test` contends for `.build`. Re-running
-the flagged mutation alone showed `testWritingAToggleThroughTheBindingSkipsTheDebounce` failing with a
-precise message both times. Both scripts now say to run them alone, and to treat a SURVIVED as a
+the flagged mutation alone showed `testWritingAToggleThroughTheBindingRendersWithoutWaiting` failing with
+a precise message both times. (It was named for skipping the debounce until the debounce was removed
+in 11/2026; the test survived the rename.) Both scripts now say to run them alone, and to treat a SURVIVED as a
 hypothesis to re-check by hand — **"N failures" is not evidence that the intended test failed**, which
 is the same reasoning error this review keeps finding in the repo's own record.
 

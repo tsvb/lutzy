@@ -113,21 +113,9 @@ final class AppViewModel {
     }
 
     @ObservationIgnored private var capabilitiesTask: Task<Void, Never>?
-    @ObservationIgnored private var developTask: Task<Void, Never>?
 
     /// Held so a superseded EXIF read can be cancelled before it publishes. See `refreshMetadata`.
     @ObservationIgnored private var metadataTask: Task<Void, Never>?
-
-    /// Whether any call since the last fired render changed `rawDevelop`.
-    ///
-    /// A coalesced burst of `updateDocument(debounced:)` calls shares one `developTask` — only the
-    /// last call in the burst survives to fire. If that flag were captured per call (as it was
-    /// before this existed), an earlier call in the burst that touched `rawDevelop` would have its
-    /// `developChanged == true` thrown away the moment a later call in the same burst cancelled its
-    /// task, even though the comparison baseline genuinely needs to move. Accumulating the flag here
-    /// instead — OR'd in by every call, read and cleared by whichever call actually fires the render —
-    /// means the baseline re-renders if *any* call in the burst touched develop, not just the last.
-    @ObservationIgnored private var pendingDevelopChange = false
 
     /// LUTs a document can reference that no folder scan produces — a freshly derived LUT, and the
     /// file it becomes once saved. See `DerivedLUTRegistry`; this is the Step 9 replacement for the
@@ -280,9 +268,15 @@ final class AppViewModel {
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     /// Redeeming the file promises of a Photos drop. Superseded by the next drop.
     @ObservationIgnored private var dropTask: Task<Void, Never>?
+
+    /// The graded preview's render loop, while one is running. See `schedulePreview`.
     @ObservationIgnored private var previewTask: Task<Void, Never>?
+    /// Bumped by every `schedulePreview()`. The loop renders until the generation it drew is the
+    /// current one, which is how an edit made mid-render gets drawn without queueing a render per edit.
+    @ObservationIgnored private var previewGeneration = 0
+    /// The comparison baseline's loop, and its generation — the same mechanism, for the other panel.
     @ObservationIgnored private var originalPreviewTask: Task<Void, Never>?
-    @ObservationIgnored private var intensityTask: Task<Void, Never>?
+    @ObservationIgnored private var originalPreviewGeneration = 0
 
     // MARK: - Init
 
@@ -405,10 +399,7 @@ final class AppViewModel {
     /// doing it inline would freeze the window on every ←/→ step.
     private func load(name: String, url: URL?, data: Data?) {
         loadTask?.cancel()
-        previewTask?.cancel()
-        originalPreviewTask?.cancel()
-        intensityTask?.cancel()
-        developTask?.cancel()
+        cancelPreviewRenders()
         // **`capabilitiesTask` is deliberately NOT cancelled here** — see B15 in `docs/CODE_REVIEW.md`.
         //
         // It used to be, and that was a stuck state: this line runs before the decode, so it fired
@@ -431,10 +422,6 @@ final class AppViewModel {
         // `LoadCancellationTests` reaches a `capabilityProbeCount` of 2 on purpose.
         //
         // `refreshMetadata` takes the same shape for the same reason.
-        // A pending develop flag describes the image being left; it must not survive onto whatever
-        // opens next, or an unrelated first edit on the new image would render a comparison baseline
-        // for develop settings that were never actually touched on it.
-        pendingDevelopChange = false
 
         isLoading = true
         statusMessage = "Loading \(name)..."
@@ -661,58 +648,32 @@ final class AppViewModel {
 
     /// Mutate the document and re-render.
     ///
-    /// The only way to reach `rawDevelop` and `adjustments` today. The inspector that will drive them
-    /// from the UI is Step 10; until it exists this is the seam those fields are tested through, and
-    /// it is what the inspector will call. Keeping `document` `private(set)` behind it means every
-    /// mutation goes through one place that knows to re-render.
+    /// The only way to reach `rawDevelop` and `adjustments`. Keeping `document` `private(set)` behind
+    /// it means every mutation goes through one place that knows to re-render.
+    ///
+    /// **Every caller gets the same path: sliders, toggles and resets alike.** This used to take a
+    /// `debounced:` flag that parked slider renders behind a 60 ms trailing timer, and that timer was
+    /// restarted by every tick — so a drag that never paused for 60 ms never rendered at all, and the
+    /// preview only caught up once the pointer stopped. The render loops behind `schedulePreview()`
+    /// and `scheduleOriginalPreview()` do the coalescing instead: an edit renders at once when the
+    /// engine is idle, and edits made while a render is in flight collapse into one follow-up render
+    /// of the latest document. That paces a drag to what the engine can actually draw, so a cheap
+    /// render tracks the pointer and an expensive one still never builds a queue.
+    ///
+    /// The document is updated **immediately**; only the pixels can lag, and only by one render.
+    ///
+    /// A develop change costs *two* renders — the comparison baseline keeps `rawDevelop` (§8.5), so
+    /// it moves too — while an adjustment or LUT change moves only the graded side.
     func updateDocument(_ transform: (inout EditDocument) -> Void) {
-        updateDocument(debounced: false, transform)
-    }
-
-    /// Mutate the document and re-render, optionally coalescing a burst of edits into one render.
-    ///
-    /// **`debounced: true` is for continuous controls only** — a slider drag, where the user
-    /// produces tens of values per second and only the one they settle on matters. `PHASE2_SPEC.md`
-    /// §6 is explicit that open and filmstrip navigation must stay immediate, and discrete controls
-    /// (toggles, resets) should too: a checkbox that lagged 60 ms would feel broken.
-    ///
-    /// The document itself is updated **immediately** either way. Only the render is deferred, so
-    /// the control stays glued to the pointer and `document` is always the truth. Deferring the
-    /// document as well would mean a read-back mid-drag saw a stale value.
-    ///
-    /// Worth the machinery because a develop change costs *two* renders — `scheduleOriginalPreview`
-    /// as well as `schedulePreview`, since the comparison baseline moves with develop.
-    func updateDocument(debounced: Bool, _ transform: (inout EditDocument) -> Void) {
         var updated = document
         transform(&updated)
         guard updated != document else { return }
 
         let developChanged = updated.rawDevelop != document.rawDevelop
         document = updated
-        // OR'd in rather than assigned: a call earlier in a coalesced burst may have changed
-        // `rawDevelop` even though *this* call didn't, and only the last call's task survives to
-        // fire (see `pendingDevelopChange`'s doc comment).
-        pendingDevelopChange = pendingDevelopChange || developChanged
 
-        developTask?.cancel()
-
-        guard debounced else {
-            let shouldRenderBaseline = pendingDevelopChange
-            pendingDevelopChange = false
-            if shouldRenderBaseline { scheduleOriginalPreview() }
-            schedulePreview()
-            return
-        }
-
-        developTask = Task {
-            try? await Task.sleep(for: .milliseconds(Self.intensityDebounceMs))
-            guard !Task.isCancelled else { return }
-            if self.pendingDevelopChange {
-                self.pendingDevelopChange = false
-                self.scheduleOriginalPreview()
-            }
-            self.schedulePreview()
-        }
+        if developChanged { scheduleOriginalPreview() }
+        schedulePreview()
     }
 
     /// Resolve a document's LUT reference: the registry first, then the library. A miss returns
@@ -751,27 +712,19 @@ final class AppViewModel {
         schedulePreview()
     }
 
-    /// Set the LUT strength (0...1) and re-render the preview. Safe to call on
-    /// every slider tick: the re-render is debounced and the previous one is
-    /// cancelled, so a full-travel drag costs a handful of renders, not one per
-    /// pixel of travel.
+    /// Set the LUT strength (0...1) and re-render the preview. Safe to call on every slider tick:
+    /// `schedulePreview()` coalesces ticks that land while a render is in flight, so a full-travel
+    /// drag costs as many renders as the engine can finish in that time, not one per tick.
     func setLUTIntensity(_ value: Double) {
         let clamped = max(0, min(1, value))
         guard clamped != document.lut.intensity else { return }
         document.lut.intensity = clamped
-
-        intensityTask?.cancel()
-        intensityTask = Task {
-            try? await Task.sleep(for: .milliseconds(Self.intensityDebounceMs))
-            guard !Task.isCancelled else { return }
-            self.schedulePreview()
-        }
+        schedulePreview()
     }
 
     // MARK: - Preview
 
     private let maxPreview = CGSize(width: 1600, height: 1200)
-    private static let intensityDebounceMs = 60
 
     /// What the main preview panel should currently show, as a render request.
     ///
@@ -796,69 +749,125 @@ final class AppViewModel {
     /// Nothing here touches `CIImage` any more — only `Sendable` values cross to the engine and a
     /// `CGImage` comes back, which is wrapped for AppKit on this actor.
     ///
-    /// Any in-flight render is cancelled first, so a slider drag drops stale work rather than
-    /// queueing one full render per tick.
+    /// **Leading edge, latest wins, at most one render in flight.** If no loop is running this
+    /// starts one, and its first render goes straight to the engine — no timer. If a loop *is*
+    /// running, this only bumps `previewGeneration`; when the in-flight render lands it is
+    /// published, and the loop goes round again for the newest request. Ten ticks during one render
+    /// therefore cost one follow-up render, not ten queued ones, and the user sees every frame the
+    /// engine can draw rather than nothing until they let go.
     ///
-    /// **The mechanism is the 60 ms debounce upstream, not this cancel.** `setLUTIntensity` and the
-    /// develop path cancel a task parked in `Task.sleep`, which is a real cancellation point, so a
-    /// superseded render never starts. Cancelling `previewTask` itself skips the publish and the
-    /// follow-on histogram render — but `RenderEngine.makeCGImage` polls no cancellation flag and an
-    /// actor hop is not a cancellation point, so a render already handed to the engine runs to
-    /// completion and has its result discarded rather than its work stopped.
+    /// The request is read when the loop **starts each render**, not when this is called. A burst of
+    /// edits in one main-actor turn — a reset following two slider writes, a toggle following a
+    /// slider — therefore renders once, with all of them applied, and never a partial state.
+    ///
+    /// The previous version cancelled the in-flight task on every call. That dropped the result but
+    /// not the work — an actor hop is not a cancellation point — and so a held ↓ queued one full
+    /// render per LUT. Only `cancelPreviewRenders()` cancels now, when a different image opens, and
+    /// `RenderEngine.makeCGImage` checks the flag on entry so a cancelled request skips the GPU.
     private func schedulePreview() {
-        previewTask?.cancel()
+        previewGeneration &+= 1
 
-        guard let imageSource else {
+        guard imageSource != nil else {
+            previewTask?.cancel()
+            previewTask = nil
             previewNSImage = nil
             return
         }
+        // A running loop re-reads the request before its next render; it does not need a new task.
+        guard previewTask == nil else { return }
+        previewTask = Task { await self.runPreviewRenders() }
+    }
 
-        let (requested, lut) = displayRequest
-        let box = maxPreview
-
-        previewTask = Task { [engine] in
+    /// The loop behind `schedulePreview()`. Publishes every frame it draws, and goes round again
+    /// while a newer request arrived during the render.
+    ///
+    /// **The histogram is tallied once, when the loop settles**, not per frame. It is a second render
+    /// on the same actor, so tallying mid-drag would put one between every pair of preview frames and
+    /// halve the frame rate of the thing the user is actually watching.
+    private func runPreviewRenders() async {
+        while let imageSource = self.imageSource {
+            // A loop cancelled before it ever ran — an edit then an open in one turn — must not issue
+            // even one request: by now `imageSource` may already be the *next* image's.
+            if Task.isCancelled { return }
+            let generation = previewGeneration
+            let (requested, lut) = displayRequest
             let cgImage = await engine.makeCGImage(
                 source: imageSource, document: requested, lut: lut,
-                scale: .preview(maxSize: box), space: .current
+                scale: .preview(maxSize: maxPreview), space: .current
             )
+            // Cancelled means a different image opened. `cancelPreviewRenders()` has already cleared
+            // `previewTask`, and a replacement loop may own it now, so touch nothing on the way out.
             guard !Task.isCancelled else { return }
-            guard let cgImage else {
+
+            if let cgImage {
+                previewNSImage = NSImage(
+                    cgImage: cgImage,
+                    size: NSSize(width: cgImage.width, height: cgImage.height)
+                )
+            } else {
                 // Not per-LUT validation — a bad cube is caught and reported at parse time (§7).
                 // This is the render itself failing, which means the source stopped being readable.
-                self.statusMessage = "Could not render \(self.sourceName)"
-                return
+                statusMessage = "Could not render \(sourceName)"
             }
-            self.previewNSImage = NSImage(
-                cgImage: cgImage,
-                size: NSSize(width: cgImage.width, height: cgImage.height)
-            )
-            self.updateHistogram()
+
+            if generation == previewGeneration { break }
         }
+        previewTask = nil
+        updateHistogram()
     }
 
     /// Rasterize the comparison baseline for the side-by-side left panel. Only needs to re-run when
     /// the image or the develop settings change — not when the look does.
+    ///
+    /// The same leading-edge, latest-wins loop as `schedulePreview()`, on its own generation counter:
+    /// a develop drag moves both panels, and each must coalesce on its own.
     private func scheduleOriginalPreview() {
-        originalPreviewTask?.cancel()
+        originalPreviewGeneration &+= 1
 
-        guard let imageSource else {
+        guard imageSource != nil else {
+            originalPreviewTask?.cancel()
+            originalPreviewTask = nil
             originalPreviewNSImage = nil
             return
         }
-        let baseline = document.originalForComparison
-        let box = maxPreview
+        guard originalPreviewTask == nil else { return }
+        originalPreviewTask = Task { await self.runOriginalPreviewRenders() }
+    }
 
-        originalPreviewTask = Task { [engine] in
+    private func runOriginalPreviewRenders() async {
+        while let imageSource = self.imageSource {
+            if Task.isCancelled { return }
+            let generation = originalPreviewGeneration
+            let baseline = document.originalForComparison
             let cgImage = await engine.makeCGImage(
                 source: imageSource, document: baseline, lut: nil,
-                scale: .preview(maxSize: box), space: .current
+                scale: .preview(maxSize: maxPreview), space: .current
             )
-            guard !Task.isCancelled, let cgImage else { return }
-            self.originalPreviewNSImage = NSImage(
-                cgImage: cgImage,
-                size: NSSize(width: cgImage.width, height: cgImage.height)
-            )
+            guard !Task.isCancelled else { return }
+
+            if let cgImage {
+                originalPreviewNSImage = NSImage(
+                    cgImage: cgImage,
+                    size: NSSize(width: cgImage.width, height: cgImage.height)
+                )
+            }
+
+            if generation == originalPreviewGeneration { break }
         }
+        originalPreviewTask = nil
+    }
+
+    /// Stop both render loops. Called when a different image opens: anything they would still draw
+    /// belongs to the image being left.
+    ///
+    /// Nil-ing the handles here, not in the loops, is what lets the replacement loops start at once —
+    /// the cancelled ones may still be parked on the engine, and on waking they return without
+    /// touching any state.
+    private func cancelPreviewRenders() {
+        previewTask?.cancel()
+        previewTask = nil
+        originalPreviewTask?.cancel()
+        originalPreviewTask = nil
     }
 
     /// Toggle between original and LUT preview (for Space-hold comparison).

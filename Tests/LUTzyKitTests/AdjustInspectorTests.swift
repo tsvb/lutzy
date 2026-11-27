@@ -65,19 +65,18 @@ final class AdjustInspectorTests: TempDirectoryTestCase {
         viewModel.adjustmentBinding(for: .exposure).wrappedValue = 1.5
 
         XCTAssertEqual(viewModel.document.adjustments, [.exposure(ev: 1.5)],
-                       "the document updates immediately, even though the render is debounced")
+                       "the document updates immediately")
 
         try await waitUntil("the adjusted render") {
             await fake.previewRequests.contains { $0.document.adjustments == [.exposure(ev: 1.5)] }
         }
     }
 
-    /// Nothing asserted that adjustment sliders actually debounce. `adjustmentBinding(for:)` passes
-    /// `debounced: true`, and a regression to `debounced: false` would mean one full render per
-    /// slider tick on a 60 MP RAW — shipping silently, because
-    /// `testAnAdjustmentEditRendersThroughTheEngine` makes a single edit and passes either way.
-    /// Follows `DevelopInspectorTests.testWritingASliderThroughTheBindingStillDebounces`.
-    func testWritingAnAdjustmentSliderThroughTheBindingStillDebounces() async throws {
+    /// A drag through `adjustmentBinding(for:)` must coalesce, or one full render per slider tick
+    /// on a 60 MP RAW ships silently — `testAnAdjustmentEditRendersThroughTheEngine` makes a single
+    /// edit and passes either way. Follows
+    /// `DevelopInspectorTests.testWritingASliderThroughTheBindingStillCoalesces`.
+    func testWritingAnAdjustmentSliderThroughTheBindingStillCoalesces() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
         try await openStandardImage(viewModel)
@@ -94,29 +93,24 @@ final class AdjustInspectorTests: TempDirectoryTestCase {
         let issued = await fake.previewRequests.count - atRest
         XCTAssertLessThan(issued, 10,
                           "20 slider ticks issued \(issued) renders — adjustmentBinding stopped "
-                          + "debouncing")
+                          + "coalescing")
     }
 
-    /// Resets are undebounced, per `updateDocument(debounced:)`'s contract — a button that lagged
-    /// 60 ms would feel broken. Follows
-    /// `DevelopInspectorTests.testWritingAToggleThroughTheBindingSkipsTheDebounce`: **sequence, not
-    /// elapsed time**, is the discriminator. Two debounced writes land on the same node first — both
-    /// through `adjustmentBinding`, which always debounces here, there being no toggles in this panel
-    /// — and then, with no suspension in between, the undebounced reset, so
-    /// `updateDocument(debounced:)`'s `developTask?.cancel()` is what has to pre-empt the pending
-    /// debounce task rather than merely outrunning it. Spinning on `Task.yield()` rather than
-    /// sleeping keeps the loop's own cost a tiny fraction of the 60 ms debounce, so the reset's render
-    /// can only appear this fast if it truly took the immediate path.
+    /// A reset straight after two slider writes, in the same turn, renders once with all three
+    /// applied — never the pre-reset state. **Sequence, not elapsed time**, is the discriminator, as
+    /// in `DevelopInspectorTests.testAnEditRendersWithoutWaiting`: spinning on `Task.yield()` keeps
+    /// the loop's own cost far below any timer, so the reset's render can only appear this fast if
+    /// nothing is waiting in front of it.
     func testResettingOneControlPreservesTheOthers() async throws {
         let fake = FakeRenderEngine()
         let viewModel = AppViewModel(engine: fake)
         try await openStandardImage(viewModel)
         try await waitUntil("the opening render") { await !fake.previewRequests.isEmpty }
 
-        // Two debounced writes to the same node — this pair *should* wait ~60 ms.
+        // Two slider writes to the same node...
         viewModel.adjustmentBinding(for: .contrast).wrappedValue = 1.4
         viewModel.adjustmentBinding(for: .saturation).wrappedValue = 0.5
-        // ...and immediately, with no suspension in between, the undebounced reset.
+        // ...and immediately, with no suspension in between, the reset.
         viewModel.resetAdjustment(.contrast)
 
         XCTAssertEqual(viewModel.adjustmentValue(for: .contrast),
@@ -131,12 +125,11 @@ final class AdjustInspectorTests: TempDirectoryTestCase {
             await Task.yield()
         }
         XCTAssertTrue(sawReset,
-                      "resetAdjustment must render immediately — a reset routed through the debounce "
-                      + "would not have landed within this tight a loop")
+                      "resetAdjustment must render immediately — a reset behind a timer would not have "
+                      + "landed within this tight a loop")
 
         // And the pre-reset writes' own render — contrast still at 1.4 — must never have landed: it
-        // can only appear if the debounced task outraced the reset's cancellation instead of being
-        // pre-empted by it.
+        // can only appear if the render loop captured its request before the reset was applied.
         let soFar = await fake.previewRequests
         XCTAssertFalse(
             soFar.contains { request in
@@ -146,7 +139,7 @@ final class AdjustInspectorTests: TempDirectoryTestCase {
                 }
                 return contrast == 1.4 && saturation == 0.5
             },
-            "the debounced writes' own render should have been pre-empted by the reset, not raced"
+            "the pre-reset state rendered on its own; the loop read its request too early"
         )
     }
 
@@ -222,8 +215,8 @@ extension AdjustInspectorTests {
     ///
     /// `EditDocument.originalForComparison` keeps `rawDevelop` and strips `adjustments` (§8.5), so
     /// the comparison baseline moves when develop moves and stays put when an adjustment moves.
-    /// That falls out of `pendingDevelopChange` never being set here, which is to say it works by
-    /// accident of the current code — hence this test. Without it, a later edit that started
+    /// That falls out of `updateDocument` scheduling the baseline only when `rawDevelop` moved —
+    /// hence this test. Without it, a later edit that started
     /// scheduling the baseline unconditionally would double every slider tick's cost silently.
     func testAnAdjustmentEditDoesNotReRenderTheComparisonBaseline() async throws {
         let fake = FakeRenderEngine()
@@ -253,7 +246,7 @@ extension AdjustInspectorTests {
     /// The count alone is not enough — a regression that called `schedulePreview()` twice and never
     /// `scheduleOriginalPreview()` would also produce a delta of 2 and pass. So, following the pattern
     /// `DevelopInspectorTests.testAMixedBurstStillRendersTheComparisonBaseline` and
-    /// `testAPendingDevelopFlagDoesNotSurviveOpeningAnotherImage` already use, this also confirms
+    /// `testADevelopEditPendingAtOpenDoesNotLeakOntoTheNextImage` already use, this also confirms
     /// *which* two renders landed: one of them must be the baseline itself, a request whose document
     /// equals `originalForComparison` and which carries no LUT — and the other must be the graded
     /// document, distinct in value from the baseline.

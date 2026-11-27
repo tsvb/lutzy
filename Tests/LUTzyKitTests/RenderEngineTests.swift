@@ -37,6 +37,47 @@ final class RenderEngineTests: TempDirectoryTestCase {
         return try XCTUnwrap(image)
     }
 
+    // MARK: - Cancellation
+
+    /// **A cancelled request skips the GPU.** An actor hop is not a cancellation point, so a caller
+    /// cancelled while queued behind another render still reaches the engine — and before this check
+    /// it was rasterized in full and thrown away, once per LUT on a held ↓ and once per image on a
+    /// held →. The task cancels itself before calling, so the outcome is decided, not raced.
+    ///
+    /// The control half matters as much: an engine that returned `nil` for everything would satisfy
+    /// the first two assertions.
+    func testACancelledRequestSkipsTheRender() async throws {
+        let engine = RenderEngine()
+        let source: ImageSource = self.source
+
+        let previewSkipped = await Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            let image = await engine.makeCGImage(
+                source: source, document: EditDocument(), lut: nil, scale: .full, space: .current
+            )
+            return image == nil
+        }.value
+        XCTAssertTrue(previewSkipped, "a cancelled preview request was rendered anyway")
+
+        let histogramSkipped = await Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            let tally = await engine.histogram(
+                source: source, document: EditDocument(), lut: nil, scale: .full, space: .current,
+                maxDimension: 64
+            )
+            return tally == nil
+        }.value
+        XCTAssertTrue(histogramSkipped, "a cancelled histogram request was tallied anyway")
+
+        // Control: the same requests, uncancelled, still produce something.
+        _ = try await render(engine, EditDocument())
+        let tally = await engine.histogram(
+            source: source, document: EditDocument(), lut: nil, scale: .full, space: .current,
+            maxDimension: 64
+        )
+        XCTAssertNotNil(tally, "the uncancelled histogram must still tally")
+    }
+
     // MARK: - Parity
 
     /// The whole point of Phase 2, asserted directly: the same document rendered for display and

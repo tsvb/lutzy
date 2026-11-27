@@ -21,16 +21,16 @@ extension AppViewModel {
     /// from `rawCapabilities` — and only the setter stores anything. Seeding every field when the
     /// panel opened would silently make every document non-neutral.
     ///
-    /// **Writes for a toggle control are immediate, not debounced.** `updateDocument(debounced:)`'s
-    /// own doc comment is explicit that debouncing is for continuous controls only — "a checkbox that
-    /// lagged 60 ms would feel broken" — and this binding backs both sliders and the three Bool
-    /// controls (`lensCorrection`, `gamutMapping`, `highlightRecovery`), routed through `Toggle` in
-    /// the view. Only sliders get the 60 ms coalescing.
+    /// **Sliders and toggles take the same path.** This binding backs both the sliders and the three
+    /// Bool controls (`lensCorrection`, `gamutMapping`, `highlightRecovery`, routed through `Toggle`
+    /// in the view). It used to debounce the sliders by 60 ms and exempt the toggles; `updateDocument`
+    /// now renders every edit at once and coalesces only what lands mid-render, so there is no longer
+    /// a slow path for a toggle to be kept off.
     func developBinding(for control: DevelopControl) -> Binding<Double> {
         Binding(
             get: { self.developValue(for: control) },
             set: { newValue in
-                self.updateDocument(debounced: !control.isToggle) { document in
+                self.updateDocument { document in
                     Self.setDevelop(control, to: newValue, in: &document.rawDevelop)
                 }
             }
@@ -123,7 +123,7 @@ extension AppViewModel {
         Binding(
             get: { self.document.rawDevelop.neutralTint ?? self.rawCapabilities?.asShotTint ?? 0 },
             set: { newValue in
-                self.updateDocument(debounced: true) { $0.rawDevelop.neutralTint = newValue }
+                self.updateDocument { $0.rawDevelop.neutralTint = newValue }
             }
         )
     }
